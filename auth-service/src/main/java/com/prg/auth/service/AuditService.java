@@ -12,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -63,9 +65,9 @@ public class AuditService {
     public PageResponse<AuditLogResponse> getAuditLogs(UUID tenantId, UUID userId, String action,
                                                         String resourceType, Instant fromTs, Instant toTs,
                                                         int page, int size) {
-        PageRequest pageRequest = PageRequest.of(page, Math.min(size, 200));
-        Page<AuditLog> auditPage = auditLogRepository.findByTenantIdWithFilters(
-                tenantId, userId, action, resourceType, fromTs, toTs, pageRequest);
+        PageRequest pageRequest = PageRequest.of(page, Math.min(size, 200), Sort.by(Sort.Direction.DESC, "createdTs"));
+        Specification<AuditLog> spec = buildAuditLogSpecification(tenantId, userId, action, resourceType, fromTs, toTs);
+        Page<AuditLog> auditPage = auditLogRepository.findAll(spec, pageRequest);
 
         return PageResponse.<AuditLogResponse>builder()
                 .content(auditPage.getContent().stream().map(this::toResponse).toList())
@@ -74,6 +76,33 @@ public class AuditService {
                 .totalElements(auditPage.getTotalElements())
                 .totalPages(auditPage.getTotalPages())
                 .build();
+    }
+
+    private Specification<AuditLog> buildAuditLogSpecification(UUID tenantId, UUID userId, String action,
+                                                                String resourceType, Instant fromTs, Instant toTs) {
+        return (root, query, cb) -> {
+            var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+
+            predicates.add(cb.equal(root.get("tenantId"), tenantId));
+
+            if (userId != null) {
+                predicates.add(cb.equal(root.get("userId"), userId));
+            }
+            if (action != null) {
+                predicates.add(cb.equal(root.get("action"), action));
+            }
+            if (resourceType != null) {
+                predicates.add(cb.equal(root.get("resourceType"), resourceType));
+            }
+            if (fromTs != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("createdTs"), fromTs));
+            }
+            if (toTs != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("createdTs"), toTs));
+            }
+
+            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
     }
 
     private AuditLogResponse toResponse(AuditLog auditLog) {

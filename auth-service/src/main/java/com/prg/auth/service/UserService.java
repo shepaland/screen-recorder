@@ -245,12 +245,23 @@ public class UserService {
                 .build();
     }
 
+    private static final Map<String, String> SORT_FIELD_MAP = Map.of(
+            "created_ts", "createdTs",
+            "updated_ts", "updatedTs",
+            "last_login_ts", "lastLoginTs",
+            "username", "username",
+            "email", "email",
+            "first_name", "firstName",
+            "last_name", "lastName",
+            "is_active", "isActive"
+    );
+
     private Sort parseSort(String sort) {
         if (sort == null || sort.isBlank()) {
             return Sort.by(Sort.Direction.DESC, "createdTs");
         }
         String[] parts = sort.split(",");
-        String field = parts[0].trim();
+        String field = SORT_FIELD_MAP.getOrDefault(parts[0].trim(), "createdTs");
         Sort.Direction direction = parts.length > 1 && parts[1].trim().equalsIgnoreCase("asc")
                 ? Sort.Direction.ASC : Sort.Direction.DESC;
         return Sort.by(direction, field);
