@@ -29,10 +29,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     Page<User> findByTenantId(UUID tenantId, Pageable pageable);
 
     @Query("SELECT u FROM User u WHERE u.tenant.id = :tenantId " +
-           "AND (:search IS NULL OR LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(u.firstName) LIKE LOWER(CONCAT('%', :search, '%')) " +
-           "OR LOWER(u.lastName) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "AND (:search IS NULL OR :search = '' " +
+           "OR LOWER(u.username) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) " +
+           "OR LOWER(u.email) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) " +
+           "OR LOWER(u.firstName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) " +
+           "OR LOWER(u.lastName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))) " +
            "AND (:isActive IS NULL OR u.isActive = :isActive)")
     Page<User> findByTenantIdWithFilters(
             @Param("tenantId") UUID tenantId,
