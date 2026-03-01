@@ -1,5 +1,6 @@
 package com.prg.auth.config;
 
+import com.prg.auth.filter.InternalApiKeyFilter;
 import com.prg.auth.filter.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final InternalApiKeyFilter internalApiKeyFilter;
 
     @Value("${prg.security.bcrypt-strength}")
     private int bcryptStrength;
@@ -62,6 +64,7 @@ public class SecurityConfig {
                             response.getWriter().write("{\"error\":\"Authentication required\",\"code\":\"UNAUTHORIZED\"}");
                         })
                 )
+                .addFilterBefore(internalApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

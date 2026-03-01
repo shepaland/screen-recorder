@@ -1,6 +1,7 @@
 package com.prg.auth.service;
 
 import com.prg.auth.dto.request.CreateTenantRequest;
+import com.prg.auth.dto.request.UpdateTenantRequest;
 import com.prg.auth.dto.response.TenantResponse;
 import com.prg.auth.entity.Role;
 import com.prg.auth.entity.Tenant;
@@ -114,7 +115,7 @@ public class TenantService {
     }
 
     @Transactional
-    public TenantResponse updateTenant(UUID tenantId, Map<String, Object> updates, UserPrincipal principal,
+    public TenantResponse updateTenant(UUID tenantId, UpdateTenantRequest request, UserPrincipal principal,
                                         String ipAddress, String userAgent) {
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found", "TENANT_NOT_FOUND"));
@@ -124,23 +125,26 @@ public class TenantService {
             throw new com.prg.auth.exception.AccessDeniedException("You can only update your own tenant");
         }
 
-        if (updates.containsKey("name")) {
-            tenant.setName((String) updates.get("name"));
+        Map<String, Object> changes = new HashMap<>();
+
+        if (request.getName() != null) {
+            changes.put("name", request.getName());
+            tenant.setName(request.getName());
         }
-        if (updates.containsKey("is_active") && principal.hasScope("global")) {
-            tenant.setIsActive((Boolean) updates.get("is_active"));
+        if (request.getIsActive() != null && principal.hasScope("global")) {
+            changes.put("is_active", request.getIsActive());
+            tenant.setIsActive(request.getIsActive());
         }
-        if (updates.containsKey("settings")) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> newSettings = (Map<String, Object>) updates.get("settings");
-            tenant.setSettings(newSettings);
+        if (request.getSettings() != null) {
+            changes.put("settings", request.getSettings());
+            tenant.setSettings(request.getSettings());
         }
 
         tenant = tenantRepository.save(tenant);
 
         // Audit
         auditService.logAction(tenantId, principal.getUserId(), "TENANT_UPDATED", "TENANTS", tenantId,
-                updates, ipAddress, userAgent, null);
+                changes, ipAddress, userAgent, null);
 
         log.info("Tenant updated: id={}, slug={}", tenantId, tenant.getSlug());
         return toResponse(tenant);

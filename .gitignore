@@ -6,3 +6,6 @@ auth-service/target/
 *.class
 *.jar
 !auth-service/.mvn/wrapper/maven-wrapper.jar
+
+# k8s secrets — never commit real secrets
+deploy/k8s/**/secret.yaml

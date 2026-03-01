@@ -8,7 +8,7 @@ spring:
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:prg_dev}
     username: ${DB_USERNAME:prg_app}
-    password: ${DB_PASSWORD:changeme}
+    password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: 20
       minimum-idle: 5
@@ -39,12 +39,12 @@ spring:
 
 prg:
   jwt:
-    secret: ${JWT_SECRET:must-be-at-least-256-bits-long-secret-key-for-hmac-sha256-algorithm}
+    secret: ${JWT_SECRET}
     access-token-ttl: 900
     refresh-token-ttl: 2592000
     issuer: prg-auth-service
   security:
-    internal-api-key: ${INTERNAL_API_KEY:dev-internal-key}
+    internal-api-key: ${INTERNAL_API_KEY}
     bcrypt-strength: 12
     max-login-attempts: 5
     login-attempt-window: 900

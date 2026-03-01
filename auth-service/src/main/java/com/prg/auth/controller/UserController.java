@@ -41,7 +41,7 @@ public class UserController {
 
     @GetMapping("/me")
     public ResponseEntity<UserResponse> getCurrentUser(@AuthenticationPrincipal UserPrincipal principal) {
-        UserResponse response = userService.getCurrentUser(principal.getUserId());
+        UserResponse response = userService.getCurrentUser(principal.getUserId(), principal.getTenantId());
         return ResponseEntity.ok(response);
     }
 

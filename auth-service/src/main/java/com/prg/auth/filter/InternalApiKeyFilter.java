@@ -14,6 +14,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
 @Component
 @RequiredArgsConstructor
@@ -32,7 +34,9 @@ public class InternalApiKeyFilter extends OncePerRequestFilter {
                                      FilterChain filterChain) throws ServletException, IOException {
         String apiKey = request.getHeader(API_KEY_HEADER);
 
-        if (apiKey == null || !apiKey.equals(internalApiKey)) {
+        if (apiKey == null || !MessageDigest.isEqual(
+                apiKey.getBytes(StandardCharsets.UTF_8),
+                internalApiKey.getBytes(StandardCharsets.UTF_8))) {
             log.warn("Invalid or missing internal API key for request: {} {}", request.getMethod(), request.getRequestURI());
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);

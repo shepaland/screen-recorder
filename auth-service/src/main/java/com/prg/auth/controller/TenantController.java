@@ -1,6 +1,7 @@
 package com.prg.auth.controller;
 
 import com.prg.auth.dto.request.CreateTenantRequest;
+import com.prg.auth.dto.request.UpdateTenantRequest;
 import com.prg.auth.dto.response.TenantResponse;
 import com.prg.auth.exception.AccessDeniedException;
 import com.prg.auth.security.UserPrincipal;
@@ -14,7 +15,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -47,12 +47,12 @@ public class TenantController {
     @PutMapping("/{id}")
     public ResponseEntity<TenantResponse> updateTenant(
             @PathVariable UUID id,
-            @RequestBody Map<String, Object> updates,
+            @Valid @RequestBody UpdateTenantRequest request,
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest httpRequest) {
         requirePermission(principal, "TENANTS:UPDATE");
         TenantResponse response = tenantService.updateTenant(
-                id, updates, principal,
+                id, request, principal,
                 getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.ok(response);
     }

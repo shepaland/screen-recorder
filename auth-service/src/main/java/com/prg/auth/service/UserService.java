@@ -65,8 +65,8 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public UserResponse getCurrentUser(UUID userId) {
-        User user = userRepository.findById(userId)
+    public UserResponse getCurrentUser(UUID userId, UUID tenantId) {
+        User user = userRepository.findByIdAndTenantId(userId, tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found", "USER_NOT_FOUND"));
         return toResponse(user);
     }
