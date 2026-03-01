@@ -1,0 +1,55 @@
+server:
+  port: 8084
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+spring:
+  application:
+    name: ingest-gateway
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:prg_dev}
+    username: ${DB_USERNAME:prg_app}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 10
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+  flyway:
+    enabled: false
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: non_null
+
+prg:
+  auth-service:
+    base-url: ${AUTH_SERVICE_URL:http://localhost:8081}
+    internal-api-key: ${INTERNAL_API_KEY}
+  s3:
+    endpoint: ${S3_ENDPOINT:http://localhost:9000}
+    region: ${S3_REGION:us-east-1}
+    access-key: ${S3_ACCESS_KEY:minioadmin}
+    secret-key: ${S3_SECRET_KEY:minioadmin}
+    bucket: ${S3_BUCKET:prg-segments}
+    presign-expiry-sec: ${S3_PRESIGN_EXPIRY:300}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+logging:
+  level:
+    com.prg.ingest: DEBUG
+  pattern:
+    console: "%d{ISO8601} [%thread] %-5level %logger{36} [%X{correlation_id:-}] [%X{tenant_id:-}] - %msg%n"

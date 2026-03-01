@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: control-plane-config
+  labels:
+    app: control-plane
+data:
+  DB_HOST: "172.17.0.1"
+  DB_PORT: "5432"
+  DB_NAME: "prg_dev"
+  AUTH_SERVICE_URL: "http://auth-service:8081"
+  HEARTBEAT_TIMEOUT: "90"
+  JAVA_OPTS: "-Xms256m -Xmx512m"

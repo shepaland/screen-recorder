@@ -10,6 +10,10 @@ import UserDetailPage from './pages/UserDetailPage';
 import RolesListPage from './pages/RolesListPage';
 import RoleCreatePage from './pages/RoleCreatePage';
 import RoleDetailPage from './pages/RoleDetailPage';
+import DevicesListPage from './pages/DevicesListPage';
+import DeviceDetailPage from './pages/DeviceDetailPage';
+import DeviceTokensListPage from './pages/DeviceTokensListPage';
+import DeviceTokenCreatePage from './pages/DeviceTokenCreatePage';
 import AuditLogPage from './pages/AuditLogPage';
 import ProfilePage from './pages/ProfilePage';
 import TenantsPage from './pages/TenantsPage';
@@ -88,6 +92,42 @@ function App() {
           element={
             <ProtectedRoute permission="ROLES:READ">
               <RoleDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Devices */}
+        <Route
+          path="/devices"
+          element={
+            <ProtectedRoute permission="DEVICES:READ">
+              <DevicesListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/devices/:id"
+          element={
+            <ProtectedRoute permission="DEVICES:READ">
+              <DeviceDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Device Tokens */}
+        <Route
+          path="/device-tokens"
+          element={
+            <ProtectedRoute permission="DEVICE_TOKENS:READ">
+              <DeviceTokensListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/device-tokens/create"
+          element={
+            <ProtectedRoute permission="DEVICE_TOKENS:CREATE">
+              <DeviceTokenCreatePage />
             </ProtectedRoute>
           }
         />

@@ -48,6 +48,13 @@ prg:
     bcrypt-strength: 12
     max-login-attempts: 5
     login-attempt-window: 900
+  device:
+    heartbeat-interval-sec: ${DEVICE_HEARTBEAT_INTERVAL:30}
+    segment-duration-sec: ${DEVICE_SEGMENT_DURATION:10}
+    capture-fps: ${DEVICE_CAPTURE_FPS:5}
+    quality: ${DEVICE_QUALITY:medium}
+    ingest-base-url: ${INGEST_BASE_URL:}
+    control-plane-base-url: ${CONTROL_PLANE_BASE_URL:}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:80}
 

@@ -1,0 +1,65 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: control-plane
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:prg_dev}
+    username: ${DB_USERNAME:prg_app}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+    open-in-view: false
+
+  flyway:
+    enabled: false
+
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+
+prg:
+  auth-service:
+    base-url: ${AUTH_SERVICE_URL:http://localhost:8081}
+    internal-api-key: ${INTERNAL_API_KEY}
+  security:
+    internal-api-key: ${INTERNAL_API_KEY}
+  device:
+    heartbeat-timeout-sec: ${HEARTBEAT_TIMEOUT:90}
+    default-heartbeat-interval-sec: 30
+    default-segment-duration-sec: 10
+    default-capture-fps: 5
+    default-quality: medium
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    com.prg.controlplane: DEBUG
+    org.hibernate.SQL: WARN
+  pattern:
+    console: "%d{ISO8601} [%thread] %-5level %logger{36} [%X{correlation_id:-}] [%X{tenant_id:-}] - %msg%n"

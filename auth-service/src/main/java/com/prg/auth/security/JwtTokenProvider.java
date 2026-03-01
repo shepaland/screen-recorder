@@ -46,6 +46,29 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    public String generateDeviceAccessToken(UUID userId, UUID tenantId, String username, String email,
+                                               List<String> roles, List<String> permissions,
+                                               List<String> scopes, UUID deviceId) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + jwtConfig.getAccessTokenTtl() * 1000L);
+
+        return Jwts.builder()
+                .id(UUID.randomUUID().toString())
+                .subject(userId.toString())
+                .claim("tenant_id", tenantId.toString())
+                .claim("username", username)
+                .claim("email", email)
+                .claim("roles", roles)
+                .claim("permissions", permissions)
+                .claim("scopes", scopes)
+                .claim("device_id", deviceId.toString())
+                .issuer(jwtConfig.getIssuer())
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(secretKey, Jwts.SIG.HS256)
+                .compact();
+    }
+
     public boolean validateToken(String token) {
         try {
             parseToken(token);

@@ -75,6 +75,16 @@ public class GlobalExceptionHandler {
                         .build());
     }
 
+    @ExceptionHandler(DeviceDeactivatedException.class)
+    public ResponseEntity<ErrorResponse> handleDeviceDeactivated(DeviceDeactivatedException ex) {
+        log.warn("Device deactivated: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ErrorResponse.builder()
+                        .error(ex.getMessage())
+                        .code(ex.getCode())
+                        .build());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationErrors(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult().getFieldErrors().stream()

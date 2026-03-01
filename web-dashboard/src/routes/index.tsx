@@ -7,20 +7,24 @@
  * Route Map:
  *
  * PUBLIC:
- *   /login                - LoginPage (AuthLayout)
+ *   /login                   - LoginPage (AuthLayout)
  *
  * PROTECTED (MainLayout):
- *   /                     - DashboardPage    (DASHBOARD:VIEW)
- *   /users                - UsersListPage    (USERS:READ)
- *   /users/new            - UserCreatePage   (USERS:CREATE)
- *   /users/:id            - UserDetailPage   (USERS:READ)
- *   /roles                - RolesListPage    (ROLES:READ)
- *   /roles/new            - RoleCreatePage   (ROLES:CREATE)
- *   /roles/:id            - RoleDetailPage   (ROLES:READ)
- *   /audit                - AuditLogPage     (AUDIT:READ)
- *   /tenants              - TenantsPage      (TENANTS:READ)
- *   /tenants/new          - TenantCreatePage (TENANTS:CREATE)
- *   /profile              - ProfilePage      (authenticated)
+ *   /                        - DashboardPage            (DASHBOARD:VIEW)
+ *   /users                   - UsersListPage             (USERS:READ)
+ *   /users/new               - UserCreatePage            (USERS:CREATE)
+ *   /users/:id               - UserDetailPage            (USERS:READ)
+ *   /roles                   - RolesListPage             (ROLES:READ)
+ *   /roles/new               - RoleCreatePage            (ROLES:CREATE)
+ *   /roles/:id               - RoleDetailPage            (ROLES:READ)
+ *   /devices                 - DevicesListPage            (DEVICES:READ)
+ *   /devices/:id             - DeviceDetailPage           (DEVICES:READ)
+ *   /device-tokens           - DeviceTokensListPage       (DEVICE_TOKENS:READ)
+ *   /device-tokens/create    - DeviceTokenCreatePage      (DEVICE_TOKENS:CREATE)
+ *   /audit                   - AuditLogPage               (AUDIT:READ)
+ *   /tenants                 - TenantsPage                (TENANTS:READ)
+ *   /tenants/new             - TenantCreatePage           (TENANTS:CREATE)
+ *   /profile                 - ProfilePage                (authenticated)
  */
 
 export const ROUTES = {
@@ -32,6 +36,10 @@ export const ROUTES = {
   ROLES: '/roles',
   ROLE_CREATE: '/roles/new',
   ROLE_DETAIL: (id: string) => `/roles/${id}`,
+  DEVICES: '/devices',
+  DEVICE_DETAIL: (id: string) => `/devices/${id}`,
+  DEVICE_TOKENS: '/device-tokens',
+  DEVICE_TOKEN_CREATE: '/device-tokens/create',
   AUDIT: '/audit',
   TENANTS: '/tenants',
   TENANT_CREATE: '/tenants/new',

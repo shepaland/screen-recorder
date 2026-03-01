@@ -20,3 +20,12 @@ export type {
   CreateTenantRequest,
   UpdateTenantRequest,
 } from './tenant';
+export type {
+  DeviceTokenResponse,
+  CreateDeviceTokenRequest,
+  DeviceResponse,
+  DeviceDetailResponse,
+  DeviceCommandResponse,
+  RecordingSessionResponse,
+  CreateCommandRequest,
+} from './device';

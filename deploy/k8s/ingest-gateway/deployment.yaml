@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingest-gateway
+  labels:
+    app: ingest-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ingest-gateway
+  template:
+    metadata:
+      labels:
+        app: ingest-gateway
+    spec:
+      containers:
+        - name: ingest-gateway
+          image: prg-ingest-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8084
+          envFrom:
+            - configMapRef:
+                name: ingest-gateway-config
+            - secretRef:
+                name: ingest-gateway-secret
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "768Mi"
+              cpu: "750m"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8084
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8084
+            initialDelaySeconds: 60
+            periodSeconds: 30

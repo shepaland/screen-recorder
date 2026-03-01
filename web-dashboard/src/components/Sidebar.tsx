@@ -6,6 +6,8 @@ import {
   DocumentTextIcon,
   BuildingOfficeIcon,
   UserCircleIcon,
+  ComputerDesktopIcon,
+  KeyIcon,
 } from '@heroicons/react/24/outline';
 import PermissionGate from './PermissionGate';
 
@@ -24,6 +26,8 @@ const navigation: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: HomeIcon, permission: 'DASHBOARD:VIEW' },
   { name: 'Users', href: '/users', icon: UsersIcon, permission: 'USERS:READ' },
   { name: 'Roles', href: '/roles', icon: ShieldCheckIcon, permission: 'ROLES:READ' },
+  { name: 'Устройства', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
+  { name: 'Токены регистрации', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
   { name: 'Audit Log', href: '/audit', icon: DocumentTextIcon, permission: 'AUDIT:READ' },
   { name: 'Tenants', href: '/tenants', icon: BuildingOfficeIcon, permission: 'TENANTS:READ' },
 ];
