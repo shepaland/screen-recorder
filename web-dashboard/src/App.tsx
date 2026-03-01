@@ -1,0 +1,133 @@
+import { Routes, Route, Navigate } from 'react-router-dom';
+import AuthLayout from './layouts/AuthLayout';
+import MainLayout from './layouts/MainLayout';
+import ProtectedRoute from './components/ProtectedRoute';
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
+import UsersListPage from './pages/UsersListPage';
+import UserCreatePage from './pages/UserCreatePage';
+import UserDetailPage from './pages/UserDetailPage';
+import RolesListPage from './pages/RolesListPage';
+import RoleCreatePage from './pages/RoleCreatePage';
+import RoleDetailPage from './pages/RoleDetailPage';
+import AuditLogPage from './pages/AuditLogPage';
+import ProfilePage from './pages/ProfilePage';
+import TenantsPage from './pages/TenantsPage';
+import TenantCreatePage from './pages/TenantCreatePage';
+
+function App() {
+  return (
+    <Routes>
+      {/* Public routes */}
+      <Route element={<AuthLayout />}>
+        <Route path="/login" element={<LoginPage />} />
+      </Route>
+
+      {/* Protected routes */}
+      <Route
+        element={
+          <ProtectedRoute>
+            <MainLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute permission="DASHBOARD:VIEW">
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Users */}
+        <Route
+          path="/users"
+          element={
+            <ProtectedRoute permission="USERS:READ">
+              <UsersListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/users/new"
+          element={
+            <ProtectedRoute permission="USERS:CREATE">
+              <UserCreatePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/users/:id"
+          element={
+            <ProtectedRoute permission="USERS:READ">
+              <UserDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Roles */}
+        <Route
+          path="/roles"
+          element={
+            <ProtectedRoute permission="ROLES:READ">
+              <RolesListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/roles/new"
+          element={
+            <ProtectedRoute permission="ROLES:CREATE">
+              <RoleCreatePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/roles/:id"
+          element={
+            <ProtectedRoute permission="ROLES:READ">
+              <RoleDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Audit */}
+        <Route
+          path="/audit"
+          element={
+            <ProtectedRoute permission="AUDIT:READ">
+              <AuditLogPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Tenants */}
+        <Route
+          path="/tenants"
+          element={
+            <ProtectedRoute permission="TENANTS:READ">
+              <TenantsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tenants/new"
+          element={
+            <ProtectedRoute permission="TENANTS:CREATE">
+              <TenantCreatePage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Profile - any authenticated user */}
+        <Route path="/profile" element={<ProfilePage />} />
+      </Route>
+
+      {/* Catch-all redirect */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+export default App;

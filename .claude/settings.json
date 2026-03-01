@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(./mvnw *)",
+      "Bash(mvn *)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(node *)",
+      "Bash(docker build *)",
+      "Bash(docker push *)",
+      "Bash(docker tag *)",
+      "Bash(swift build *)",
+      "Bash(swift test *)",
+      "Bash(kubectl -n dev-screen-record *)",
+      "Bash(kubectl -n test-screen-record *)",
+      "Bash(kubectl --namespace dev-screen-record *)",
+      "Bash(kubectl --namespace test-screen-record *)",
+      "Bash(helm -n dev-screen-record *)",
+      "Bash(helm -n test-screen-record *)",
+      "Bash(helm --namespace dev-screen-record *)",
+      "Bash(helm --namespace test-screen-record *)",
+      "Bash(curl *)",
+      "Bash(git *)",
+      "Bash(grep *)",
+      "Bash(find *)",
+      "Bash(cat *)",
+      "Bash(ls *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(diff *)",
+      "Bash(jq *)",
+      "Bash(yq *)",
+      "Bash(sed *)",
+      "Bash(awk *)",
+      "Bash(sort *)",
+      "Bash(uniq *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(echo *)",
+      "Bash(printf *)",
+      "Bash(psql *)",
+      "Bash(flyway *)",
+      "Read(**)",
+      "Edit(**)"
+    ],
+    "deny": [
+      "Bash(kubectl -n prod-screen-record *)",
+      "Bash(kubectl --namespace prod-screen-record *)",
+      "Bash(kubectl * -n prod-screen-record *)",
+      "Bash(kubectl * --namespace prod-screen-record *)",
+      "Bash(helm -n prod-screen-record *)",
+      "Bash(helm --namespace prod-screen-record *)",
+      "Bash(helm * -n prod-screen-record *)",
+      "Bash(helm * --namespace prod-screen-record *)",
+      "Bash(rm -rf /)",
+      "Bash(rm -rf /*)",
+      "Bash(kubectl delete namespace *)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/secrets/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE '(kubectl|helm).*(prod-screen-record)'; then echo 'BLOCK: prod namespace requires explicit user approval' >&2; exit 1; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

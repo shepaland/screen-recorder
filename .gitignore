@@ -1,0 +1,8 @@
+**/.DS_Store
+node_modules/
+web-dashboard/dist/
+auth-service/target/
+.env
+*.class
+*.jar
+!auth-service/.mvn/wrapper/maven-wrapper.jar
