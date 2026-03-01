@@ -77,7 +77,7 @@ public class AuthService {
             auditService.logAction(tenant.getId(), user.getId(), "LOGIN_FAILED", "AUTH", null,
                     Map.of("reason", "account_disabled"),
                     ipAddress, userAgent, getCorrelationId());
-            throw new InvalidCredentialsException("Account is disabled", "ACCOUNT_DISABLED");
+            throw new InvalidCredentialsException("Invalid username or password");
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {

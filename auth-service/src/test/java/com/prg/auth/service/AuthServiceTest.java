@@ -180,7 +180,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login(request, "127.0.0.1", "Test-Agent"))
                 .isInstanceOf(InvalidCredentialsException.class)
-                .hasMessage("Account is disabled");
+                .hasMessage("Invalid username or password");
     }
 
     @Test
