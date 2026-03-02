@@ -1,6 +1,8 @@
 package com.prg.auth.dto.request;
 
+import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,7 +21,9 @@ public class CreateDeviceTokenRequest {
     @Size(min = 1, max = 255, message = "Token name must be between 1 and 255 characters")
     private String name;
 
+    @Positive(message = "Max uses must be a positive number")
     private Integer maxUses;
 
+    @Future(message = "Expiration date must be in the future")
     private Instant expiresAt;
 }

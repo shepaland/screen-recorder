@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PlusIcon } from '@heroicons/react/20/solid';
+import { PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 import DataTable, { type Column } from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
 import PermissionGate from '../components/PermissionGate';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { getDeviceTokens, deleteDeviceToken } from '../api/deviceTokens';
+import { getDeviceTokens, deleteDeviceToken, type DeviceTokensListParams } from '../api/deviceTokens';
 import type { DeviceTokenResponse } from '../types';
 import { useToast } from '../contexts/ToastContext';
 import { formatDateTime } from '../utils/format';
@@ -21,13 +21,31 @@ export default function DeviceTokensListPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [size] = useState(20);
 
+  // Filters
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
+
   // Deactivate dialog
   const [deactivateTarget, setDeactivateTarget] = useState<DeviceTokenResponse | null>(null);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const fetchTokens = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getDeviceTokens({ page, size });
+      const params: DeviceTokensListParams = { page, size };
+      if (search) params.search = search;
+      if (statusFilter !== '') params.is_active = statusFilter === 'active';
+
+      const data = await getDeviceTokens(params);
       setTokens(data.content);
       setTotalElements(data.total_elements);
       setTotalPages(data.total_pages);
@@ -36,7 +54,7 @@ export default function DeviceTokensListPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, size, addToast]);
+  }, [page, size, search, statusFilter, addToast]);
 
   useEffect(() => {
     fetchTokens();
@@ -75,15 +93,9 @@ export default function DeviceTokensListPage() {
       key: 'current_uses',
       title: 'Использований',
       render: (token) => (
-        <span className="text-gray-900">{token.current_uses}</span>
-      ),
-    },
-    {
-      key: 'max_uses',
-      title: 'Максимум',
-      render: (token) => (
         <span className="text-gray-900">
-          {token.max_uses !== null ? token.max_uses : 'Без ограничений'}
+          {token.current_uses}
+          {token.max_uses !== null ? ` / ${token.max_uses}` : ''}
         </span>
       ),
     },
@@ -110,6 +122,13 @@ export default function DeviceTokensListPage() {
           activeText="Активен"
           inactiveText="Деактивирован"
         />
+      ),
+    },
+    {
+      key: 'created_by_username',
+      title: 'Создал',
+      render: (token) => (
+        <span className="text-gray-700">{token.created_by_username || '--'}</span>
       ),
     },
     {
@@ -156,6 +175,45 @@ export default function DeviceTokensListPage() {
             Создать токен
           </button>
         </PermissionGate>
+      </div>
+
+      {/* Filters */}
+      <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-end">
+        {/* Search */}
+        <div className="flex-1">
+          <label htmlFor="tokenSearch" className="label">Поиск</label>
+          <div className="relative mt-1">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+            </div>
+            <input
+              id="tokenSearch"
+              type="text"
+              placeholder="Поиск по имени..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="input-field pl-10"
+            />
+          </div>
+        </div>
+
+        {/* Status filter */}
+        <div className="sm:w-48">
+          <label htmlFor="tokenStatus" className="label">Статус</label>
+          <select
+            id="tokenStatus"
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(0);
+            }}
+            className="input-field mt-1"
+          >
+            <option value="">Все</option>
+            <option value="active">Активные</option>
+            <option value="inactive">Деактивированные</option>
+          </select>
+        </div>
       </div>
 
       {/* Table */}

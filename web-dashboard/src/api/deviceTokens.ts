@@ -5,10 +5,17 @@ import type { PageResponse } from '../types/common';
 export interface DeviceTokensListParams {
   page?: number;
   size?: number;
+  search?: string;
+  is_active?: boolean;
 }
 
 export async function getDeviceTokens(params?: DeviceTokensListParams): Promise<PageResponse<DeviceTokenResponse>> {
   const response = await apiClient.get<PageResponse<DeviceTokenResponse>>('/device-tokens', { params });
+  return response.data;
+}
+
+export async function getDeviceToken(id: string): Promise<DeviceTokenResponse> {
+  const response = await apiClient.get<DeviceTokenResponse>(`/device-tokens/${id}`);
   return response.data;
 }
 

@@ -7,7 +7,7 @@ export interface DeviceTokenResponse {
   current_uses: number;
   expires_at: string | null;
   is_active: boolean;
-  created_by: string;
+  created_by_username?: string;
   created_ts: string;
 }
 

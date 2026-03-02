@@ -175,10 +175,10 @@ class DeviceTokenServiceTest {
         PageImpl<DeviceRegistrationToken> page = new PageImpl<>(List.of(token1, token2),
                 PageRequest.of(0, 20), 2);
 
-        when(tokenRepository.findByTenantId(eq(principal.getTenantId()), any(Pageable.class)))
+        when(tokenRepository.findByTenantIdFiltered(eq(principal.getTenantId()), isNull(), isNull(), any(Pageable.class)))
                 .thenReturn(page);
 
-        PageResponse<DeviceTokenResponse> response = deviceTokenService.getTokens(principal, 0, 20);
+        PageResponse<DeviceTokenResponse> response = deviceTokenService.getTokens(principal, 0, 20, null, null);
 
         assertThat(response.getContent()).hasSize(2);
         assertThat(response.getTotalElements()).isEqualTo(2);

@@ -70,11 +70,12 @@ public class DeviceTokenService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<DeviceTokenResponse> getTokens(UserPrincipal principal, int page, int size) {
+    public PageResponse<DeviceTokenResponse> getTokens(UserPrincipal principal, int page, int size,
+                                                        String search, Boolean isActive) {
         PageRequest pageRequest = PageRequest.of(page, Math.min(size, 100),
                 Sort.by(Sort.Direction.DESC, "createdTs"));
-        Page<DeviceRegistrationToken> tokenPage = tokenRepository.findByTenantId(
-                principal.getTenantId(), pageRequest);
+        Page<DeviceRegistrationToken> tokenPage = tokenRepository.findByTenantIdFiltered(
+                principal.getTenantId(), search, isActive, pageRequest);
 
         return PageResponse.<DeviceTokenResponse>builder()
                 .content(tokenPage.getContent().stream()
@@ -85,6 +86,20 @@ public class DeviceTokenService {
                 .totalElements(tokenPage.getTotalElements())
                 .totalPages(tokenPage.getTotalPages())
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public DeviceTokenResponse getToken(UUID tokenId, UserPrincipal principal) {
+        DeviceRegistrationToken token = tokenRepository.findById(tokenId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Device registration token not found", "TOKEN_NOT_FOUND"));
+
+        if (!token.getTenant().getId().equals(principal.getTenantId())) {
+            throw new ResourceNotFoundException(
+                    "Device registration token not found", "TOKEN_NOT_FOUND");
+        }
+
+        return toResponse(token, null);
     }
 
     @Transactional
@@ -111,11 +126,13 @@ public class DeviceTokenService {
         return DeviceTokenResponse.builder()
                 .id(token.getId())
                 .token(rawToken)
+                .tokenPreview("drt_" + token.getTokenHash().substring(0, 4))
                 .name(token.getName())
                 .maxUses(token.getMaxUses())
                 .currentUses(token.getCurrentUses())
                 .expiresAt(token.getExpiresAt())
                 .isActive(token.getIsActive())
+                .createdByUsername(token.getCreatedBy().getUsername())
                 .createdTs(token.getCreatedTs())
                 .build();
     }

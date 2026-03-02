@@ -22,6 +22,17 @@ public interface DeviceRegistrationTokenRepository extends JpaRepository<DeviceR
 
     Page<DeviceRegistrationToken> findByTenantId(UUID tenantId, Pageable pageable);
 
+    @Query("SELECT t FROM DeviceRegistrationToken t JOIN FETCH t.createdBy " +
+           "WHERE t.tenant.id = :tenantId " +
+           "AND (:search IS NULL OR :search = '' " +
+           "OR LOWER(t.name) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))) " +
+           "AND (:isActive IS NULL OR t.isActive = :isActive)")
+    Page<DeviceRegistrationToken> findByTenantIdFiltered(
+            @Param("tenantId") UUID tenantId,
+            @Param("search") String search,
+            @Param("isActive") Boolean isActive,
+            Pageable pageable);
+
     @Modifying
     @Query("UPDATE DeviceRegistrationToken t SET t.currentUses = t.currentUses + 1 WHERE t.id = :id")
     void incrementCurrentUses(@Param("id") UUID id);
