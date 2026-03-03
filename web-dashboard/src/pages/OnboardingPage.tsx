@@ -35,28 +35,12 @@ export default function OnboardingPage() {
   const { setUserFromToken } = useAuth();
 
   const oauthToken = searchParams.get('oauth_token') || '';
-  const prefillName = searchParams.get('name') || '';
 
   const [companyName, setCompanyName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugEdited, setSlugEdited] = useState(false);
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Prefill name from URL params
-  useEffect(() => {
-    if (prefillName) {
-      const parts = prefillName.trim().split(/\s+/);
-      if (parts.length >= 2) {
-        setFirstName(parts[0]);
-        setLastName(parts.slice(1).join(' '));
-      } else if (parts.length === 1) {
-        setFirstName(parts[0]);
-      }
-    }
-  }, [prefillName]);
 
   // Auto-generate slug from company name
   useEffect(() => {
@@ -97,8 +81,6 @@ export default function OnboardingPage() {
         {
           company_name: companyName.trim(),
           slug: slug.trim(),
-          first_name: firstName.trim() || undefined,
-          last_name: lastName.trim() || undefined,
         },
         oauthToken,
       );
@@ -197,42 +179,8 @@ export default function OnboardingPage() {
                 />
               </div>
               <p className="mt-1 text-xs text-gray-500">
-                Только латинские буквы, цифры и дефис. Минимум 3 символа.
+                Заполняется автоматически
               </p>
-            </div>
-
-            {/* First name */}
-            <div>
-              <label htmlFor="firstName" className="label">
-                Имя
-              </label>
-              <div className="mt-2">
-                <input
-                  id="firstName"
-                  type="text"
-                  placeholder="Иван"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  className="input-field"
-                />
-              </div>
-            </div>
-
-            {/* Last name */}
-            <div>
-              <label htmlFor="lastName" className="label">
-                Фамилия
-              </label>
-              <div className="mt-2">
-                <input
-                  id="lastName"
-                  type="text"
-                  placeholder="Иванов"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  className="input-field"
-                />
-              </div>
             </div>
 
             {/* Submit */}
