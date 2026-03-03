@@ -133,65 +133,30 @@ public class OAuthService {
                     .build();
         }
 
-        // 7. 1 link -> auto-login
-        if (activeLinks.size() == 1) {
-            UserOAuthLink link = activeLinks.get(0);
-            User user = link.getUser();
-            Tenant tenant = user.getTenant();
+        // 7. 1+ links -> auto-login to first tenant (user switches via sidebar)
+        UserOAuthLink link = activeLinks.get(0);
+        User user = link.getUser();
+        Tenant tenant = user.getTenant();
 
-            MDC.put("tenant_id", tenant.getId().toString());
-            MDC.put("user_id", user.getId().toString());
+        MDC.put("tenant_id", tenant.getId().toString());
+        MDC.put("user_id", user.getId().toString());
 
-            AuthResult<LoginResponse> loginResult = performOAuthLogin(user, tenant, ipAddress, userAgent);
+        log.info("OAuth auto-login: oauth_identity_id={}, tenant={}, total_tenants={}",
+                identity.getId(), tenant.getSlug(), activeLinks.size());
 
-            OAuthCallbackResponse response = OAuthCallbackResponse.builder()
-                    .status("authenticated")
-                    .accessToken(loginResult.getResponse().getAccessToken())
-                    .tokenType("Bearer")
-                    .expiresIn((int) loginResult.getResponse().getExpiresIn())
-                    .user(loginResult.getResponse().getUser())
-                    .build();
-
-            return OAuthCallbackResult.builder()
-                    .response(response)
-                    .rawRefreshToken(loginResult.getRawRefreshToken())
-                    .build();
-        }
-
-        // 8. 2+ links -> tenant selection required
-        String oauthToken = generateOAuthIntermediateToken(identity);
-
-        List<OAuthCallbackResponse.TenantPreview> tenants = activeLinks.stream()
-                .map(link -> {
-                    User user = link.getUser();
-                    Tenant tenant = user.getTenant();
-                    String primaryRole = user.getRoles().stream()
-                            .map(r -> r.getCode())
-                            .findFirst()
-                            .orElse(null);
-                    return OAuthCallbackResponse.TenantPreview.builder()
-                            .id(tenant.getId())
-                            .name(tenant.getName())
-                            .slug(tenant.getSlug())
-                            .role(primaryRole)
-                            .isCurrent(false)
-                            .build();
-                })
-                .toList();
-
-        log.info("OAuth user has {} tenants, selection required: oauth_identity_id={}", activeLinks.size(), identity.getId());
+        AuthResult<LoginResponse> loginResult = performOAuthLogin(user, tenant, ipAddress, userAgent);
 
         OAuthCallbackResponse response = OAuthCallbackResponse.builder()
-                .status("tenant_selection_required")
-                .oauthToken(oauthToken)
-                .oauthTokenExpiresIn(600)
-                .oauthUser(oauthUserInfo)
-                .tenants(tenants)
+                .status("authenticated")
+                .accessToken(loginResult.getResponse().getAccessToken())
+                .tokenType("Bearer")
+                .expiresIn((int) loginResult.getResponse().getExpiresIn())
+                .user(loginResult.getResponse().getUser())
                 .build();
 
         return OAuthCallbackResult.builder()
                 .response(response)
-                .rawRefreshToken(null)
+                .rawRefreshToken(loginResult.getRawRefreshToken())
                 .build();
     }
 

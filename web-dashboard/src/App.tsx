@@ -4,7 +4,6 @@ import MainLayout from './layouts/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import OAuthCallbackPage from './pages/OAuthCallbackPage';
-import TenantSelectPage from './pages/TenantSelectPage';
 import OnboardingPage from './pages/OnboardingPage';
 import DashboardPage from './pages/DashboardPage';
 import UsersListPage from './pages/UsersListPage';
@@ -34,7 +33,6 @@ function App() {
 
       {/* Public routes -- OAuth flow (full-screen, no AuthLayout wrapper) */}
       <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
-      <Route path="/select-tenant" element={<TenantSelectPage />} />
       <Route path="/onboarding" element={<OnboardingPage />} />
 
       {/* Protected routes */}

@@ -15,7 +15,7 @@ export default function OAuthCallbackPage() {
 
     async function handleCallback() {
       if (accessToken) {
-        // Single tenant -- auto-login
+        // Auto-login (single or multiple tenants — switch via sidebar)
         try {
           await setUserFromToken(accessToken);
           navigate('/', { replace: true });
@@ -27,12 +27,9 @@ export default function OAuthCallbackPage() {
           const name = searchParams.get('name') || '';
           const email = searchParams.get('email') || '';
           navigate(`/onboarding?oauth_token=${encodeURIComponent(oauthToken)}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`, { replace: true });
-        } else if (status === 'tenant_selection') {
-          const tenants = searchParams.get('tenants') || '';
-          navigate(`/select-tenant?oauth_token=${encodeURIComponent(oauthToken)}&tenants=${encodeURIComponent(tenants)}`, { replace: true });
         } else {
-          // Fallback: try tenant selection
-          navigate(`/select-tenant?oauth_token=${encodeURIComponent(oauthToken)}`, { replace: true });
+          // Unknown status — redirect to login
+          navigate('/login?error=' + encodeURIComponent('Unexpected OAuth status'), { replace: true });
         }
       } else {
         const error = searchParams.get('error');

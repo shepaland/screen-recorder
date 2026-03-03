@@ -28,7 +28,6 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -117,16 +116,7 @@ public class OAuthController {
                             + "&name=" + urlEncode(oauthUser != null ? oauthUser.getName() : "")
                             + "&email=" + urlEncode(oauthUser != null ? oauthUser.getEmail() : "");
                 }
-                case "tenant_selection_required" -> {
-                    // Multiple tenants - redirect to callback page with tenant selection params
-                    String tenantsParam = response.getTenants().stream()
-                            .map(t -> t.getId() + ":" + t.getSlug() + ":" + urlEncode(t.getName()))
-                            .collect(Collectors.joining(","));
-                    redirectUrl = frontendBaseUrl + "/oauth/callback"
-                            + "?oauth_token=" + urlEncode(response.getOauthToken())
-                            + "&status=tenant_selection"
-                            + "&tenants=" + urlEncode(tenantsParam);
-                }
+                // tenant_selection_required removed: auto-login to first tenant, switch via sidebar
                 default -> {
                     log.error("Unknown OAuth callback status: {}", response.getStatus());
                     redirectUrl = frontendBaseUrl + "/login?error=" + urlEncode("Unexpected error");
