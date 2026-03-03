@@ -49,6 +49,36 @@ spec:
                 port:
                   number: 80
 ---
+# Ingress for presigned S3 upload URLs (agents upload segments via /prg-segments/)
+# NO StripPrefix — path must be preserved for MinIO signature validation
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prg-segments-upload
+  labels:
+    app: web-dashboard
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - services-test.shepaland.ru
+      secretName: services-test-shepaland-ru-tls
+  rules:
+    - host: services-test.shepaland.ru
+      http:
+        paths:
+          - path: /prg-segments
+            pathType: Prefix
+            backend:
+              service:
+                name: web-dashboard
+                port:
+                  number: 80
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -65,6 +95,13 @@ spec:
       http:
         paths:
           - path: /screenrecorder
+            pathType: Prefix
+            backend:
+              service:
+                name: web-dashboard
+                port:
+                  number: 80
+          - path: /prg-segments
             pathType: Prefix
             backend:
               service:
