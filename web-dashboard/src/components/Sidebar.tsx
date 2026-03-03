@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   HomeIcon,
@@ -8,6 +9,9 @@ import {
   ComputerDesktopIcon,
   KeyIcon,
   Cog6ToothIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  FilmIcon,
 } from '@heroicons/react/24/outline';
 import PermissionGate from './PermissionGate';
 import TenantSwitcher from './TenantSwitcher';
@@ -27,6 +31,7 @@ interface NavItem {
 /** Full navigation for superadmin (password auth, SUPER_ADMIN role). */
 const superAdminNavigation: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: HomeIcon, permission: 'DASHBOARD:VIEW' },
+  { name: 'Архив записей', href: '/recordings', icon: FilmIcon },
   { name: 'Users', href: '/users', icon: UsersIcon, permission: 'USERS:READ' },
   { name: 'Roles', href: '/roles', icon: ShieldCheckIcon, permission: 'ROLES:READ' },
   { name: 'Устройства', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
@@ -38,6 +43,7 @@ const superAdminNavigation: NavItem[] = [
 /** Tenant-scoped items under the company name. */
 const tenantScopedNavigation: NavItem[] = [
   { name: 'Контрольная панель', href: '/', icon: HomeIcon, permission: 'DASHBOARD:VIEW' },
+  { name: 'Архив записей', href: '/recordings', icon: FilmIcon },
   { name: 'Токены регистрации', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
   { name: 'Устройства', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
   { name: 'Пользователи', href: '/users', icon: UsersIcon, permission: 'USERS:READ' },
@@ -70,8 +76,8 @@ function NavList({
               className={({ isActive }) =>
                 `group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 ${
                   isActive
-                    ? 'bg-indigo-700 text-white'
-                    : 'text-indigo-200 hover:bg-indigo-700 hover:text-white'
+                    ? 'bg-red-700 text-white'
+                    : 'text-gray-300 hover:bg-red-700 hover:text-white'
                 }`
               }
             >
@@ -87,6 +93,7 @@ function NavList({
 
 export default function Sidebar({ onClose }: SidebarProps) {
   const { user } = useAuth();
+  const [isTenantMenuExpanded, setIsTenantMenuExpanded] = useState(true);
 
   const handleClick = () => {
     onClose?.();
@@ -95,7 +102,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
   const isSuperAdmin = user?.roles?.includes('SUPER_ADMIN');
 
   return (
-    <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-indigo-950 px-6 pb-4">
+    <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-gray-950 px-6 pb-4">
       {/* Logo */}
       <div className="flex h-16 shrink-0 items-center">
         <span className="text-xl font-bold text-white">PRG Screen Recorder</span>
@@ -111,18 +118,34 @@ export default function Sidebar({ onClose }: SidebarProps) {
           ) : (
             /* ---- OAuth user: structured menu ---- */
             <>
-              {/* Company name (tenant switcher) + tenant-scoped items */}
+              {/* Company name (tenant switcher) + collapsible tenant-scoped items */}
               <li>
-                <div className="-mx-2 mb-2">
-                  <TenantSwitcher />
+                <div className="-mx-2 mb-2 flex items-center gap-1">
+                  <div className="flex-1">
+                    <TenantSwitcher />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsTenantMenuExpanded(!isTenantMenuExpanded)}
+                    className="p-1 rounded-md text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+                    title={isTenantMenuExpanded ? 'Свернуть меню' : 'Развернуть меню'}
+                  >
+                    {isTenantMenuExpanded ? (
+                      <ChevronDownIcon className="h-4 w-4" />
+                    ) : (
+                      <ChevronRightIcon className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
-                <NavList items={tenantScopedNavigation} onClick={handleClick} indent />
+                {isTenantMenuExpanded && (
+                  <NavList items={tenantScopedNavigation} onClick={handleClick} indent />
+                )}
               </li>
 
               {/* Global items: Компании, Аудит */}
               <li>
                 <div className="-mx-2 mb-2">
-                  <p className="px-3 text-xs font-semibold uppercase tracking-wider text-indigo-400">
+                  <p className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
                     Управление
                   </p>
                 </div>
@@ -141,8 +164,8 @@ export default function Sidebar({ onClose }: SidebarProps) {
                   className={({ isActive }) =>
                     `group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 ${
                       isActive
-                        ? 'bg-indigo-700 text-white'
-                        : 'text-indigo-200 hover:bg-indigo-700 hover:text-white'
+                        ? 'bg-red-700 text-white'
+                        : 'text-gray-300 hover:bg-red-700 hover:text-white'
                     }`
                   }
                 >

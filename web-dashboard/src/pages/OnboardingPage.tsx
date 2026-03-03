@@ -204,7 +204,7 @@ export default function OnboardingPage() {
           <button
             type="button"
             onClick={() => navigate('/login')}
-            className="text-sm text-gray-500 hover:text-indigo-600 transition-colors"
+            className="text-sm text-gray-500 hover:text-red-600 transition-colors"
           >
             &larr; Назад к входу
           </button>

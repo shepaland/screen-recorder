@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -41,6 +42,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             @Param("isActive") Boolean isActive,
             Pageable pageable
     );
+
+    @Query("SELECT u FROM User u JOIN FETCH u.roles r JOIN FETCH r.permissions JOIN u.tenant t " +
+           "WHERE u.username = :username AND u.isActive = true AND t.isActive = true " +
+           "AND u.authProvider = 'password'")
+    List<User> findActivePasswordUsersByUsername(@Param("username") String username);
 
     @Modifying
     @Query("UPDATE User u SET u.lastLoginTs = :loginTs WHERE u.id = :userId")

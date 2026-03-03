@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { PlusIcon } from '@heroicons/react/20/solid';
 import DataTable, { type Column } from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
-import PermissionGate from '../components/PermissionGate';
 import { getTenants } from '../api/tenants';
 import type { TenantResponse } from '../types';
 import { useToast } from '../contexts/ToastContext';
@@ -76,21 +75,19 @@ export default function TenantsPage() {
       {/* Page header */}
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Tenants</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Компании</h1>
           <p className="mt-2 text-sm text-gray-600">
-            Manage organizations using the platform.
+            Управление организациями на платформе.
           </p>
         </div>
-        <PermissionGate permission="TENANTS:CREATE">
-          <button
-            type="button"
-            onClick={() => navigate('/tenants/new')}
-            className="btn-primary mt-4 sm:mt-0"
-          >
-            <PlusIcon className="-ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
-            Add Tenant
-          </button>
-        </PermissionGate>
+        <button
+          type="button"
+          onClick={() => navigate('/tenants/new')}
+          className="btn-primary mt-4 sm:mt-0"
+        >
+          <PlusIcon className="-ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
+          Создать компанию
+        </button>
       </div>
 
       {/* Table */}
@@ -105,7 +102,7 @@ export default function TenantsPage() {
           totalPages={totalPages}
           onPageChange={setPage}
           keyExtractor={(tenant) => tenant.id}
-          emptyMessage="No tenants found"
+          emptyMessage="Компании не найдены"
         />
       </div>
     </div>

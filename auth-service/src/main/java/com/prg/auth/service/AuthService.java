@@ -65,11 +65,31 @@ public class AuthService {
         String rateLimitKey = ipAddress + ":" + request.getUsername();
         checkRateLimit(rateLimitKey);
 
-        Tenant tenant = tenantRepository.findBySlugAndIsActiveTrue(request.getTenantSlug())
-                .orElseThrow(() -> new ResourceNotFoundException("Tenant not found or inactive", "TENANT_NOT_FOUND"));
+        Tenant tenant;
+        User user;
 
-        User user = userRepository.findByTenantIdAndUsername(tenant.getId(), request.getUsername())
-                .orElse(null);
+        if (request.getTenantSlug() != null && !request.getTenantSlug().isBlank()) {
+            // Tenant specified — use original logic
+            tenant = tenantRepository.findBySlugAndIsActiveTrue(request.getTenantSlug())
+                    .orElseThrow(() -> new ResourceNotFoundException("Tenant not found or inactive", "TENANT_NOT_FOUND"));
+            user = userRepository.findByTenantIdAndUsername(tenant.getId(), request.getUsername())
+                    .orElse(null);
+        } else {
+            // No tenant specified — find password user by username across all active tenants
+            List<User> candidates = userRepository.findActivePasswordUsersByUsername(request.getUsername());
+            if (candidates.isEmpty()) {
+                user = null;
+                tenant = null;
+            } else {
+                user = candidates.get(0); // Pick first match
+                tenant = user.getTenant();
+            }
+        }
+
+        if (tenant == null) {
+            recordLoginAttempt(rateLimitKey);
+            throw new InvalidCredentialsException("Invalid username or password");
+        }
 
         if (user == null) {
             recordLoginAttempt(rateLimitKey);

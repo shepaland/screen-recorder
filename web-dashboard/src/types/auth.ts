@@ -18,7 +18,7 @@ export interface User {
 export interface LoginRequest {
   username: string;
   password: string;
-  tenant_slug: string;
+  tenant_slug?: string;
 }
 
 export interface LoginResponse {

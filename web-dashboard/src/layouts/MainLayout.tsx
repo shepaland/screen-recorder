@@ -62,7 +62,7 @@ export default function MainLayout() {
             <div className="flex items-center gap-x-4 lg:gap-x-6">
               {/* User info */}
               <div className="flex items-center gap-x-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-sm font-semibold text-white">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-sm font-semibold text-white">
                   {user?.first_name?.[0] || user?.username?.[0] || 'U'}
                 </div>
                 <div className="hidden sm:block">

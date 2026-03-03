@@ -1,36 +1,38 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { getOAuthLoginUrl } from '../api/auth';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { AxiosError } from 'axios';
 import type { ErrorResponse } from '../types';
 
 export default function LoginPage() {
-  const [tenantSlug, setTenantSlug] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  // If already authenticated, redirect to home
+  if (!isLoading && isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+
+  const errorMessage = searchParams.get('error');
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    // Client-side validation
-    if (!tenantSlug.trim()) {
-      setError('Tenant is required');
-      return;
-    }
     if (!username.trim()) {
-      setError('Username is required');
+      setError('Введите имя пользователя');
       return;
     }
     if (!password.trim()) {
-      setError('Password is required');
+      setError('Введите пароль');
       return;
     }
 
@@ -38,7 +40,6 @@ export default function LoginPage() {
 
     try {
       await login({
-        tenant_slug: tenantSlug.trim().toLowerCase(),
         username: username.trim(),
         password,
       });
@@ -49,28 +50,39 @@ export default function LoginPage() {
       if (err instanceof AxiosError) {
         const data = err.response?.data as ErrorResponse | undefined;
         if (err.response?.status === 429) {
-          setError('Too many attempts. Please try again in a few minutes.');
+          setError('Слишком много попыток. Попробуйте позже.');
         } else if (data?.error) {
           setError(data.error);
         } else if (err.response?.status === 401) {
-          setError('Invalid username or password');
+          setError('Неверное имя пользователя или пароль');
         } else if (err.response?.status === 404) {
-          setError('Tenant not found or inactive');
+          setError('Компания не найдена или неактивна');
         } else {
-          setError('An unexpected error occurred. Please try again.');
+          setError('Произошла ошибка. Попробуйте ещё раз.');
         }
       } else {
-        setError('An unexpected error occurred. Please try again.');
+        setError('Произошла ошибка. Попробуйте ещё раз.');
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleYandexLogin = () => {
+    window.location.href = getOAuthLoginUrl();
+  };
+
   return (
     <div className="card">
-      <form className="space-y-6" onSubmit={handleSubmit}>
-        {/* Error alert */}
+      <div className="space-y-6">
+        {/* Error from OAuth callback */}
+        {errorMessage && (
+          <div className="rounded-md bg-red-50 p-3">
+            <p className="text-sm text-red-700">{errorMessage}</p>
+          </div>
+        )}
+
+        {/* Error from form submission */}
         {error && (
           <div className="rounded-md bg-red-50 p-4">
             <div className="flex">
@@ -94,66 +106,45 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Tenant */}
-        <div>
-          <label htmlFor="tenant" className="label">
-            Tenant
-          </label>
-          <div className="mt-2">
-            <input
-              id="tenant"
-              name="tenant"
-              type="text"
-              autoComplete="organization"
-              placeholder="company-abc"
-              required
-              value={tenantSlug}
-              onChange={(e) => setTenantSlug(e.target.value)}
-              className="input-field"
-            />
+        {/* Password login form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="username" className="label">
+              Имя пользователя
+            </label>
+            <div className="mt-1">
+              <input
+                id="username"
+                name="username"
+                type="text"
+                autoComplete="username"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="input-field"
+                placeholder="superadmin"
+              />
+            </div>
           </div>
-        </div>
 
-        {/* Username */}
-        <div>
-          <label htmlFor="username" className="label">
-            Username
-          </label>
-          <div className="mt-2">
-            <input
-              id="username"
-              name="username"
-              type="text"
-              autoComplete="username"
-              required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="input-field"
-            />
+          <div>
+            <label htmlFor="password" className="label">
+              Пароль
+            </label>
+            <div className="mt-1">
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="input-field"
+              />
+            </div>
           </div>
-        </div>
 
-        {/* Password */}
-        <div>
-          <label htmlFor="password" className="label">
-            Password
-          </label>
-          <div className="mt-2">
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="input-field"
-            />
-          </div>
-        </div>
-
-        {/* Submit */}
-        <div>
           <button
             type="submit"
             disabled={isSubmitting}
@@ -162,10 +153,38 @@ export default function LoginPage() {
             {isSubmitting ? (
               <LoadingSpinner size="sm" className="mr-2" />
             ) : null}
-            {isSubmitting ? 'Signing in...' : 'Sign in'}
+            {isSubmitting ? 'Вход...' : 'Войти'}
+          </button>
+        </form>
+
+        {/* Divider */}
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-200" />
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="bg-white px-4 text-gray-500">или</span>
+          </div>
+        </div>
+
+        {/* OAuth section */}
+        <div>
+          <p className="text-xs text-center text-gray-500 mb-3">
+            Альтернативные способы входа
+          </p>
+          <button
+            type="button"
+            onClick={handleYandexLogin}
+            className="flex w-full items-center justify-center gap-3 rounded-lg bg-[#FC3F1D] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#E5391A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FC3F1D] transition-colors"
+          >
+            {/* Yandex icon */}
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M13.32 7.666h-.924c-1.694 0-2.585.858-2.585 2.123 0 1.43.616 2.1 1.881 2.959l1.045.704-3.003 4.487H7.49l2.695-4.014c-1.55-1.111-2.42-2.19-2.42-3.925 0-2.321 1.606-3.891 4.485-3.891h3.24v11.83H13.32V7.666z" />
+            </svg>
+            Войти через Яндекс
           </button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

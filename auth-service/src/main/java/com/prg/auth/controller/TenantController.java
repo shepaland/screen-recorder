@@ -1,5 +1,6 @@
 package com.prg.auth.controller;
 
+import com.prg.auth.dto.request.CreateOwnTenantRequest;
 import com.prg.auth.dto.request.CreateTenantRequest;
 import com.prg.auth.dto.request.TransferOwnershipRequest;
 import com.prg.auth.dto.request.UpdateTenantRequest;
@@ -32,7 +33,8 @@ public class TenantController {
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        requirePermission(principal, "TENANTS:READ");
+        // Allow all authenticated users to list tenants they have access to
+        // The service method already filters by scope (global vs own tenant)
         List<TenantResponse> tenants = tenantService.getTenants(principal);
 
         // Wrap list into PageResponse for frontend compatibility
@@ -57,6 +59,23 @@ public class TenantController {
             HttpServletRequest httpRequest) {
         requirePermission(principal, "TENANTS:CREATE");
         TenantResponse response = tenantService.createTenant(
+                request, principal,
+                getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Create a new tenant owned by the current authenticated user.
+     * No admin user details required - the current user becomes the owner.
+     * Any authenticated user can call this endpoint.
+     */
+    @PostMapping("/create-own")
+    public ResponseEntity<TenantResponse> createOwnTenant(
+            @Valid @RequestBody CreateOwnTenantRequest request,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest httpRequest) {
+        // No permission check - any authenticated user can create their own tenant
+        TenantResponse response = tenantService.createOwnTenant(
                 request, principal,
                 getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

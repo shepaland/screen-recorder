@@ -20,7 +20,5 @@ public class LoginRequest {
     @NotBlank(message = "Password is required")
     private String password;
 
-    @Size(min = 3, max = 100, message = "Tenant slug must be between 3 and 100 characters")
-    @Builder.Default
-    private String tenantSlug = "prg-platform";
+    private String tenantSlug;
 }

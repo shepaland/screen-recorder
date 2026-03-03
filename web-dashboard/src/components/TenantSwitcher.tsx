@@ -56,8 +56,8 @@ export default function TenantSwitcher() {
     [currentTenantId, switchTenant, addToast],
   );
 
-  // Don't render for password-based users (superadmin)
-  if (!user || user.auth_provider !== 'oauth') {
+  // Don't render if user is not loaded
+  if (!user) {
     return null;
   }
 
@@ -69,20 +69,20 @@ export default function TenantSwitcher() {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center gap-3 rounded-lg bg-indigo-900/50 px-3 py-2.5 text-left text-sm transition-colors hover:bg-indigo-900/70 cursor-pointer"
+        className="flex w-full items-center gap-3 rounded-lg bg-gray-800/50 px-3 py-2.5 text-left text-sm transition-colors hover:bg-gray-800/70 cursor-pointer"
       >
-        <BuildingOffice2Icon className="h-5 w-5 flex-shrink-0 text-indigo-300" />
+        <BuildingOffice2Icon className="h-5 w-5 flex-shrink-0 text-gray-400" />
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-white">
             {currentTenant?.name || 'Компания'}
           </p>
           {currentTenant?.role && (
-            <p className="truncate text-xs text-indigo-300">
+            <p className="truncate text-xs text-gray-400">
               {ROLE_LABELS[currentTenant.role] || currentTenant.role}
             </p>
           )}
         </div>
-        <ChevronUpDownIcon className="h-5 w-5 flex-shrink-0 text-indigo-300" />
+        <ChevronUpDownIcon className="h-5 w-5 flex-shrink-0 text-gray-400" />
       </button>
 
       {/* Dropdown */}
@@ -101,7 +101,7 @@ export default function TenantSwitcher() {
                 disabled={isSwitching}
                 className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors ${
                   isActive
-                    ? 'bg-indigo-50 text-indigo-700'
+                    ? 'bg-red-50 text-red-700'
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
@@ -112,7 +112,7 @@ export default function TenantSwitcher() {
                   </p>
                 </div>
                 {isActive && (
-                  <CheckIcon className="h-4 w-4 flex-shrink-0 text-indigo-600" />
+                  <CheckIcon className="h-4 w-4 flex-shrink-0 text-red-600" />
                 )}
               </button>
             );

@@ -92,16 +92,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [clearRefreshTimer],
   );
 
-  const loadTenants = useCallback(async (userData: User) => {
-    // Load tenants list for OAuth users
-    if (userData.auth_provider === 'oauth') {
-      try {
-        const data = await authApi.getMyTenants();
-        setTenants(data.tenants);
-      } catch {
-        // Non-critical: tenants list is optional
-        setTenants([]);
-      }
+  const loadTenants = useCallback(async (_userData: User) => {
+    // Load tenants list for all users
+    try {
+      const data = await authApi.getMyTenants();
+      setTenants(data.tenants);
+    } catch {
+      // Non-critical: tenants list is optional
+      setTenants([]);
     }
   }, []);
 

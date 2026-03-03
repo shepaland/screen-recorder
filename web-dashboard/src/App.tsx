@@ -2,8 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import AuthLayout from './layouts/AuthLayout';
 import MainLayout from './layouts/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
-import OAuthLoginPage from './pages/OAuthLoginPage';
-import AdminLoginPage from './pages/AdminLoginPage';
+import LoginPage from './pages/LoginPage';
 import OAuthCallbackPage from './pages/OAuthCallbackPage';
 import TenantSelectPage from './pages/TenantSelectPage';
 import OnboardingPage from './pages/OnboardingPage';
@@ -23,14 +22,14 @@ import SettingsPage from './pages/SettingsPage';
 // ProfilePage merged into SettingsPage
 import TenantsPage from './pages/TenantsPage';
 import TenantCreatePage from './pages/TenantCreatePage';
+import RecordingsPage from './pages/RecordingsPage';
 
 function App() {
   return (
     <Routes>
       {/* Public routes -- auth pages */}
       <Route element={<AuthLayout />}>
-        <Route path="/login" element={<OAuthLoginPage />} />
-        <Route path="/login/admin" element={<AdminLoginPage />} />
+        <Route path="/login" element={<LoginPage />} />
       </Route>
 
       {/* Public routes -- OAuth flow (full-screen, no AuthLayout wrapper) */}
@@ -54,6 +53,9 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Recordings */}
+        <Route path="/recordings" element={<RecordingsPage />} />
 
         {/* Users */}
         <Route
@@ -154,18 +156,11 @@ function App() {
         />
 
         {/* Tenants */}
-        <Route
-          path="/tenants"
-          element={
-            <ProtectedRoute permission="TENANTS:READ">
-              <TenantsPage />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/tenants" element={<TenantsPage />} />
         <Route
           path="/tenants/new"
           element={
-            <ProtectedRoute permission="TENANTS:CREATE">
+            <ProtectedRoute>
               <TenantCreatePage />
             </ProtectedRoute>
           }

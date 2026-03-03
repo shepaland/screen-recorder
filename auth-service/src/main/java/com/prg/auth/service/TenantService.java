@@ -1,16 +1,20 @@
 package com.prg.auth.service;
 
+import com.prg.auth.dto.request.CreateOwnTenantRequest;
 import com.prg.auth.dto.request.CreateTenantRequest;
 import com.prg.auth.dto.request.UpdateTenantRequest;
 import com.prg.auth.dto.response.TenantResponse;
+import com.prg.auth.entity.OAuthIdentity;
 import com.prg.auth.entity.Role;
 import com.prg.auth.entity.Tenant;
 import com.prg.auth.entity.User;
+import com.prg.auth.entity.UserOAuthLink;
 import com.prg.auth.exception.AccessDeniedException;
 import com.prg.auth.exception.DuplicateResourceException;
 import com.prg.auth.exception.ResourceNotFoundException;
 import com.prg.auth.repository.RoleRepository;
 import com.prg.auth.repository.TenantRepository;
+import com.prg.auth.repository.UserOAuthLinkRepository;
 import com.prg.auth.repository.UserRepository;
 import com.prg.auth.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +36,7 @@ public class TenantService {
     private final TenantRepository tenantRepository;
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
+    private final UserOAuthLinkRepository userOAuthLinkRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
 
@@ -112,6 +117,97 @@ public class TenantService {
 
         TenantResponse response = toResponse(tenant);
         response.setAdminUserId(adminUser.getId());
+        return response;
+    }
+
+    /**
+     * Create a new tenant and bind it to the current authenticated user.
+     * For OAuth users: creates new user record + UserOAuthLink.
+     * For password users: creates new user record with same credentials.
+     */
+    @Transactional
+    public TenantResponse createOwnTenant(CreateOwnTenantRequest request, UserPrincipal principal,
+                                            String ipAddress, String userAgent) {
+        if (tenantRepository.existsBySlug(request.getSlug())) {
+            throw new DuplicateResourceException("Tenant slug already exists", "SLUG_ALREADY_EXISTS");
+        }
+
+        // Find current user
+        User currentUser = userRepository.findById(principal.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found", "USER_NOT_FOUND"));
+
+        // 1. Create tenant
+        Map<String, Object> settings = request.getSettings() != null ? request.getSettings() : Map.of("session_ttl_max_days", 30);
+        Tenant tenant = Tenant.builder()
+                .name(request.getName())
+                .slug(request.getSlug())
+                .isActive(true)
+                .settings(settings)
+                .build();
+        tenant = tenantRepository.save(tenant);
+
+        // 2. Copy system roles from template tenant
+        List<Role> templateRoles = roleRepository.findByTenantIdWithPermissions(TEMPLATE_TENANT_ID);
+        Map<String, Role> newRoles = new HashMap<>();
+
+        for (Role templateRole : templateRoles) {
+            Role newRole = Role.builder()
+                    .tenant(tenant)
+                    .code(templateRole.getCode())
+                    .name(templateRole.getName())
+                    .description(templateRole.getDescription())
+                    .isSystem(true)
+                    .permissions(new HashSet<>(templateRole.getPermissions()))
+                    .build();
+            newRole = roleRepository.save(newRole);
+            newRoles.put(newRole.getCode(), newRole);
+        }
+
+        // 3. Determine owner role (OWNER, fallback to TENANT_ADMIN)
+        Role ownerRole = newRoles.get("OWNER");
+        if (ownerRole == null) {
+            ownerRole = newRoles.get("TENANT_ADMIN");
+        }
+
+        // 4. Create new user in the new tenant
+        User newUser = User.builder()
+                .tenant(tenant)
+                .username(currentUser.getUsername())
+                .email(currentUser.getEmail())
+                .passwordHash(currentUser.getPasswordHash()) // copy password hash for password users, null for OAuth
+                .firstName(currentUser.getFirstName())
+                .lastName(currentUser.getLastName())
+                .authProvider(currentUser.getAuthProvider())
+                .isActive(true)
+                .roles(ownerRole != null ? Set.of(ownerRole) : Set.of())
+                .settings(Map.of())
+                .build();
+        newUser = userRepository.save(newUser);
+
+        // 5. For OAuth users: link the new user to the same OAuth identity
+        if ("oauth".equals(currentUser.getAuthProvider())) {
+            UserOAuthLink existingLink = userOAuthLinkRepository.findByUserId(currentUser.getId())
+                    .orElse(null);
+            if (existingLink != null) {
+                OAuthIdentity identity = existingLink.getOauthIdentity();
+                UserOAuthLink newLink = UserOAuthLink.builder()
+                        .user(newUser)
+                        .oauthIdentity(identity)
+                        .build();
+                userOAuthLinkRepository.save(newLink);
+            }
+        }
+
+        // 6. Audit
+        auditService.logAction(tenant.getId(), principal.getUserId(), "TENANT_CREATED", "TENANTS", tenant.getId(),
+                Map.of("name", tenant.getName(), "slug", tenant.getSlug(), "owner_user_id", newUser.getId().toString()),
+                ipAddress, userAgent, null);
+
+        log.info("Tenant created by user: tenant_id={}, slug={}, creator_id={}, new_user_id={}",
+                tenant.getId(), tenant.getSlug(), principal.getUserId(), newUser.getId());
+
+        TenantResponse response = toResponse(tenant);
+        response.setAdminUserId(newUser.getId());
         return response;
     }
 
