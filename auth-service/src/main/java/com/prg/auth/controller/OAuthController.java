@@ -40,7 +40,7 @@ public class OAuthController {
     private final FrontendConfig frontendConfig;
 
     private static final String REFRESH_TOKEN_COOKIE = "refresh_token";
-    private static final String COOKIE_PATH = "/api/v1/auth";
+    private static final String COOKIE_PATH = "/";
 
     /**
      * GET /api/v1/auth/oauth/yandex

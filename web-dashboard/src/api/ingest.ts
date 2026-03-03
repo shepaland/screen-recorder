@@ -1,0 +1,77 @@
+import axios from 'axios';
+import { getAccessToken } from './client';
+
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+const INGEST_API_BASE_URL = import.meta.env.VITE_INGEST_API_BASE_URL || `${basePath}/api/ingest/v1/ingest`;
+
+const ingestApiClient = axios.create({
+  baseURL: INGEST_API_BASE_URL,
+  headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
+});
+
+// Request interceptor: attach Authorization header
+ingestApiClient.interceptors.request.use(
+  (config) => {
+    const token = getAccessToken();
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
+
+export interface Recording {
+  id: string;
+  device_id: string;
+  device_hostname: string;
+  status: string;
+  started_ts: string;
+  ended_ts: string | null;
+  segment_count: number;
+  total_bytes: number;
+  total_duration_ms: number;
+  metadata: Record<string, unknown>;
+}
+
+export interface RecordingsResponse {
+  content: Recording[];
+  page: number;
+  size: number;
+  total_elements: number;
+  total_pages: number;
+}
+
+export interface Segment {
+  id: string;
+  sequence_num: number;
+  duration_ms: number;
+  size_bytes: number;
+  status: string;
+  s3_key: string;
+}
+
+export interface RecordingSegmentsResponse {
+  session_id: string;
+  segments: Segment[];
+}
+
+export async function getRecordings(params?: {
+  page?: number;
+  size?: number;
+  status?: string;
+  device_id?: string;
+  from?: string;
+  to?: string;
+}): Promise<RecordingsResponse> {
+  const response = await ingestApiClient.get<RecordingsResponse>('/recordings', { params });
+  return response.data;
+}
+
+export async function getRecordingSegments(id: string): Promise<RecordingSegmentsResponse> {
+  const response = await ingestApiClient.get<RecordingSegmentsResponse>(`/recordings/${id}/segments`);
+  return response.data;
+}
+
+export default ingestApiClient;

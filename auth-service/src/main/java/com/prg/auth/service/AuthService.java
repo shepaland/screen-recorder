@@ -458,6 +458,7 @@ public class AuthService {
                     .slug(tenant.getSlug())
                     .role(primaryRole)
                     .isCurrent(true)
+                    .createdTs(tenant.getCreatedTs())
                     .build();
             return MyTenantsResponse.builder()
                     .tenants(List.of(preview))
@@ -481,6 +482,7 @@ public class AuthService {
                             .slug(tenant.getSlug())
                             .role(primaryRole)
                             .isCurrent(user.getId().equals(currentUserId))
+                            .createdTs(tenant.getCreatedTs())
                             .build();
                 })
                 .toList();

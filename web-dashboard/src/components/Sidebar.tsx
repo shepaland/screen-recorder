@@ -12,6 +12,7 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   FilmIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 import PermissionGate from './PermissionGate';
 import TenantSwitcher from './TenantSwitcher';
@@ -37,6 +38,7 @@ const superAdminNavigation: NavItem[] = [
   { name: 'Устройства', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
   { name: 'Токены регистрации', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
   { name: 'Audit Log', href: '/audit', icon: DocumentTextIcon, permission: 'AUDIT:READ' },
+  { name: 'Скачать клиент', href: '/download', icon: ArrowDownTrayIcon },
   { name: 'Tenants', href: '/tenants', icon: BuildingOfficeIcon, permission: 'TENANTS:READ' },
 ];
 
@@ -47,6 +49,7 @@ const tenantScopedNavigation: NavItem[] = [
   { name: 'Токены регистрации', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
   { name: 'Устройства', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
   { name: 'Пользователи', href: '/users', icon: UsersIcon, permission: 'USERS:READ' },
+  { name: 'Скачать клиент', href: '/download', icon: ArrowDownTrayIcon },
 ];
 
 /** Global items outside the company scope. */

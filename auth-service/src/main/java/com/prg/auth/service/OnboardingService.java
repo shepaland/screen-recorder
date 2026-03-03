@@ -151,6 +151,7 @@ public class OnboardingService {
                 .slug(tenant.getSlug())
                 .role(primaryRoleCode)
                 .isCurrent(true)
+                .createdTs(tenant.getCreatedTs())
                 .build();
 
         OnboardingResponse onboardingResponse = OnboardingResponse.builder()

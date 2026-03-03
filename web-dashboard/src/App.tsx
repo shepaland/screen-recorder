@@ -22,6 +22,7 @@ import SettingsPage from './pages/SettingsPage';
 import TenantsPage from './pages/TenantsPage';
 import TenantCreatePage from './pages/TenantCreatePage';
 import RecordingsPage from './pages/RecordingsPage';
+import DownloadPage from './pages/DownloadPage';
 
 function App() {
   return (
@@ -54,6 +55,9 @@ function App() {
 
         {/* Recordings */}
         <Route path="/recordings" element={<RecordingsPage />} />
+
+        {/* Download */}
+        <Route path="/download" element={<DownloadPage />} />
 
         {/* Users */}
         <Route

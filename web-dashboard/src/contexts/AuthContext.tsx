@@ -96,7 +96,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Load tenants list for all users
     try {
       const data = await authApi.getMyTenants();
-      setTenants(data.tenants);
+      const sorted = [...data.tenants].sort((a, b) =>
+        new Date(a.created_ts || 0).getTime() - new Date(b.created_ts || 0).getTime()
+      );
+      setTenants(sorted);
     } catch {
       // Non-critical: tenants list is optional
       setTenants([]);

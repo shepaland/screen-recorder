@@ -29,7 +29,7 @@ public class AuthController {
     private final AuthService authService;
 
     private static final String REFRESH_TOKEN_COOKIE = "refresh_token";
-    private static final String COOKIE_PATH = "/api/v1/auth";
+    private static final String COOKIE_PATH = "/";
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request,

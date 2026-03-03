@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -44,5 +45,6 @@ public class OAuthCallbackResponse {
         private String slug;
         private String role;
         private Boolean isCurrent;
+        private Instant createdTs;
     }
 }

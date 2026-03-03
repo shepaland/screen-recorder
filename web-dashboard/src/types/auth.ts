@@ -60,6 +60,7 @@ export interface TenantPreview {
   slug: string;
   role: string;
   is_current?: boolean;
+  created_ts?: string;
 }
 
 export interface OnboardingRequest {

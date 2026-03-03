@@ -25,6 +25,7 @@ public interface UserOAuthLinkRepository extends JpaRepository<UserOAuthLink, UU
            "JOIN FETCH uol.user u " +
            "JOIN FETCH u.tenant t " +
            "WHERE uol.oauthIdentity.id = :oauthId " +
-           "AND u.isActive = true AND t.isActive = true")
+           "AND u.isActive = true AND t.isActive = true " +
+           "ORDER BY t.createdTs ASC")
     List<UserOAuthLink> findActiveLinksWithUserAndTenant(@Param("oauthId") UUID oauthId);
 }
