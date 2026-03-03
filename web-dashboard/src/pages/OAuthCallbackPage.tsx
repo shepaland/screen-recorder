@@ -11,6 +11,7 @@ export default function OAuthCallbackPage() {
   useEffect(() => {
     const accessToken = searchParams.get('access_token');
     const oauthToken = searchParams.get('oauth_token');
+    const status = searchParams.get('status');
 
     async function handleCallback() {
       if (accessToken) {
@@ -19,21 +20,23 @@ export default function OAuthCallbackPage() {
           await setUserFromToken(accessToken);
           navigate('/', { replace: true });
         } catch {
-          navigate('/login', { replace: true });
+          navigate('/login?error=' + encodeURIComponent('Failed to authenticate'), { replace: true });
         }
       } else if (oauthToken) {
-        // Multiple tenants or needs onboarding
-        const status = searchParams.get('status');
         if (status === 'needs_onboarding') {
           const name = searchParams.get('name') || '';
           const email = searchParams.get('email') || '';
           navigate(`/onboarding?oauth_token=${encodeURIComponent(oauthToken)}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`, { replace: true });
+        } else if (status === 'tenant_selection') {
+          const tenants = searchParams.get('tenants') || '';
+          navigate(`/select-tenant?oauth_token=${encodeURIComponent(oauthToken)}&tenants=${encodeURIComponent(tenants)}`, { replace: true });
         } else {
+          // Fallback: try tenant selection
           navigate(`/select-tenant?oauth_token=${encodeURIComponent(oauthToken)}`, { replace: true });
         }
       } else {
-        // No token, redirect to login
-        navigate('/login', { replace: true });
+        const error = searchParams.get('error');
+        navigate('/login' + (error ? `?error=${encodeURIComponent(error)}` : ''), { replace: true });
       }
     }
 

@@ -93,6 +93,7 @@ spec:
 # -----------------------------------------------------------------------------
 # Allow outbound traffic to:
 #   - PostgreSQL at 172.17.0.1:5432 (host network, TCP)
+#   - External HTTPS (443) for Yandex OAuth (oauth.yandex.ru token exchange)
 #   - kube-dns at kube-system namespace (UDP 53 for service discovery)
 # -----------------------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
@@ -116,6 +117,17 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
+    # External HTTPS (Yandex OAuth token exchange + user info)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
     # DNS (kube-dns in kube-system)
     - to:
         - namespaceSelector:

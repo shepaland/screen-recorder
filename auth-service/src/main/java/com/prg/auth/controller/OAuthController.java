@@ -98,28 +98,33 @@ public class OAuthController {
 
             switch (response.getStatus()) {
                 case "authenticated" -> {
-                    // Single tenant - auto-login, set cookie and redirect to dashboard
+                    // Single tenant - auto-login, set cookie and redirect to callback page
                     if (result.getRawRefreshToken() != null) {
                         // Default 30 days; actual token expiry was set in performOAuthLogin
                         setRefreshTokenCookie(httpResponse, result.getRawRefreshToken(), 30L * 86400L);
                     }
                     redirectUrl = frontendBaseUrl
-                            + "/?access_token=" + urlEncode(response.getAccessToken())
+                            + "/oauth/callback?access_token=" + urlEncode(response.getAccessToken())
                             + "&token_type=Bearer"
                             + "&expires_in=" + response.getExpiresIn();
                 }
                 case "needs_onboarding" -> {
-                    // No tenants - redirect to onboarding page
-                    redirectUrl = frontendBaseUrl + "/onboarding"
-                            + "?oauth_token=" + urlEncode(response.getOauthToken());
+                    // No tenants - redirect to callback page with onboarding params
+                    var oauthUser = response.getOauthUser();
+                    redirectUrl = frontendBaseUrl + "/oauth/callback"
+                            + "?oauth_token=" + urlEncode(response.getOauthToken())
+                            + "&status=needs_onboarding"
+                            + "&name=" + urlEncode(oauthUser != null ? oauthUser.getName() : "")
+                            + "&email=" + urlEncode(oauthUser != null ? oauthUser.getEmail() : "");
                 }
                 case "tenant_selection_required" -> {
-                    // Multiple tenants - redirect to tenant selection page
+                    // Multiple tenants - redirect to callback page with tenant selection params
                     String tenantsParam = response.getTenants().stream()
                             .map(t -> t.getId() + ":" + t.getSlug() + ":" + urlEncode(t.getName()))
                             .collect(Collectors.joining(","));
-                    redirectUrl = frontendBaseUrl + "/select-tenant"
+                    redirectUrl = frontendBaseUrl + "/oauth/callback"
                             + "?oauth_token=" + urlEncode(response.getOauthToken())
+                            + "&status=tenant_selection"
                             + "&tenants=" + urlEncode(tenantsParam);
                 }
                 default -> {
