@@ -17,6 +17,8 @@ data:
   JAVA_OPTS: "-Xms256m -Xmx512m"
   INGEST_BASE_URL: "https://services-test.shepaland.ru/screenrecorder/api/ingest/v1/ingest"
   CONTROL_PLANE_BASE_URL: "https://services-test.shepaland.ru/screenrecorder/api/cp/v1/devices"
+  YANDEX_OAUTH_CALLBACK_URL: "https://services-test.shepaland.ru/screenrecorder/api/v1/auth/oauth/yandex/callback"
+  FRONTEND_BASE_URL: "https://services-test.shepaland.ru/screenrecorder"
 ---
 apiVersion: v1
 kind: ConfigMap
