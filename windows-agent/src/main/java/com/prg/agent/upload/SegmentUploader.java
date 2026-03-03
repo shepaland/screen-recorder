@@ -42,17 +42,18 @@ public class SegmentUploader {
      *
      * @param segmentFile the local segment file
      * @param sessionId   the recording session ID
+     * @param deviceId    the device UUID (required by server)
      * @param sequenceNum the segment sequence number within the session
      * @param sizeBytes   the file size in bytes
      * @param checksum    the SHA-256 checksum of the file
      * @throws HttpClient.HttpException if any step of the pipeline fails
      */
-    public void uploadSegment(File segmentFile, String sessionId, int sequenceNum,
+    public void uploadSegment(File segmentFile, String sessionId, String deviceId, int sequenceNum,
                                long sizeBytes, String checksum) throws HttpClient.HttpException {
         log.info("Uploading segment #{} for session {} ({} bytes)", sequenceNum, sessionId, sizeBytes);
 
         // Step 1: Get presigned URL
-        PresignResponse presignResponse = presign(sessionId, sequenceNum, sizeBytes, checksum);
+        PresignResponse presignResponse = presign(sessionId, deviceId, sequenceNum, sizeBytes, checksum);
         log.debug("Got presigned URL for segment {} (segment_id={})",
                 sequenceNum, presignResponse.getSegmentId());
 
@@ -79,12 +80,14 @@ public class SegmentUploader {
     /**
      * Step 1: Request a presigned upload URL from the ingest gateway.
      */
-    private PresignResponse presign(String sessionId, int sequenceNum,
+    private PresignResponse presign(String sessionId, String deviceId, int sequenceNum,
                                      long sizeBytes, String checksum) throws HttpClient.HttpException {
         PresignRequest request = new PresignRequest();
+        request.setDeviceId(deviceId);
         request.setSessionId(sessionId);
         request.setSequenceNum(sequenceNum);
         request.setSizeBytes(sizeBytes);
+        request.setDurationMs(config.getSegmentDurationSec() * 1000);
         request.setChecksumSha256(checksum);
         request.setContentType(CONTENT_TYPE);
         request.setMetadata(Map.of(
@@ -114,12 +117,16 @@ public class SegmentUploader {
     @Data
     @NoArgsConstructor
     public static class PresignRequest {
+        @JsonProperty("device_id")
+        private String deviceId;
         @JsonProperty("session_id")
         private String sessionId;
         @JsonProperty("sequence_num")
         private int sequenceNum;
         @JsonProperty("size_bytes")
         private long sizeBytes;
+        @JsonProperty("duration_ms")
+        private int durationMs;
         @JsonProperty("checksum_sha256")
         private String checksumSha256;
         @JsonProperty("content_type")

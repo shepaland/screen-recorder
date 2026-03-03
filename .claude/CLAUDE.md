@@ -61,7 +61,7 @@ swift build && swift test
 | prod | shepaland-videocalls-test-srv | `prod-screen-record` | `https://services.shepaland.ru/screenrecorder` | `prg_prod` |
 
 - **shepaland-cloud** (158.160.222.120): k3s, cert-manager + ClusterIssuer, PostgreSQL на хосте
-- **shepaland-videocalls-test-srv** (158.160.221.196): k3s, Traefik ACME, PostgreSQL на хосте (172.17.0.1:5432)
+- **shepaland-videocalls-test-srv** (158.160.130.90): k3s, Traefik ACME, PostgreSQL на хосте (172.17.0.1:5432)
 
 ### Path-based routing
 

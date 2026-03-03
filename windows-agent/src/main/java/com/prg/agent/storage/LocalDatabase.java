@@ -36,6 +36,7 @@ public class LocalDatabase {
                 CREATE TABLE IF NOT EXISTS pending_segments (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     session_id TEXT NOT NULL,
+                    device_id TEXT,
                     sequence_num INTEGER NOT NULL,
                     file_path TEXT NOT NULL,
                     size_bytes INTEGER NOT NULL,
@@ -45,6 +46,13 @@ public class LocalDatabase {
                     UNIQUE(session_id, sequence_num)
                 )
             """);
+
+            // Migration: add device_id column if missing (existing databases)
+            try {
+                stmt.execute("ALTER TABLE pending_segments ADD COLUMN device_id TEXT");
+            } catch (SQLException ignored) {
+                // Column already exists
+            }
 
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS agent_state (
@@ -69,24 +77,25 @@ public class LocalDatabase {
     /**
      * Adds a segment to the pending queue for later upload.
      */
-    public void addPendingSegment(String sessionId, int sequenceNum, String filePath,
+    public void addPendingSegment(String sessionId, String deviceId, int sequenceNum, String filePath,
                                    long sizeBytes, String checksum) {
         String sql = """
-            INSERT OR REPLACE INTO pending_segments 
-            (session_id, sequence_num, file_path, size_bytes, checksum, retry_count, created_at)
-            VALUES (?, ?, ?, ?, ?, 0, ?)
+            INSERT OR REPLACE INTO pending_segments
+            (session_id, device_id, sequence_num, file_path, size_bytes, checksum, retry_count, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, 0, ?)
         """;
 
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, sessionId);
-            ps.setInt(2, sequenceNum);
-            ps.setString(3, filePath);
-            ps.setLong(4, sizeBytes);
-            ps.setString(5, checksum);
-            ps.setString(6, Instant.now().toString());
+            ps.setString(2, deviceId);
+            ps.setInt(3, sequenceNum);
+            ps.setString(4, filePath);
+            ps.setLong(5, sizeBytes);
+            ps.setString(6, checksum);
+            ps.setString(7, Instant.now().toString());
             ps.executeUpdate();
-            log.debug("Added pending segment: session={}, seq={}", sessionId, sequenceNum);
+            log.debug("Added pending segment: session={}, device={}, seq={}", sessionId, deviceId, sequenceNum);
         } catch (SQLException e) {
             log.error("Failed to add pending segment", e);
         }
@@ -107,6 +116,7 @@ public class LocalDatabase {
                 PendingSegment seg = new PendingSegment();
                 seg.setId(rs.getInt("id"));
                 seg.setSessionId(rs.getString("session_id"));
+                seg.setDeviceId(rs.getString("device_id"));
                 seg.setSequenceNum(rs.getInt("sequence_num"));
                 seg.setFilePath(rs.getString("file_path"));
                 seg.setSizeBytes(rs.getLong("size_bytes"));
@@ -137,6 +147,7 @@ public class LocalDatabase {
                     PendingSegment seg = new PendingSegment();
                     seg.setId(rs.getInt("id"));
                     seg.setSessionId(rs.getString("session_id"));
+                    seg.setDeviceId(rs.getString("device_id"));
                     seg.setSequenceNum(rs.getInt("sequence_num"));
                     seg.setFilePath(rs.getString("file_path"));
                     seg.setSizeBytes(rs.getLong("size_bytes"));
@@ -280,6 +291,7 @@ public class LocalDatabase {
     public static class PendingSegment {
         private int id;
         private String sessionId;
+        private String deviceId;
         private int sequenceNum;
         private String filePath;
         private long sizeBytes;

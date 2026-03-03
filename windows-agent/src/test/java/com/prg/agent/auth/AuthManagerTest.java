@@ -37,7 +37,7 @@ class AuthManagerTest {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
         mapper.setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
-        when(httpClient.getObjectMapper()).thenReturn(mapper);
+        lenient().when(httpClient.getObjectMapper()).thenReturn(mapper);
 
         authManager = new AuthManager(config, httpClient, credentialStore);
     }

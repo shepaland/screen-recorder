@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -57,17 +58,17 @@ class UploadQueueTest {
         doAnswer(invocation -> {
             latch.countDown();
             return null;
-        }).when(segmentUploader).uploadSegment(any(), anyString(), anyInt(), anyLong(), anyString());
+        }).when(segmentUploader).uploadSegment(any(), anyString(), anyString(), anyInt(), anyLong(), anyString());
 
         // When
-        uploadQueue.enqueue(new UploadQueue.SegmentTask(file1, "session-1", 1, 1024, "checksum1"));
-        uploadQueue.enqueue(new UploadQueue.SegmentTask(file2, "session-1", 2, 2048, "checksum2"));
+        uploadQueue.enqueue(new UploadQueue.SegmentTask(file1, "session-1", "device-1", 1, 1024, "checksum1"));
+        uploadQueue.enqueue(new UploadQueue.SegmentTask(file2, "session-1", "device-1", 2, 2048, "checksum2"));
 
         // Then
         assertTrue(latch.await(10, TimeUnit.SECONDS), "Both segments should be processed");
 
-        verify(segmentUploader).uploadSegment(eq(file1), eq("session-1"), eq(1), eq(1024L), eq("checksum1"));
-        verify(segmentUploader).uploadSegment(eq(file2), eq("session-1"), eq(2), eq(2048L), eq("checksum2"));
+        verify(segmentUploader).uploadSegment(eq(file1), eq("session-1"), eq("device-1"), eq(1), eq(1024L), eq("checksum1"));
+        verify(segmentUploader).uploadSegment(eq(file2), eq("session-1"), eq("device-1"), eq(2), eq(2048L), eq("checksum2"));
 
         uploadQueue.stop();
     }
@@ -87,19 +88,19 @@ class UploadQueueTest {
                     latch.countDown();
                     return null;
                 })
-                .when(segmentUploader).uploadSegment(any(), anyString(), anyInt(), anyLong(), anyString());
+                .when(segmentUploader).uploadSegment(any(), anyString(), anyString(), anyInt(), anyLong(), anyString());
 
         // When
-        uploadQueue.enqueue(new UploadQueue.SegmentTask(file, "session-1", 1, 1024, "checksum"));
+        uploadQueue.enqueue(new UploadQueue.SegmentTask(file, "session-1", "device-1", 1, 1024, "checksum"));
 
         // Then
         assertTrue(latch.await(30, TimeUnit.SECONDS), "Upload should eventually succeed after retries");
 
         // Verify 3 attempts total (2 failures + 1 success)
-        verify(segmentUploader, times(3)).uploadSegment(any(), anyString(), anyInt(), anyLong(), anyString());
+        verify(segmentUploader, times(3)).uploadSegment(any(), anyString(), anyString(), anyInt(), anyLong(), anyString());
 
         // Should NOT be saved to local database (succeeded on retry)
-        verify(localDatabase, never()).addPendingSegment(anyString(), anyInt(), anyString(), anyLong(), anyString());
+        verify(localDatabase, never()).addPendingSegment(anyString(), anyString(), anyInt(), anyString(), anyLong(), anyString());
 
         uploadQueue.stop();
     }
@@ -114,25 +115,25 @@ class UploadQueueTest {
 
         // Fail all attempts
         doThrow(new HttpClient.HttpException(500, "Server error"))
-                .when(segmentUploader).uploadSegment(any(), anyString(), anyInt(), anyLong(), anyString());
+                .when(segmentUploader).uploadSegment(any(), anyString(), anyString(), anyInt(), anyLong(), anyString());
 
         doAnswer(invocation -> {
             latch.countDown();
             return null;
-        }).when(localDatabase).addPendingSegment(anyString(), anyInt(), anyString(), anyLong(), anyString());
+        }).when(localDatabase).addPendingSegment(anyString(), anyString(), anyInt(), anyString(), anyLong(), anyString());
 
         // When
-        uploadQueue.enqueue(new UploadQueue.SegmentTask(file, "session-1", 1, 1024, "checksum"));
+        uploadQueue.enqueue(new UploadQueue.SegmentTask(file, "session-1", "device-1", 1, 1024, "checksum"));
 
         // Then
         assertTrue(latch.await(30, TimeUnit.SECONDS), "Segment should be saved to local database after max retries");
 
         // Verify max retries + 1 initial attempt = 4 total attempts
-        verify(segmentUploader, times(4)).uploadSegment(any(), anyString(), anyInt(), anyLong(), anyString());
+        verify(segmentUploader, times(4)).uploadSegment(any(), anyString(), anyString(), anyInt(), anyLong(), anyString());
 
         // Verify saved to local database
         verify(localDatabase).addPendingSegment(
-                eq("session-1"), eq(1), eq(file.getAbsolutePath()), eq(1024L), eq("checksum"));
+                eq("session-1"), eq("device-1"), eq(1), eq(file.getAbsolutePath()), eq(1024L), eq("checksum"));
 
         uploadQueue.stop();
     }
@@ -143,40 +144,57 @@ class UploadQueueTest {
         File file = createTempFile("segment_offline.mp4");
 
         // When
-        uploadQueue.enqueue(new UploadQueue.SegmentTask(file, "session-1", 1, 1024, "checksum"));
+        uploadQueue.enqueue(new UploadQueue.SegmentTask(file, "session-1", "device-1", 1, 1024, "checksum"));
 
         // Then
         verify(localDatabase).addPendingSegment(
-                eq("session-1"), eq(1), eq(file.getAbsolutePath()), eq(1024L), eq("checksum"));
+                eq("session-1"), eq("device-1"), eq(1), eq(file.getAbsolutePath()), eq(1024L), eq("checksum"));
     }
 
     @Test
-    void testStop_savesPendingItemsToLocalDatabase() throws Exception {
-        // Given
+    void testStop_waitsForInProgressUploads() throws Exception {
+        // Given - control upload timing with latches
+        CountDownLatch uploadStarted = new CountDownLatch(1);
+        CountDownLatch uploadCanFinish = new CountDownLatch(1);
+
+        doAnswer(invocation -> {
+            uploadStarted.countDown();
+            uploadCanFinish.await(10, TimeUnit.SECONDS);
+            return null;
+        }).when(segmentUploader).uploadSegment(any(), anyString(), anyString(), anyInt(), anyLong(), anyString());
+
         uploadQueue.start();
 
-        // Create a slow uploader to keep items in queue
-        doAnswer(invocation -> {
-            Thread.sleep(5000); // Slow upload
-            return null;
-        }).when(segmentUploader).uploadSegment(any(), anyString(), anyInt(), anyLong(), anyString());
+        File file = createTempFile("segment_1.mp4");
+        uploadQueue.enqueue(new UploadQueue.SegmentTask(file, "session-1", "device-1", 1, 1024, "checksum1"));
 
-        File file1 = createTempFile("segment_1.mp4");
-        File file2 = createTempFile("segment_2.mp4");
-        File file3 = createTempFile("segment_3.mp4");
+        // Wait for upload to start
+        assertTrue(uploadStarted.await(5, TimeUnit.SECONDS), "Upload should start");
 
-        uploadQueue.enqueue(new UploadQueue.SegmentTask(file1, "session-1", 1, 1024, "checksum1"));
-        Thread.sleep(100); // Let first task start processing
-        uploadQueue.enqueue(new UploadQueue.SegmentTask(file2, "session-1", 2, 2048, "checksum2"));
-        uploadQueue.enqueue(new UploadQueue.SegmentTask(file3, "session-1", 3, 3072, "checksum3"));
-
-        // When
+        // Release upload to complete, then stop
+        uploadCanFinish.countDown();
         uploadQueue.stop();
 
-        // Then - remaining items in queue should be saved to local database
-        // At least the last two items (that were not yet being processed) should be saved
-        verify(localDatabase, atLeastOnce()).addPendingSegment(
-                anyString(), anyInt(), anyString(), anyLong(), anyString());
+        // Then - upload completed, queue is stopped, nothing saved to localDB (success)
+        verify(segmentUploader).uploadSegment(eq(file), eq("session-1"), eq("device-1"), eq(1), eq(1024L), eq("checksum1"));
+        assertFalse(uploadQueue.isRunning());
+        verify(localDatabase, never()).addPendingSegment(anyString(), anyString(), anyInt(), anyString(), anyLong(), anyString());
+    }
+
+    @Test
+    void testStop_thenEnqueue_savesToLocalDatabase() throws Exception {
+        // Given - start and stop the queue
+        uploadQueue.start();
+        uploadQueue.stop();
+        assertFalse(uploadQueue.isRunning());
+
+        // When - enqueue after stop
+        File file = createTempFile("segment_after_stop.mp4");
+        uploadQueue.enqueue(new UploadQueue.SegmentTask(file, "session-1", "device-1", 1, 1024, "checksum"));
+
+        // Then - should be saved to local database
+        verify(localDatabase).addPendingSegment(
+                eq("session-1"), eq("device-1"), eq(1), eq(file.getAbsolutePath()), eq(1024L), eq("checksum"));
     }
 
     private File createTempFile(String name) {

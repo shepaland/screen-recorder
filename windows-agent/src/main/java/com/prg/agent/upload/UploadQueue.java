@@ -145,7 +145,7 @@ public class UploadQueue {
         for (int attempt = 0; attempt <= maxRetries; attempt++) {
             try {
                 segmentUploader.uploadSegment(
-                        task.file, task.sessionId, task.sequenceNum,
+                        task.file, task.sessionId, task.deviceId, task.sequenceNum,
                         task.sizeBytes, task.checksum);
                 log.debug("Segment #{} uploaded successfully", task.sequenceNum);
                 return; // Success
@@ -173,7 +173,7 @@ public class UploadQueue {
     private void saveToLocalDatabase(SegmentTask task) {
         try {
             localDatabase.addPendingSegment(
-                    task.sessionId, task.sequenceNum, task.file.getAbsolutePath(),
+                    task.sessionId, task.deviceId, task.sequenceNum, task.file.getAbsolutePath(),
                     task.sizeBytes, task.checksum);
             log.info("Segment #{} saved to local database for later upload", task.sequenceNum);
         } catch (Exception e) {
@@ -200,7 +200,7 @@ public class UploadQueue {
 
             try {
                 segmentUploader.uploadSegment(
-                        file, segment.getSessionId(), segment.getSequenceNum(),
+                        file, segment.getSessionId(), segment.getDeviceId(), segment.getSequenceNum(),
                         segment.getSizeBytes(), segment.getChecksum());
                 localDatabase.removePendingSegment(segment.getId());
                 log.info("Pending segment #{} uploaded successfully", segment.getSequenceNum());
@@ -219,6 +219,7 @@ public class UploadQueue {
     public static class SegmentTask {
         private final File file;
         private final String sessionId;
+        private final String deviceId;
         private final int sequenceNum;
         private final long sizeBytes;
         private final String checksum;

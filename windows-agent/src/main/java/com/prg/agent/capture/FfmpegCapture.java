@@ -82,8 +82,9 @@ public class FfmpegCapture {
         stderrReaderThread.setDaemon(true);
         stderrReaderThread.start();
 
-        // Close stdin so FFmpeg doesn't wait for input
-        ffmpegProcess.getOutputStream().close();
+        // NOTE: Do NOT close stdin here — stop() sends 'q' to stdin for graceful shutdown.
+        // Closing stdin would make graceful shutdown impossible, forcing destroyForcibly()
+        // which can corrupt the last segment.
 
         // Start segment watcher thread
         segmentWatcherThread = new Thread(() -> watchForNewSegments(sessionDir, sessionId), "segment-watcher");

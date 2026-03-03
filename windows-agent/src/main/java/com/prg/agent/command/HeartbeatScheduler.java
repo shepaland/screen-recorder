@@ -154,8 +154,14 @@ public class HeartbeatScheduler {
             HeartbeatResponse response = httpClient.authPut(url, request, HeartbeatResponse.class);
 
             lastHeartbeatTime = Instant.now();
+            boolean wasDisconnected = !connected;
             connected = true;
             consecutiveFailures = 0;
+
+            // Notify agent about restored connection so buffered segments get retried
+            if (wasDisconnected && agentService != null) {
+                agentService.onConnectionRestored();
+            }
 
             // Process pending commands
             if (response.getPendingCommands() != null && !response.getPendingCommands().isEmpty()) {

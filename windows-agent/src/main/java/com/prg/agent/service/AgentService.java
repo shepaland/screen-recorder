@@ -232,7 +232,7 @@ public class AgentService {
             log.info("Recording session created: {}", sessionId);
 
             // Start segment producer
-            segmentProducer.startSession(sessionId);
+            segmentProducer.startSession(sessionId, deviceId);
 
             // Start screen capture
             captureManager.startRecording(sessionId);

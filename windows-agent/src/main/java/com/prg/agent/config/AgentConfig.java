@@ -174,12 +174,12 @@ public class AgentConfig {
             log.info("Server config: quality={}", captureQuality);
         }
         if (serverConfig.getIngestBaseUrl() != null && !serverConfig.getIngestBaseUrl().isEmpty()) {
-            this.serverIngestUrl = serverConfig.getIngestBaseUrl() + "/api/v1/ingest";
-            log.info("Server config: ingest_base_url={}", serverConfig.getIngestBaseUrl());
+            this.serverIngestUrl = serverConfig.getIngestBaseUrl();
+            log.info("Server config: ingest_base_url={}", serverIngestUrl);
         }
         if (serverConfig.getControlPlaneBaseUrl() != null && !serverConfig.getControlPlaneBaseUrl().isEmpty()) {
-            this.serverControlUrl = serverConfig.getControlPlaneBaseUrl() + "/api/v1/devices";
-            log.info("Server config: control_plane_base_url={}", serverConfig.getControlPlaneBaseUrl());
+            this.serverControlUrl = serverConfig.getControlPlaneBaseUrl();
+            log.info("Server config: control_plane_base_url={}", serverControlUrl);
         }
     }
 

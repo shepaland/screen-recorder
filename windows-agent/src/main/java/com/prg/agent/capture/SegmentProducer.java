@@ -23,6 +23,7 @@ public class SegmentProducer {
     private final UploadQueue uploadQueue;
     private final AtomicInteger sequenceCounter = new AtomicInteger(0);
     private volatile String currentSessionId;
+    private volatile String currentDeviceId;
 
     public SegmentProducer(SegmentFileManager segmentFileManager, UploadQueue uploadQueue) {
         this.segmentFileManager = segmentFileManager;
@@ -30,12 +31,13 @@ public class SegmentProducer {
     }
 
     /**
-     * Sets the current session ID and resets the sequence counter.
+     * Sets the current session ID and device ID, and resets the sequence counter.
      */
-    public void startSession(String sessionId) {
+    public void startSession(String sessionId, String deviceId) {
         this.currentSessionId = sessionId;
+        this.currentDeviceId = deviceId;
         this.sequenceCounter.set(0);
-        log.info("SegmentProducer started for session {}", sessionId);
+        log.info("SegmentProducer started for session {} (device={})", sessionId, deviceId);
     }
 
     /**
@@ -45,6 +47,7 @@ public class SegmentProducer {
         log.info("SegmentProducer stopped for session {} (produced {} segments)",
                 currentSessionId, sequenceCounter.get());
         this.currentSessionId = null;
+        this.currentDeviceId = null;
     }
 
     /**
@@ -67,7 +70,7 @@ public class SegmentProducer {
                 checksum.length() > 8 ? checksum.substring(0, 8) : checksum);
 
         UploadQueue.SegmentTask task = new UploadQueue.SegmentTask(
-                segmentFile, sessionId, seqNum, sizeBytes, checksum);
+                segmentFile, sessionId, currentDeviceId, seqNum, sizeBytes, checksum);
 
         uploadQueue.enqueue(task);
     }
