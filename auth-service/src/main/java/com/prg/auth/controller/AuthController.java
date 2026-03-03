@@ -1,7 +1,9 @@
 package com.prg.auth.controller;
 
 import com.prg.auth.dto.request.LoginRequest;
+import com.prg.auth.dto.request.SelectTenantRequest;
 import com.prg.auth.dto.response.LoginResponse;
+import com.prg.auth.dto.response.MyTenantsResponse;
 import com.prg.auth.dto.response.TokenResponse;
 import com.prg.auth.security.UserPrincipal;
 import com.prg.auth.service.AuthResult;
@@ -82,6 +84,39 @@ public class AuthController {
         clearRefreshTokenCookie(httpResponse);
 
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * GET /api/v1/auth/my-tenants
+     * List all tenants accessible to the current user (via OAuth identity links).
+     */
+    @GetMapping("/my-tenants")
+    public ResponseEntity<MyTenantsResponse> getMyTenants(@AuthenticationPrincipal UserPrincipal principal) {
+        MyTenantsResponse response = authService.getMyTenants(principal.getUserId());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST /api/v1/auth/switch-tenant
+     * Switch the authenticated user to a different tenant.
+     * Requires OAuth identity linked to a user in the target tenant.
+     */
+    @PostMapping("/switch-tenant")
+    public ResponseEntity<LoginResponse> switchTenant(
+            @Valid @RequestBody SelectTenantRequest request,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
+
+        String ipAddress = getClientIp(httpRequest);
+        String userAgent = httpRequest.getHeader("User-Agent");
+
+        AuthResult<LoginResponse> result = authService.switchTenant(
+                principal.getUserId(), request.getTenantId(), ipAddress, userAgent);
+
+        setRefreshTokenCookie(httpResponse, result.getRawRefreshToken(), authService.getRefreshTokenTtl());
+
+        return ResponseEntity.ok(result.getResponse());
     }
 
     private String extractRefreshTokenFromCookie(HttpServletRequest request) {

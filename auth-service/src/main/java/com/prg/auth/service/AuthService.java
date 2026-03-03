@@ -3,18 +3,24 @@ package com.prg.auth.service;
 import com.prg.auth.config.JwtConfig;
 import com.prg.auth.dto.request.LoginRequest;
 import com.prg.auth.dto.response.LoginResponse;
+import com.prg.auth.dto.response.MyTenantsResponse;
+import com.prg.auth.dto.response.OAuthCallbackResponse;
 import com.prg.auth.dto.response.RoleResponse;
 import com.prg.auth.dto.response.TokenResponse;
 import com.prg.auth.dto.response.UserResponse;
+import com.prg.auth.entity.OAuthIdentity;
 import com.prg.auth.entity.RefreshToken;
 import com.prg.auth.entity.Tenant;
 import com.prg.auth.entity.User;
+import com.prg.auth.entity.UserOAuthLink;
+import com.prg.auth.exception.AccessDeniedException;
 import com.prg.auth.exception.InvalidCredentialsException;
 import com.prg.auth.exception.RateLimitExceededException;
 import com.prg.auth.exception.ResourceNotFoundException;
 import com.prg.auth.exception.TokenExpiredException;
 import com.prg.auth.repository.RefreshTokenRepository;
 import com.prg.auth.repository.TenantRepository;
+import com.prg.auth.repository.UserOAuthLinkRepository;
 import com.prg.auth.repository.UserRepository;
 import com.prg.auth.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +46,7 @@ public class AuthService {
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final UserOAuthLinkRepository userOAuthLinkRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final JwtConfig jwtConfig;
     private final PasswordEncoder passwordEncoder;
@@ -78,6 +85,16 @@ public class AuthService {
                     Map.of("reason", "account_disabled"),
                     ipAddress, userAgent, getCorrelationId());
             throw new InvalidCredentialsException("Invalid username or password");
+        }
+
+        // Reject password login for OAuth users
+        if ("oauth".equals(user.getAuthProvider())) {
+            auditService.logAction(tenant.getId(), user.getId(), "LOGIN_FAILED", "AUTH", null,
+                    Map.of("reason", "oauth_user_password_login"),
+                    ipAddress, userAgent, getCorrelationId());
+            throw new AccessDeniedException(
+                    "This account uses OAuth authentication. Please log in via OAuth provider.",
+                    "OAUTH_USER_PASSWORD_LOGIN_DENIED");
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
@@ -131,8 +148,10 @@ public class AuthService {
                 .email(user.getEmail())
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
+                .authProvider(user.getAuthProvider())
                 .roles(roleResponses)
                 .permissions(permissions)
+                .settings(user.getSettings())
                 .build();
 
         LoginResponse loginResponse = LoginResponse.builder()
@@ -292,5 +311,162 @@ public class AuthService {
 
     public long getRefreshTokenTtl() {
         return jwtConfig.getRefreshTokenTtl();
+    }
+
+    /**
+     * Switch the current authenticated user to a different tenant.
+     * Requires that the user's OAuth identity is linked to a user in the target tenant.
+     */
+    @Transactional
+    public AuthResult<LoginResponse> switchTenant(UUID currentUserId, UUID targetTenantId,
+                                                   String ipAddress, String userAgent) {
+        // Find current user's OAuth link
+        UserOAuthLink currentLink = userOAuthLinkRepository.findByUserId(currentUserId)
+                .orElseThrow(() -> new AccessDeniedException(
+                        "Tenant switching is only available for OAuth users", "OAUTH_REQUIRED"));
+
+        OAuthIdentity identity = currentLink.getOauthIdentity();
+
+        // Find all active links for this identity
+        List<UserOAuthLink> activeLinks = userOAuthLinkRepository.findActiveLinksWithUserAndTenant(identity.getId());
+
+        // Find the link for the target tenant
+        UserOAuthLink targetLink = activeLinks.stream()
+                .filter(link -> link.getUser().getTenant().getId().equals(targetTenantId))
+                .findFirst()
+                .orElseThrow(() -> new AccessDeniedException(
+                        "You do not have access to the requested tenant"));
+
+        User targetUser = targetLink.getUser();
+        Tenant targetTenant = targetUser.getTenant();
+
+        if (!targetUser.getIsActive()) {
+            throw new AccessDeniedException("Your account in the target tenant is disabled");
+        }
+        if (!targetTenant.getIsActive()) {
+            throw new AccessDeniedException("The target tenant is disabled");
+        }
+
+        // Revoke current refresh tokens
+        refreshTokenRepository.revokeAllByUserId(currentUserId);
+
+        // Generate new tokens for the target tenant
+        List<String> roles = targetUser.getRoles().stream().map(r -> r.getCode()).toList();
+        List<String> permissions = targetUser.getRoles().stream()
+                .flatMap(r -> r.getPermissions().stream())
+                .map(p -> p.getCode())
+                .distinct().sorted().toList();
+        List<String> scopes = determineScopesForRoles(roles);
+
+        String accessToken = jwtTokenProvider.generateAccessToken(
+                targetUser.getId(), targetTenant.getId(), targetUser.getUsername(), targetUser.getEmail(),
+                roles, permissions, scopes);
+
+        String rawRefreshToken = UUID.randomUUID().toString();
+        String tokenHash = sha256(rawRefreshToken);
+
+        RefreshToken refreshToken = RefreshToken.builder()
+                .user(targetUser)
+                .tenantId(targetTenant.getId())
+                .tokenHash(tokenHash)
+                .deviceInfo(userAgent)
+                .ipAddress(ipAddress)
+                .expiresAt(Instant.now().plusSeconds(jwtConfig.getRefreshTokenTtl()))
+                .isRevoked(false)
+                .build();
+        refreshTokenRepository.save(refreshToken);
+
+        userRepository.updateLastLoginTs(targetUser.getId(), Instant.now());
+
+        auditService.logAction(targetTenant.getId(), targetUser.getId(), "TENANT_SWITCHED", "AUTH", targetUser.getId(),
+                Map.of("from_user_id", currentUserId.toString(), "to_tenant_id", targetTenantId.toString()),
+                ipAddress, userAgent, getCorrelationId());
+
+        List<RoleResponse> roleResponses = targetUser.getRoles().stream()
+                .map(r -> RoleResponse.builder().code(r.getCode()).name(r.getName()).build())
+                .toList();
+
+        UserResponse userResponse = UserResponse.builder()
+                .id(targetUser.getId())
+                .tenantId(targetTenant.getId())
+                .username(targetUser.getUsername())
+                .email(targetUser.getEmail())
+                .firstName(targetUser.getFirstName())
+                .lastName(targetUser.getLastName())
+                .authProvider(targetUser.getAuthProvider())
+                .roles(roleResponses)
+                .permissions(permissions)
+                .settings(targetUser.getSettings())
+                .build();
+
+        LoginResponse loginResponse = LoginResponse.builder()
+                .accessToken(accessToken)
+                .tokenType("Bearer")
+                .expiresIn(jwtTokenProvider.getAccessTokenTtl())
+                .user(userResponse)
+                .build();
+
+        log.info("Tenant switched: user_id={} -> tenant_id={}, target_user_id={}",
+                currentUserId, targetTenantId, targetUser.getId());
+
+        return AuthResult.<LoginResponse>builder()
+                .response(loginResponse)
+                .rawRefreshToken(rawRefreshToken)
+                .build();
+    }
+
+    /**
+     * Get all tenants accessible to the current user via OAuth identity links.
+     */
+    @Transactional(readOnly = true)
+    public MyTenantsResponse getMyTenants(UUID currentUserId) {
+        UserOAuthLink currentLink = userOAuthLinkRepository.findByUserId(currentUserId)
+                .orElse(null);
+
+        if (currentLink == null) {
+            // Password-only user, return just their current tenant
+            User user = userRepository.findById(currentUserId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found", "USER_NOT_FOUND"));
+            Tenant tenant = user.getTenant();
+            String primaryRole = user.getRoles().stream()
+                    .map(r -> r.getCode())
+                    .findFirst()
+                    .orElse(null);
+            OAuthCallbackResponse.TenantPreview preview = OAuthCallbackResponse.TenantPreview.builder()
+                    .id(tenant.getId())
+                    .name(tenant.getName())
+                    .slug(tenant.getSlug())
+                    .role(primaryRole)
+                    .isCurrent(true)
+                    .build();
+            return MyTenantsResponse.builder()
+                    .tenants(List.of(preview))
+                    .build();
+        }
+
+        OAuthIdentity identity = currentLink.getOauthIdentity();
+        List<UserOAuthLink> activeLinks = userOAuthLinkRepository.findActiveLinksWithUserAndTenant(identity.getId());
+
+        List<OAuthCallbackResponse.TenantPreview> tenants = activeLinks.stream()
+                .map(link -> {
+                    User user = link.getUser();
+                    Tenant tenant = user.getTenant();
+                    String primaryRole = user.getRoles().stream()
+                            .map(r -> r.getCode())
+                            .findFirst()
+                            .orElse(null);
+                    return OAuthCallbackResponse.TenantPreview.builder()
+                            .id(tenant.getId())
+                            .name(tenant.getName())
+                            .slug(tenant.getSlug())
+                            .role(primaryRole)
+                            .isCurrent(user.getId().equals(currentUserId))
+                            .build();
+                })
+                .toList();
+
+        return MyTenantsResponse.builder()
+                .tenants(tenants)
+                .build();
     }
 }

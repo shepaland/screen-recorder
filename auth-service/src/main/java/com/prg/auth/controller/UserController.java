@@ -3,8 +3,10 @@ package com.prg.auth.controller;
 import com.prg.auth.dto.request.ChangePasswordRequest;
 import com.prg.auth.dto.request.CreateUserRequest;
 import com.prg.auth.dto.request.UpdateUserRequest;
+import com.prg.auth.dto.request.UpdateUserSettingsRequest;
 import com.prg.auth.dto.response.PageResponse;
 import com.prg.auth.dto.response.UserResponse;
+import com.prg.auth.dto.response.UserSettingsResponse;
 import com.prg.auth.exception.AccessDeniedException;
 import com.prg.auth.security.UserPrincipal;
 import com.prg.auth.service.UserService;
@@ -104,6 +106,21 @@ public class UserController {
         userService.changePassword(id, request, principal.getTenantId(), principal,
                 getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * PUT /api/v1/users/me/settings
+     * Update the current user's personal settings (e.g. session TTL).
+     */
+    @PutMapping("/me/settings")
+    public ResponseEntity<UserSettingsResponse> updateMySettings(
+            @Valid @RequestBody UpdateUserSettingsRequest request,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest httpRequest) {
+        UserSettingsResponse response = userService.updateUserSettings(
+                principal.getUserId(), principal.getTenantId(), request,
+                getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
+        return ResponseEntity.ok(response);
     }
 
     private void requirePermission(UserPrincipal principal, String permission) {

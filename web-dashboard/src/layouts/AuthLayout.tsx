@@ -26,7 +26,7 @@ export default function AuthLayout() {
             PRG Screen Recorder
           </h1>
           <p className="mt-2 text-sm text-gray-600">
-            Sign in to your account
+            Платформа записи экранов
           </p>
         </div>
         <Outlet />

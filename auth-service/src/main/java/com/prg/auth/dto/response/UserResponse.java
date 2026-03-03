@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Data
@@ -20,10 +21,13 @@ public class UserResponse {
     private String email;
     private String firstName;
     private String lastName;
+    private String authProvider;
+    private String avatarUrl;
     private Boolean isActive;
     private List<RoleResponse> roles;
     private List<String> permissions;
     private Instant lastLoginTs;
+    private Map<String, Object> settings;
     private Instant createdTs;
     private Instant updatedTs;
 }

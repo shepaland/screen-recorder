@@ -232,8 +232,10 @@ public class DeviceAuthService {
                 .email(user.getEmail())
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
+                .authProvider(user.getAuthProvider())
                 .roles(roleResponses)
                 .permissions(permissions)
+                .settings(user.getSettings())
                 .build();
 
         // Build server config

@@ -1,6 +1,7 @@
 package com.prg.auth.controller;
 
 import com.prg.auth.dto.request.CreateTenantRequest;
+import com.prg.auth.dto.request.TransferOwnershipRequest;
 import com.prg.auth.dto.request.UpdateTenantRequest;
 import com.prg.auth.dto.response.PageResponse;
 import com.prg.auth.dto.response.TenantResponse;
@@ -16,6 +17,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -71,6 +73,32 @@ public class TenantController {
                 id, request, principal,
                 getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST /api/v1/tenants/{id}/transfer-ownership
+     * Transfer tenant ownership to another user. Only OWNER or SUPER_ADMIN can call.
+     */
+    @PostMapping("/{id}/transfer-ownership")
+    public ResponseEntity<Map<String, String>> transferOwnership(
+            @PathVariable UUID id,
+            @Valid @RequestBody TransferOwnershipRequest request,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest httpRequest) {
+        // Only OWNER or SUPER_ADMIN can transfer ownership
+        if (!principal.hasRole("OWNER") && !principal.hasRole("SUPER_ADMIN")) {
+            throw new AccessDeniedException("Only the tenant owner or super admin can transfer ownership");
+        }
+
+        // TENANT_ADMIN scope check: can only transfer their own tenant
+        if (!principal.hasScope("global") && !principal.getTenantId().equals(id)) {
+            throw new AccessDeniedException("You can only transfer ownership of your own tenant");
+        }
+
+        tenantService.transferOwnership(id, request.getNewOwnerUserId(), principal,
+                getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
+
+        return ResponseEntity.ok(Map.of("message", "Ownership transferred successfully"));
     }
 
     private void requirePermission(UserPrincipal principal, String permission) {

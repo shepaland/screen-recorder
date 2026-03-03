@@ -2,7 +2,11 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import AuthLayout from './layouts/AuthLayout';
 import MainLayout from './layouts/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
-import LoginPage from './pages/LoginPage';
+import OAuthLoginPage from './pages/OAuthLoginPage';
+import AdminLoginPage from './pages/AdminLoginPage';
+import OAuthCallbackPage from './pages/OAuthCallbackPage';
+import TenantSelectPage from './pages/TenantSelectPage';
+import OnboardingPage from './pages/OnboardingPage';
 import DashboardPage from './pages/DashboardPage';
 import UsersListPage from './pages/UsersListPage';
 import UserCreatePage from './pages/UserCreatePage';
@@ -16,16 +20,23 @@ import DeviceTokensListPage from './pages/DeviceTokensListPage';
 import DeviceTokenCreatePage from './pages/DeviceTokenCreatePage';
 import AuditLogPage from './pages/AuditLogPage';
 import ProfilePage from './pages/ProfilePage';
+import SettingsPage from './pages/SettingsPage';
 import TenantsPage from './pages/TenantsPage';
 import TenantCreatePage from './pages/TenantCreatePage';
 
 function App() {
   return (
     <Routes>
-      {/* Public routes */}
+      {/* Public routes -- auth pages */}
       <Route element={<AuthLayout />}>
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login" element={<OAuthLoginPage />} />
+        <Route path="/login/admin" element={<AdminLoginPage />} />
       </Route>
+
+      {/* Public routes -- OAuth flow (full-screen, no AuthLayout wrapper) */}
+      <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
+      <Route path="/select-tenant" element={<TenantSelectPage />} />
+      <Route path="/onboarding" element={<OnboardingPage />} />
 
       {/* Protected routes */}
       <Route
@@ -159,6 +170,9 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Settings - any authenticated user */}
+        <Route path="/settings" element={<SettingsPage />} />
 
         {/* Profile - any authenticated user */}
         <Route path="/profile" element={<ProfilePage />} />

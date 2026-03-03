@@ -1,5 +1,18 @@
 export type { PageResponse, ErrorResponse, PageParams } from './common';
-export type { User, LoginRequest, LoginResponse, TokenResponse } from './auth';
+export type {
+  User,
+  LoginRequest,
+  LoginResponse,
+  TokenResponse,
+  OAuthCallbackResponse,
+  OAuthUser,
+  TenantPreview,
+  OnboardingRequest,
+  OnboardingResponse,
+  SwitchTenantRequest,
+  UserSettings,
+  UpdateSettingsResponse,
+} from './auth';
 export type {
   UserResponse,
   UserRole,

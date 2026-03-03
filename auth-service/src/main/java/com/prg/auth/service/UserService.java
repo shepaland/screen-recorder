@@ -3,9 +3,11 @@ package com.prg.auth.service;
 import com.prg.auth.dto.request.ChangePasswordRequest;
 import com.prg.auth.dto.request.CreateUserRequest;
 import com.prg.auth.dto.request.UpdateUserRequest;
+import com.prg.auth.dto.request.UpdateUserSettingsRequest;
 import com.prg.auth.dto.response.PageResponse;
 import com.prg.auth.dto.response.RoleResponse;
 import com.prg.auth.dto.response.UserResponse;
+import com.prg.auth.dto.response.UserSettingsResponse;
 import com.prg.auth.entity.Role;
 import com.prg.auth.entity.Tenant;
 import com.prg.auth.entity.User;
@@ -213,6 +215,54 @@ public class UserService {
         log.info("Password changed: user_id={}, changed_by={}", userId, isSelf ? "self" : principal.getUserId());
     }
 
+    /**
+     * Update the current user's personal settings (e.g. session TTL).
+     * Validates that session_ttl_days does not exceed the tenant's session_ttl_max_days.
+     */
+    @Transactional
+    public UserSettingsResponse updateUserSettings(UUID userId, UUID tenantId,
+                                                    UpdateUserSettingsRequest request,
+                                                    String ipAddress, String userAgent) {
+        User user = userRepository.findByIdAndTenantId(userId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found", "USER_NOT_FOUND"));
+
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tenant not found", "TENANT_NOT_FOUND"));
+
+        // Get tenant max session TTL
+        int tenantMaxDays = 30; // default
+        if (tenant.getSettings() != null && tenant.getSettings().containsKey("session_ttl_max_days")) {
+            Object val = tenant.getSettings().get("session_ttl_max_days");
+            if (val instanceof Number) {
+                tenantMaxDays = ((Number) val).intValue();
+            }
+        }
+
+        Map<String, Object> settings = new HashMap<>(user.getSettings() != null ? user.getSettings() : Map.of());
+
+        if (request.getSessionTtlDays() != null) {
+            if (request.getSessionTtlDays() > tenantMaxDays) {
+                throw new IllegalArgumentException(
+                        "Session TTL cannot exceed tenant maximum of " + tenantMaxDays + " days");
+            }
+            settings.put("session_ttl_days", request.getSessionTtlDays());
+        }
+
+        user.setSettings(settings);
+        user = userRepository.save(user);
+
+        // Audit
+        auditService.logAction(tenantId, userId, "USER_SETTINGS_UPDATED", "USERS", userId,
+                Map.of("settings", settings), ipAddress, userAgent, null);
+
+        log.info("User settings updated: user_id={}, tenant_id={}", userId, tenantId);
+
+        return UserSettingsResponse.builder()
+                .settings(user.getSettings())
+                .tenantMaxSessionTtlDays(tenantMaxDays)
+                .build();
+    }
+
     private UserResponse toResponse(User user) {
         List<RoleResponse> roleResponses = user.getRoles().stream()
                 .map(r -> RoleResponse.builder()
@@ -236,9 +286,11 @@ public class UserService {
                 .email(user.getEmail())
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
+                .authProvider(user.getAuthProvider())
                 .isActive(user.getIsActive())
                 .roles(roleResponses)
                 .permissions(permissions)
+                .settings(user.getSettings())
                 .lastLoginTs(user.getLastLoginTs())
                 .createdTs(user.getCreatedTs())
                 .updatedTs(user.getUpdatedTs())

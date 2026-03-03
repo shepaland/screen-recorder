@@ -6,7 +6,7 @@ import {
   useRef,
   type ReactNode,
 } from 'react';
-import type { User, LoginRequest } from '../types';
+import type { User, LoginRequest, TenantPreview } from '../types';
 import * as authApi from '../api/auth';
 import { setAccessToken } from '../api/client';
 
@@ -17,6 +17,10 @@ interface AuthContextValue {
   login: (credentials: LoginRequest) => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
+  switchTenant: (tenantId: string) => Promise<void>;
+  currentTenantId: string | null;
+  tenants: TenantPreview[];
+  setUserFromToken: (token: string) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -32,9 +36,27 @@ function getTokenExpiry(token: string): number | null {
   }
 }
 
+/**
+ * Check URL for access_token query param (OAuth callback redirect).
+ * If found, extract it and clean the URL.
+ */
+function extractAccessTokenFromUrl(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('access_token');
+  if (token) {
+    params.delete('access_token');
+    const newSearch = params.toString();
+    const newUrl =
+      window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash;
+    window.history.replaceState({}, '', newUrl);
+  }
+  return token;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [tenants, setTenants] = useState<TenantPreview[]>([]);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentTokenRef = useRef<string | null>(null);
 
@@ -70,14 +92,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [clearRefreshTimer],
   );
 
+  const loadTenants = useCallback(async (userData: User) => {
+    // Load tenants list for OAuth users
+    if (userData.auth_provider === 'oauth') {
+      try {
+        const data = await authApi.getMyTenants();
+        setTenants(data.tenants);
+      } catch {
+        // Non-critical: tenants list is optional
+        setTenants([]);
+      }
+    }
+  }, []);
+
   const login = useCallback(
     async (credentials: LoginRequest) => {
       const response = await authApi.login(credentials);
       currentTokenRef.current = response.access_token;
       setUser(response.user);
       scheduleRefresh(response.access_token);
+      await loadTenants(response.user);
     },
-    [scheduleRefresh],
+    [scheduleRefresh, loadTenants],
   );
 
   const logout = useCallback(async () => {
@@ -86,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await authApi.logout();
     } finally {
       setUser(null);
+      setTenants([]);
       currentTokenRef.current = null;
       setAccessToken(null);
     }
@@ -97,20 +134,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     scheduleRefresh(response.access_token);
   }, [scheduleRefresh]);
 
-  // On mount: try to restore session via refresh cookie
+  const switchTenant = useCallback(
+    async (tenantId: string) => {
+      const response = await authApi.switchTenant(tenantId);
+      currentTokenRef.current = response.access_token;
+      setUser(response.user);
+      scheduleRefresh(response.access_token);
+      // Reload tenants after switch
+      await loadTenants(response.user);
+    },
+    [scheduleRefresh, loadTenants],
+  );
+
+  const setUserFromToken = useCallback(
+    async (token: string) => {
+      setAccessToken(token);
+      currentTokenRef.current = token;
+      scheduleRefresh(token);
+
+      const userData = await authApi.getMe();
+      setUser(userData);
+      await loadTenants(userData);
+    },
+    [scheduleRefresh, loadTenants],
+  );
+
+  // On mount: check for access_token in URL, then try to restore session
   useEffect(() => {
     let cancelled = false;
 
     async function restoreSession() {
       try {
-        const tokenResponse = await authApi.refresh();
-        if (cancelled) return;
-        currentTokenRef.current = tokenResponse.access_token;
-        scheduleRefresh(tokenResponse.access_token);
+        // Check if there is an access_token in URL (OAuth redirect)
+        const urlToken = extractAccessTokenFromUrl();
 
-        const userData = await authApi.getMe();
-        if (cancelled) return;
-        setUser(userData);
+        if (urlToken) {
+          setAccessToken(urlToken);
+          currentTokenRef.current = urlToken;
+          scheduleRefresh(urlToken);
+
+          const userData = await authApi.getMe();
+          if (cancelled) return;
+          setUser(userData);
+          await loadTenants(userData);
+        } else {
+          // Normal flow: try to restore via refresh cookie
+          const tokenResponse = await authApi.refresh();
+          if (cancelled) return;
+          currentTokenRef.current = tokenResponse.access_token;
+          scheduleRefresh(tokenResponse.access_token);
+
+          const userData = await authApi.getMe();
+          if (cancelled) return;
+          setUser(userData);
+          await loadTenants(userData);
+        }
       } catch {
         // No valid session, user needs to login
         if (!cancelled) {
@@ -130,7 +208,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       clearRefreshTimer();
     };
-  }, [scheduleRefresh, clearRefreshTimer]);
+  }, [scheduleRefresh, clearRefreshTimer, loadTenants]);
+
+  const currentTenantId = user?.tenant_id ?? null;
 
   const value: AuthContextValue = {
     user,
@@ -139,6 +219,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     refreshToken,
+    switchTenant,
+    currentTenantId,
+    tenants,
+    setUserFromToken,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

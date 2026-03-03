@@ -2,9 +2,13 @@ package com.prg.auth.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -35,8 +39,12 @@ public class User {
     @Column(nullable = false, length = 255)
     private String email;
 
-    @Column(name = "password_hash", nullable = false, length = 255)
+    @Column(name = "password_hash", length = 255)
     private String passwordHash;
+
+    @Column(name = "auth_provider", nullable = false, length = 20)
+    @Builder.Default
+    private String authProvider = "password";
 
     @Column(name = "first_name", length = 255)
     private String firstName;
@@ -59,6 +67,11 @@ public class User {
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb", nullable = false)
+    @Builder.Default
+    private Map<String, Object> settings = new HashMap<>();
+
     @Column(name = "created_ts", nullable = false, updatable = false)
     private Instant createdTs;
 
@@ -70,6 +83,8 @@ public class User {
         if (createdTs == null) createdTs = Instant.now();
         if (updatedTs == null) updatedTs = Instant.now();
         if (isActive == null) isActive = true;
+        if (authProvider == null) authProvider = "password";
+        if (settings == null) settings = new HashMap<>();
     }
 
     @PreUpdate

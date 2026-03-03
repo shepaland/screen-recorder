@@ -119,6 +119,57 @@ public class JwtTokenProvider {
                 .build();
     }
 
+    /**
+     * Generate an intermediate JWT token for OAuth flow (onboarding or tenant selection).
+     * This token identifies the OAuthIdentity, not a User.
+     *
+     * @param oauthIdentityId the OAuthIdentity UUID
+     * @param email           email from the OAuth provider
+     * @param name            display name from the OAuth provider
+     * @param provider        OAuth provider name (e.g. "yandex")
+     * @param providerSub     provider-specific user ID
+     * @return signed JWT string
+     */
+    public String generateOAuthIntermediateToken(UUID oauthIdentityId, String email,
+                                                  String name, String provider, String providerSub) {
+        Date now = new Date();
+        // Default 600 seconds (10 minutes) for intermediate token
+        long ttlSeconds = 600;
+        Date expiryDate = new Date(now.getTime() + ttlSeconds * 1000L);
+
+        return Jwts.builder()
+                .id(UUID.randomUUID().toString())
+                .subject(oauthIdentityId.toString())
+                .claim("type", "oauth_intermediate")
+                .claim("email", email)
+                .claim("name", name)
+                .claim("provider", provider)
+                .claim("provider_sub", providerSub)
+                .issuer(jwtConfig.getIssuer())
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(secretKey, Jwts.SIG.HS256)
+                .compact();
+    }
+
+    /**
+     * Validate an OAuth intermediate token and return its claims.
+     *
+     * @param token the JWT string
+     * @return parsed Claims
+     * @throws JwtException if the token is invalid, expired, or not of type "oauth_intermediate"
+     */
+    public Claims validateOAuthIntermediateToken(String token) {
+        Claims claims = parseToken(token);
+
+        String type = claims.get("type", String.class);
+        if (!"oauth_intermediate".equals(type)) {
+            throw new JwtException("Invalid token type: expected oauth_intermediate, got " + type);
+        }
+
+        return claims;
+    }
+
     public long getAccessTokenTtl() {
         return jwtConfig.getAccessTokenTtl();
     }

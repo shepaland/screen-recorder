@@ -55,6 +55,17 @@ prg:
     quality: ${DEVICE_QUALITY:medium}
     ingest-base-url: ${INGEST_BASE_URL:}
     control-plane-base-url: ${CONTROL_PLANE_BASE_URL:}
+  oauth:
+    yandex:
+      client-id: ${YANDEX_OAUTH_CLIENT_ID:}
+      client-secret: ${YANDEX_OAUTH_CLIENT_SECRET:}
+      authorize-url: https://oauth.yandex.ru/authorize
+      token-url: https://oauth.yandex.ru/token
+      user-info-url: https://login.yandex.ru/info?format=json
+      callback-url: ${YANDEX_OAUTH_CALLBACK_URL:}
+    intermediate-token-ttl: 600
+  frontend:
+    base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:80}
 

@@ -6,6 +6,7 @@ import com.prg.auth.dto.response.TenantResponse;
 import com.prg.auth.entity.Role;
 import com.prg.auth.entity.Tenant;
 import com.prg.auth.entity.User;
+import com.prg.auth.exception.AccessDeniedException;
 import com.prg.auth.exception.DuplicateResourceException;
 import com.prg.auth.exception.ResourceNotFoundException;
 import com.prg.auth.repository.RoleRepository;
@@ -148,6 +149,63 @@ public class TenantService {
 
         log.info("Tenant updated: id={}, slug={}", tenantId, tenant.getSlug());
         return toResponse(tenant);
+    }
+
+    /**
+     * Transfer tenant ownership from current owner to a new user.
+     * Removes OWNER role from current owner, assigns it to the new owner.
+     */
+    @Transactional
+    public void transferOwnership(UUID tenantId, UUID newOwnerUserId, UserPrincipal principal,
+                                   String ipAddress, String userAgent) {
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tenant not found", "TENANT_NOT_FOUND"));
+
+        User newOwner = userRepository.findByIdAndTenantId(newOwnerUserId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Target user not found in this tenant", "USER_NOT_FOUND"));
+
+        if (!newOwner.getIsActive()) {
+            throw new AccessDeniedException("Cannot transfer ownership to an inactive user");
+        }
+
+        // Find OWNER role in this tenant
+        Role ownerRole = roleRepository.findByTenantIdAndCode(tenantId, "OWNER")
+                .orElseThrow(() -> new ResourceNotFoundException("OWNER role not found", "ROLE_NOT_FOUND"));
+
+        // Find current owner(s) and remove OWNER role
+        // The principal might be SUPER_ADMIN, so find current OWNER by role
+        List<User> currentOwners = userRepository.findByTenantId(tenantId, org.springframework.data.domain.Pageable.unpaged())
+                .getContent().stream()
+                .filter(u -> u.getRoles().contains(ownerRole))
+                .toList();
+
+        for (User currentOwner : currentOwners) {
+            Set<Role> updatedRoles = new HashSet<>(currentOwner.getRoles());
+            updatedRoles.remove(ownerRole);
+
+            // If removing OWNER leaves no roles, assign TENANT_ADMIN
+            if (updatedRoles.isEmpty()) {
+                roleRepository.findByTenantIdAndCode(tenantId, "TENANT_ADMIN")
+                        .ifPresent(updatedRoles::add);
+            }
+            currentOwner.setRoles(updatedRoles);
+            userRepository.save(currentOwner);
+        }
+
+        // Assign OWNER role to the new owner
+        Set<Role> newOwnerRoles = new HashSet<>(newOwner.getRoles());
+        newOwnerRoles.add(ownerRole);
+        newOwner.setRoles(newOwnerRoles);
+        userRepository.save(newOwner);
+
+        // Audit
+        auditService.logAction(tenantId, principal.getUserId(), "OWNERSHIP_TRANSFERRED", "TENANTS", tenantId,
+                Map.of("new_owner_user_id", newOwnerUserId.toString(),
+                        "previous_owners", currentOwners.stream().map(u -> u.getId().toString()).toList()),
+                ipAddress, userAgent, null);
+
+        log.info("Tenant ownership transferred: tenant_id={}, new_owner_id={}", tenantId, newOwnerUserId);
     }
 
     private TenantResponse toResponse(Tenant tenant) {
