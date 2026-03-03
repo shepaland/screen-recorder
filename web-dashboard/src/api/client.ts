@@ -1,6 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || `${basePath}/api/v1`;
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -93,7 +94,7 @@ apiClient.interceptors.response.use(
         processQueue(refreshError, null);
         setAccessToken(null);
         // Redirect to login
-        window.location.href = '/login';
+        window.location.href = `${import.meta.env.BASE_URL}login`;
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

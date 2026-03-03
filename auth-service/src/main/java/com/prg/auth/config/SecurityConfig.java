@@ -56,7 +56,7 @@ public class SecurityConfig {
                                 "/actuator/health",
                                 "/actuator/info"
                         ).permitAll()
-                        .requestMatchers("/api/v1/internal/**").permitAll()
+                        .requestMatchers("/api/v1/internal/**").hasRole("INTERNAL")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex

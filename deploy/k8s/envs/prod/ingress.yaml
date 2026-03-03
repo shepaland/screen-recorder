@@ -1,0 +1,69 @@
+# Prod ingress: services.shepaland.ru/screenrecorder
+# Server: shepaland-videocalls-test-srv (Traefik built-in ACME)
+# Apply: kubectl -n prod-screen-record apply -f ingress.yaml
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-screenrecorder
+spec:
+  stripPrefix:
+    prefixes:
+      - /screenrecorder
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-https
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-dashboard
+  labels:
+    app: web-dashboard
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+    traefik.ingress.kubernetes.io/router.middlewares: "prod-screen-record-strip-screenrecorder@kubernetescrd"
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: services.shepaland.ru
+      http:
+        paths:
+          - path: /screenrecorder
+            pathType: Prefix
+            backend:
+              service:
+                name: web-dashboard
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-dashboard-redirect
+  labels:
+    app: web-dashboard
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.middlewares: "prod-screen-record-redirect-https@kubernetescrd"
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: services.shepaland.ru
+      http:
+        paths:
+          - path: /screenrecorder
+            pathType: Prefix
+            backend:
+              service:
+                name: web-dashboard
+                port:
+                  number: 80

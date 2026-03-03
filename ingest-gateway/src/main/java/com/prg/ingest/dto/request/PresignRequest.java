@@ -33,7 +33,7 @@ public class PresignRequest {
 
     @NotNull(message = "duration_ms is required")
     @Min(value = 1, message = "duration_ms must be > 0")
-    private Long durationMs;
+    private Integer durationMs;
 
     @NotBlank(message = "checksum_sha256 is required")
     private String checksumSha256;

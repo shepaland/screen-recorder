@@ -1,0 +1,579 @@
+# =============================================================================
+# NetworkPolicies for PRG Screen Recorder
+# =============================================================================
+# Apply to any namespace: kubectl -n <namespace> apply -f network-policies.yaml
+#
+# Traffic architecture:
+#   External -> Traefik (kube-system) -> web-dashboard, control-plane, ingest-gateway
+#   web-dashboard (nginx) -> auth-service (proxy /api/), control-plane (/api/cp/),
+#                           ingest-gateway (/api/ingest/), minio (/prg-segments/)
+#   control-plane -> auth-service, PostgreSQL, NATS
+#   ingest-gateway -> auth-service, PostgreSQL, MinIO, NATS
+#   All services -> kube-dns (UDP 53)
+#
+# External services:
+#   PostgreSQL: 172.17.0.1:5432 (host network, not in k8s)
+#   MinIO: minio service in same namespace (app: minio)
+#   NATS: nats service in same namespace (app: nats)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Default Deny All
+# -----------------------------------------------------------------------------
+# Deny all ingress and egress traffic by default.
+# Each service must explicitly allow its required traffic.
+# This is the foundation of a zero-trust network model.
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  labels:
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# =============================================================================
+# auth-service (port 8081)
+# =============================================================================
+# Ingress: web-dashboard (nginx proxy), control-plane, ingest-gateway
+# Egress: PostgreSQL 172.17.0.1:5432, DNS
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 2. auth-service -- Ingress
+# -----------------------------------------------------------------------------
+# Allow inbound traffic from:
+#   - web-dashboard: nginx proxies /api/v1/auth/* requests
+#   - control-plane: validates JWT tokens, checks permissions
+#   - ingest-gateway: validates device tokens and JWT
+# All sources are within the same namespace.
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: auth-service-ingress
+  labels:
+    app: auth-service
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector:
+    matchLabels:
+      app: auth-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: web-dashboard
+      ports:
+        - protocol: TCP
+          port: 8081
+    - from:
+        - podSelector:
+            matchLabels:
+              app: control-plane
+      ports:
+        - protocol: TCP
+          port: 8081
+    - from:
+        - podSelector:
+            matchLabels:
+              app: ingest-gateway
+      ports:
+        - protocol: TCP
+          port: 8081
+---
+# -----------------------------------------------------------------------------
+# 3. auth-service -- Egress
+# -----------------------------------------------------------------------------
+# Allow outbound traffic to:
+#   - PostgreSQL at 172.17.0.1:5432 (host network, TCP)
+#   - kube-dns at kube-system namespace (UDP 53 for service discovery)
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: auth-service-egress
+  labels:
+    app: auth-service
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector:
+    matchLabels:
+      app: auth-service
+  policyTypes:
+    - Egress
+  egress:
+    # PostgreSQL on host network
+    - to:
+        - ipBlock:
+            cidr: 172.17.0.1/32
+      ports:
+        - protocol: TCP
+          port: 5432
+    # DNS (kube-dns in kube-system)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# =============================================================================
+# control-plane (port 8080)
+# =============================================================================
+# Ingress: Traefik ingress controller (kube-system), web-dashboard
+# Egress: auth-service:8081, PostgreSQL, NATS:4222, DNS
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 4. control-plane -- Ingress
+# -----------------------------------------------------------------------------
+# Allow inbound traffic from:
+#   - Traefik ingress controller in kube-system namespace
+#     (handles external API requests from CRM/ATS webhooks)
+#   - web-dashboard: admin UI makes API calls to manage devices, policies
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: control-plane-ingress
+  labels:
+    app: control-plane
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector:
+    matchLabels:
+      app: control-plane
+  policyTypes:
+    - Ingress
+  ingress:
+    # Traefik ingress controller from kube-system
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 8080
+    # web-dashboard (same namespace)
+    - from:
+        - podSelector:
+            matchLabels:
+              app: web-dashboard
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# -----------------------------------------------------------------------------
+# 5. control-plane -- Egress
+# -----------------------------------------------------------------------------
+# Allow outbound traffic to:
+#   - auth-service:8081 (JWT validation, permission checks via /api/v1/internal/check-access)
+#   - PostgreSQL at 172.17.0.1:5432
+#   - NATS JetStream at nats:4222 (commands to agents, event publishing)
+#   - kube-dns (UDP 53)
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: control-plane-egress
+  labels:
+    app: control-plane
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector:
+    matchLabels:
+      app: control-plane
+  policyTypes:
+    - Egress
+  egress:
+    # auth-service (same namespace)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: auth-service
+      ports:
+        - protocol: TCP
+          port: 8081
+    # PostgreSQL on host network
+    - to:
+        - ipBlock:
+            cidr: 172.17.0.1/32
+      ports:
+        - protocol: TCP
+          port: 5432
+    # NATS JetStream (same namespace)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: nats
+      ports:
+        - protocol: TCP
+          port: 4222
+    # DNS (kube-dns in kube-system)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# =============================================================================
+# ingest-gateway (port 8084)
+# =============================================================================
+# Ingress: Traefik ingress controller, agents from outside cluster
+# Egress: auth-service:8081, PostgreSQL, MinIO:9000, NATS:4222, DNS
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 6. ingest-gateway -- Ingress
+# -----------------------------------------------------------------------------
+# Allow inbound traffic from:
+#   - Traefik ingress controller in kube-system namespace
+#     (agents connect via HTTPS through Traefik for presign/confirm)
+#   - web-dashboard: nginx proxies /api/ingest/* requests to ingest-gateway
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingest-gateway-ingress
+  labels:
+    app: ingest-gateway
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector:
+    matchLabels:
+      app: ingest-gateway
+  policyTypes:
+    - Ingress
+  ingress:
+    # Traefik ingress controller from kube-system
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 8084
+    # web-dashboard (same namespace, nginx proxies /api/ingest/*)
+    - from:
+        - podSelector:
+            matchLabels:
+              app: web-dashboard
+      ports:
+        - protocol: TCP
+          port: 8084
+---
+# -----------------------------------------------------------------------------
+# 7. ingest-gateway -- Egress
+# -----------------------------------------------------------------------------
+# Allow outbound traffic to:
+#   - auth-service:8081 (device token and JWT validation)
+#   - PostgreSQL at 172.17.0.1:5432 (segment metadata persistence)
+#   - MinIO at minio:9000 (S3 presigned URL generation, segment storage)
+#   - NATS JetStream at nats:4222 (segment.confirmed events)
+#   - kube-dns (UDP 53)
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingest-gateway-egress
+  labels:
+    app: ingest-gateway
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector:
+    matchLabels:
+      app: ingest-gateway
+  policyTypes:
+    - Egress
+  egress:
+    # auth-service (same namespace)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: auth-service
+      ports:
+        - protocol: TCP
+          port: 8081
+    # PostgreSQL on host network
+    - to:
+        - ipBlock:
+            cidr: 172.17.0.1/32
+      ports:
+        - protocol: TCP
+          port: 5432
+    # MinIO S3 (same namespace)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    # NATS JetStream (same namespace)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: nats
+      ports:
+        - protocol: TCP
+          port: 4222
+    # DNS (kube-dns in kube-system)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# =============================================================================
+# web-dashboard (port 80)
+# =============================================================================
+# Ingress: Traefik ingress controller
+# Egress: auth-service:8081 (nginx reverse proxy for /api/v1/auth/*), DNS
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 8. web-dashboard -- Ingress
+# -----------------------------------------------------------------------------
+# Allow inbound traffic from:
+#   - Traefik ingress controller in kube-system namespace
+#     (serves React SPA and proxies API requests)
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-dashboard-ingress
+  labels:
+    app: web-dashboard
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector:
+    matchLabels:
+      app: web-dashboard
+  policyTypes:
+    - Ingress
+  ingress:
+    # Traefik ingress controller from kube-system
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 80
+---
+# -----------------------------------------------------------------------------
+# 9. web-dashboard -- Egress
+# -----------------------------------------------------------------------------
+# Allow outbound traffic to:
+#   - auth-service:8081 (nginx proxies /api/v1/auth/* from browser + agents)
+#   - control-plane:8080 (nginx proxies /api/cp/* from agents)
+#   - ingest-gateway:8084 (nginx proxies /api/ingest/* from agents)
+#   - minio:9000 (nginx proxies /prg-segments/* presigned uploads from agents)
+#   - kube-dns (UDP 53, needed for resolving service hostnames)
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-dashboard-egress
+  labels:
+    app: web-dashboard
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector:
+    matchLabels:
+      app: web-dashboard
+  policyTypes:
+    - Egress
+  egress:
+    # auth-service (same namespace)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: auth-service
+      ports:
+        - protocol: TCP
+          port: 8081
+    # control-plane (same namespace, proxied via /api/cp/)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: control-plane
+      ports:
+        - protocol: TCP
+          port: 8080
+    # ingest-gateway (same namespace, proxied via /api/ingest/)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: ingest-gateway
+      ports:
+        - protocol: TCP
+          port: 8084
+    # MinIO (same namespace, proxied via /prg-segments/ for presigned uploads)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    # DNS (kube-dns in kube-system)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# =============================================================================
+# MinIO (port 9000)
+# =============================================================================
+# Ingress: ingest-gateway (S3 operations), web-dashboard (presigned uploads),
+#          minio-init job (bucket + SA creation)
+# Egress: DNS only (MinIO doesn't need external connections)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 10. MinIO -- Ingress
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: minio-ingress
+  labels:
+    app: minio
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector:
+    matchLabels:
+      app: minio
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: ingest-gateway
+      ports:
+        - protocol: TCP
+          port: 9000
+    - from:
+        - podSelector:
+            matchLabels:
+              app: web-dashboard
+      ports:
+        - protocol: TCP
+          port: 9000
+    - from:
+        - podSelector:
+            matchLabels:
+              job-name: minio-init
+      ports:
+        - protocol: TCP
+          port: 9000
+---
+# -----------------------------------------------------------------------------
+# 11. MinIO -- Egress
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: minio-egress
+  labels:
+    app: minio
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector:
+    matchLabels:
+      app: minio
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# -----------------------------------------------------------------------------
+# 12. minio-init job -- Egress
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: minio-init-egress
+spec:
+  podSelector:
+    matchLabels:
+      job-name: minio-init
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

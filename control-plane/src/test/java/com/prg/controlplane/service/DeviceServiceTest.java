@@ -139,7 +139,7 @@ class DeviceServiceTest {
                 .build();
 
         when(deviceRepository.findByIdAndTenantId(deviceId, tenantId)).thenReturn(Optional.of(device));
-        when(deviceCommandRepository.findPendingCommandsByDeviceId(eq(deviceId), any(Instant.class)))
+        when(deviceCommandRepository.findPendingCommandsByDeviceIdAndTenantId(eq(deviceId), eq(tenantId), any(Instant.class)))
                 .thenReturn(List.of(pendingCommand));
         when(deviceRepository.save(any(Device.class))).thenAnswer(i -> i.getArgument(0));
         when(deviceCommandRepository.saveAll(anyList())).thenAnswer(i -> i.getArgument(0));

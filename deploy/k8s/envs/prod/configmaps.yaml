@@ -1,0 +1,51 @@
+# Production environment configmaps
+# Server: shepaland-videocalls-test-srv
+# URL: https://services.shepaland.ru/screenrecorder
+# Apply: kubectl -n prod-screen-record apply -f configmaps.yaml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-service-config
+  labels:
+    app: auth-service
+data:
+  DB_HOST: "172.17.0.1"
+  DB_PORT: "5432"
+  DB_NAME: "prg_prod"
+  CORS_ORIGINS: "https://services.shepaland.ru"
+  JAVA_OPTS: "-Xms256m -Xmx512m"
+  INGEST_BASE_URL: "https://services.shepaland.ru/screenrecorder/api/ingest/v1/ingest"
+  CONTROL_PLANE_BASE_URL: "https://services.shepaland.ru/screenrecorder/api/cp/v1/devices"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: control-plane-config
+  labels:
+    app: control-plane
+data:
+  DB_HOST: "172.17.0.1"
+  DB_PORT: "5432"
+  DB_NAME: "prg_prod"
+  AUTH_SERVICE_URL: "http://auth-service:8081"
+  HEARTBEAT_TIMEOUT: "90"
+  JAVA_OPTS: "-Xms256m -Xmx512m"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ingest-gateway-config
+  labels:
+    app: ingest-gateway
+data:
+  DB_HOST: "172.17.0.1"
+  DB_PORT: "5432"
+  DB_NAME: "prg_prod"
+  AUTH_SERVICE_URL: "http://auth-service:8081"
+  S3_ENDPOINT: "http://minio:9000"
+  S3_REGION: "us-east-1"
+  S3_BUCKET: "prg-segments"
+  S3_PRESIGN_EXPIRY: "300"
+  S3_PRESIGN_ENDPOINT: "https://services.shepaland.ru"
+  JAVA_OPTS: "-Xms256m -Xmx768m"

@@ -261,18 +261,18 @@ public class DeviceAuthService {
 
     @Transactional
     public DeviceRefreshResponse deviceRefresh(DeviceRefreshRequest request, String ipAddress, String userAgent) {
-        // Validate device exists and is active
-        Device device = deviceRepository.findById(request.getDeviceId())
+        // Validate refresh token first to get tenant context
+        String tokenHash = AuthService.sha256(request.getRefreshToken());
+        RefreshToken storedToken = refreshTokenRepository.findByTokenHash(tokenHash)
+                .orElseThrow(() -> new TokenExpiredException("Refresh token not found or expired", "REFRESH_TOKEN_EXPIRED"));
+
+        // Validate device exists, is active, and belongs to the same tenant
+        Device device = deviceRepository.findByIdAndTenantId(request.getDeviceId(), storedToken.getTenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Device not found", "DEVICE_NOT_FOUND"));
 
         if (!device.getIsActive()) {
             throw new DeviceDeactivatedException("Device has been deactivated. Contact your administrator.");
         }
-
-        // Validate refresh token
-        String tokenHash = AuthService.sha256(request.getRefreshToken());
-        RefreshToken storedToken = refreshTokenRepository.findByTokenHash(tokenHash)
-                .orElseThrow(() -> new TokenExpiredException("Refresh token not found or expired", "REFRESH_TOKEN_EXPIRED"));
 
         if (storedToken.getIsRevoked()) {
             log.warn("Refresh token reuse detected for device: {}. Revoking all tokens for user: {}.",

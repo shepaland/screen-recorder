@@ -26,8 +26,14 @@ public class AuthServiceClient {
 
     public AuthServiceClient(
             @Value("${prg.auth-service.base-url}") String baseUrl,
-            @Value("${prg.auth-service.internal-api-key}") String internalApiKey) {
+            @Value("${prg.auth-service.internal-api-key}") String internalApiKey,
+            ObjectMapper objectMapper) {
         this.restTemplate = new RestTemplate();
+        // Configure RestTemplate to use Spring's ObjectMapper (snake_case)
+        org.springframework.http.converter.json.MappingJackson2HttpMessageConverter converter =
+                new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter();
+        converter.setObjectMapper(objectMapper);
+        this.restTemplate.setMessageConverters(java.util.List.of(converter));
         this.baseUrl = baseUrl;
         this.internalApiKey = internalApiKey;
     }

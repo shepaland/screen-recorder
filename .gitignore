@@ -9,3 +9,11 @@ auth-service/target/
 
 # k8s secrets — never commit real secrets
 deploy/k8s/**/secret.yaml
+deploy/k8s/envs/**/secrets.yaml
+
+# Build artifacts
+**/target/
+!**/.mvn/wrapper/maven-wrapper.jar
+control-plane/target/
+ingest-gateway/target/
+windows-agent/target/

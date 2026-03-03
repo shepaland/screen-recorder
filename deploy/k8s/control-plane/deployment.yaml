@@ -5,7 +5,7 @@ metadata:
   labels:
     app: control-plane
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: control-plane
@@ -14,12 +14,20 @@ spec:
       labels:
         app: control-plane
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: control-plane
           image: prg-control-plane:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           envFrom:
             - configMapRef:
                 name: control-plane-config
@@ -36,11 +44,13 @@ spec:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 10
+            failureThreshold: 6
           livenessProbe:
             httpGet:
               path: /actuator/health
               port: 8080
-            initialDelaySeconds: 60
+            initialDelaySeconds: 180
             periodSeconds: 30
+            failureThreshold: 5

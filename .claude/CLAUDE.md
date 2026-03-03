@@ -26,12 +26,11 @@ H.264 fMP4 запись → сегментация → S3 хранение → H
 ## Команды
 
 ```bash
-# Java-сервисы (из директории сервиса)
-./mvnw clean compile                # компиляция
-./mvnw test                         # unit-тесты
-./mvnw verify                       # integration-тесты
-./mvnw package -DskipTests          # сборка JAR
-./mvnw spring-boot:run              # локальный запуск
+# Java-сервисы (из директории сервиса, mvnw внутри каждого сервиса)
+cd SERVICE && ./mvnw clean compile    # компиляция
+cd SERVICE && ./mvnw test             # unit-тесты
+cd SERVICE && ./mvnw verify           # integration-тесты
+cd SERVICE && ./mvnw package -DskipTests  # сборка JAR
 
 # Frontend (web-dashboard/)
 npm install
@@ -54,23 +53,24 @@ swift build && swift test
 
 ## Развёртывание
 
-Сервер: **shepaland-videocalls-test-srv**
-Оркестратор: k3s
-PostgreSQL: на хосте (не в k8s), доступен через `172.17.0.1:5432`
+Два сервера, два стейджинга:
 
-### Стейджинги (namespaces)
+| Среда | Сервер | Namespace | URL | БД |
+|-------|--------|-----------|-----|----|
+| test | shepaland-cloud | `test-screen-record` | `https://services-test.shepaland.ru/screenrecorder` | `prg_test` |
+| prod | shepaland-videocalls-test-srv | `prod-screen-record` | `https://services.shepaland.ru/screenrecorder` | `prg_prod` |
 
-| Среда | Namespace | Назначение | БД |
-|-------|-----------|------------|----|
-| dev | `dev-screen-record` | Проверка сборки, консистентности, зависимостей, интеграционные smoke-тесты | `prg_dev` |
-| test | `test-screen-record` | Функциональное и интеграционное тестирование | `prg_test` |
-| prod | `prod-screen-record` | Продакшен. Деплой ТОЛЬКО после pass всех тест-кейсов и явного подтверждения пользователя | `prg_prod` |
+- **shepaland-cloud** (158.160.222.120): k3s, cert-manager + ClusterIssuer, PostgreSQL на хосте
+- **shepaland-videocalls-test-srv** (158.160.221.196): k3s, Traefik ACME, PostgreSQL на хосте (172.17.0.1:5432)
+
+### Path-based routing
+
+Оба стейджинга используют path `/screenrecorder`. Traefik StripPrefix middleware убирает `/screenrecorder` перед пересылкой в nginx. Vite `base: "/screenrecorder/"`, React Router `basename="/screenrecorder"`.
 
 ### Пайплайн деплоя
 
-1. **dev** — сборка + деплой автоматически. Проверки: компиляция, зависимости, smoke-тесты.
-2. **test** — деплой после успешного dev. Функциональные и интеграционные тесты.
-3. **prod** — деплой ТОЛЬКО после: все тест-кейсы passed + явное подтверждение от пользователя. Никогда не деплоить на prod без спроса.
+1. **test** — сборка + деплой на shepaland-cloud. Smoke-тесты, функциональное/интеграционное тестирование.
+2. **prod** — деплой на shepaland-videocalls-test-srv ТОЛЬКО после: все тест-кейсы passed + явное подтверждение от пользователя. Никогда не деплоить на prod без спроса.
 
 ## Архитектура (ключевое)
 

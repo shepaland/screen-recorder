@@ -5,7 +5,7 @@ metadata:
   labels:
     app: auth-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: auth-service
@@ -14,12 +14,20 @@ spec:
       labels:
         app: auth-service
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: auth-service
           image: prg-auth-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8081
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           envFrom:
             - configMapRef:
                 name: auth-service-config
@@ -36,11 +44,13 @@ spec:
             httpGet:
               path: /actuator/health
               port: 8081
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 10
+            failureThreshold: 6
           livenessProbe:
             httpGet:
               path: /actuator/health
               port: 8081
-            initialDelaySeconds: 60
+            initialDelaySeconds: 180
             periodSeconds: 30
+            failureThreshold: 5

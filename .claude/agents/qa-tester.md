@@ -22,7 +22,14 @@ model: opus
 ## Контекст системы
 
 6 микросервисов (Java 21 / Spring Boot). React SPA. PostgreSQL, MinIO, NATS, OpenSearch.
-Стейджинги: dev-screen-record (smoke), test-screen-record (функциональное/интеграционное), prod-screen-record.
+
+### Стейджинги (два сервера)
+
+| Среда | Сервер | SSH | kubectl | Namespace | URL |
+|-------|--------|-----|---------|-----------|-----|
+| test | shepaland-cloud | `ssh shepaland-cloud` | `sudo k3s kubectl` | `test-screen-record` | `https://services-test.shepaland.ru/screenrecorder` |
+| prod | shepaland-videocalls-test-srv | `ssh shepaland-videcalls-test-srv` | `sudo kubectl` | `prod-screen-record` | `https://services.shepaland.ru/screenrecorder` |
+
 6 системных ролей: admin, supervisor, operator, auditor, it_admin, legal_officer.
 Мультитенантность через tenant_id. JWT аутентификация.
 
@@ -33,7 +40,8 @@ model: opus
 - Интеграционные тесты: реальная БД через TestContainers (PostgreSQL), реальный MinIO и NATS если затронуты
 - API-тесты проверяют: статус-код, структуру ответа, заголовки, пагинацию, сортировку
 - Всегда проверяй что audit_log содержит запись после значимого действия
-- Smoke-тесты для dev: сервис стартует, /health отвечает 200, основные CRUD работают
-- Функциональные тесты для test: полные сценарии по спецификации
+- Smoke-тесты: сервис стартует, /health отвечает 200, основные CRUD работают
+- Функциональные тесты: полные сценарии по спецификации
 - Баг-репорт: среда, шаги, входные данные, ожидаемый результат, фактический результат, логи/скриншоты
-- Прогон тестов: `./mvnw test` (unit), `./mvnw verify` (integration), отдельные smoke-скрипты для dev-стейджинга
+- Прогон тестов: `./mvnw test` (unit), `./mvnw verify` (integration), отдельные smoke-скрипты
+- Для тестирования через curl к ClusterIP: `ssh SERVER "KUBECTL -n NAMESPACE get svc SERVICE -o jsonpath='{.spec.clusterIP}'"` затем curl к полученному IP

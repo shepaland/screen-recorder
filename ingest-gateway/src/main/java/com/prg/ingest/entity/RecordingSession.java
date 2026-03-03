@@ -53,7 +53,8 @@ public class RecordingSession {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
-    private Map<String, Object> metadata;
+    @Builder.Default
+    private Map<String, Object> metadata = Map.of();
 
     @Column(name = "created_ts", nullable = false, updatable = false)
     private Instant createdTs;
@@ -71,6 +72,7 @@ public class RecordingSession {
         if (segmentCount == null) segmentCount = 0;
         if (totalBytes == null) totalBytes = 0L;
         if (totalDurationMs == null) totalDurationMs = 0L;
+        if (metadata == null) metadata = Map.of();
     }
 
     @PreUpdate

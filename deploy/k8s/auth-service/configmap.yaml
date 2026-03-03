@@ -10,3 +10,5 @@ data:
   DB_NAME: "prg_dev"
   CORS_ORIGINS: "http://localhost:3000"
   JAVA_OPTS: "-Xms256m -Xmx512m"
+  INGEST_BASE_URL: ""
+  CONTROL_PLANE_BASE_URL: ""

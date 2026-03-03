@@ -1,0 +1,86 @@
+# One-shot job to create bucket + service account after MinIO is deployed
+# Apply: kubectl -n <namespace> apply -f init-job.yaml
+# Re-run: kubectl -n <namespace> delete job minio-init && kubectl -n <namespace> apply -f init-job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-init
+  labels:
+    app: minio-init
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: minio/mc:latest
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: MINIO_ROOT_PASSWORD
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ingest-gateway-secret
+                  key: S3_ACCESS_KEY
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ingest-gateway-secret
+                  key: S3_SECRET_KEY
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              echo "Waiting for MinIO to be ready..."
+              until mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" 2>/dev/null; do
+                echo "MinIO not ready, retrying in 5s..."
+                sleep 5
+              done
+              echo "MinIO is ready."
+
+              # Create bucket if not exists
+              mc mb --ignore-existing local/prg-segments
+              echo "Bucket prg-segments created/exists."
+
+              # Create policy for ingest service account (read/write only to prg-segments)
+              cat > /tmp/ingest-policy.json <<'POLICY'
+              {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Action": [
+                      "s3:GetObject",
+                      "s3:PutObject",
+                      "s3:DeleteObject",
+                      "s3:ListBucket",
+                      "s3:GetBucketLocation"
+                    ],
+                    "Resource": [
+                      "arn:aws:s3:::prg-segments",
+                      "arn:aws:s3:::prg-segments/*"
+                    ]
+                  }
+                ]
+              }
+              POLICY
+
+              mc admin policy create local ingest-rw /tmp/ingest-policy.json 2>/dev/null || \
+                mc admin policy create local ingest-rw /tmp/ingest-policy.json
+              echo "Policy ingest-rw created."
+
+              # Create user with the S3 access/secret keys
+              mc admin user add local "$S3_ACCESS_KEY" "$S3_SECRET_KEY" 2>/dev/null || true
+              mc admin policy attach local ingest-rw --user "$S3_ACCESS_KEY"
+              echo "User created and policy attached."
+
+              echo "MinIO initialization complete!"

@@ -5,7 +5,7 @@ metadata:
   labels:
     app: web-dashboard
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: web-dashboard
@@ -14,12 +14,15 @@ spec:
       labels:
         app: web-dashboard
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: web-dashboard
           image: prg-web-dashboard:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
+          securityContext:
+            allowPrivilegeEscalation: false
           resources:
             requests:
               memory: "64Mi"

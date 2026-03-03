@@ -7,6 +7,7 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import java.net.URI;
@@ -16,6 +17,9 @@ public class S3Config {
 
     @Value("${prg.s3.endpoint}")
     private String endpoint;
+
+    @Value("${prg.s3.presign-endpoint:${prg.s3.endpoint}}")
+    private String presignEndpoint;
 
     @Value("${prg.s3.region}")
     private String region;
@@ -28,22 +32,33 @@ public class S3Config {
 
     @Bean
     public S3Client s3Client() {
+        S3Configuration serviceConfig = S3Configuration.builder()
+                .pathStyleAccessEnabled(true)
+                .build();
+
         return S3Client.builder()
                 .endpointOverride(URI.create(endpoint))
                 .region(Region.of(region))
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(accessKey, secretKey)))
-                .forcePathStyleAccessEnabled(true)
+                .serviceConfiguration(serviceConfig)
                 .build();
     }
 
     @Bean
     public S3Presigner s3Presigner() {
+        S3Configuration serviceConfig = S3Configuration.builder()
+                .pathStyleAccessEnabled(true)
+                .build();
+
+        // Use presignEndpoint for external-facing presigned URLs (agents upload via this URL)
+        // Defaults to internal endpoint if not configured separately
         return S3Presigner.builder()
-                .endpointOverride(URI.create(endpoint))
+                .endpointOverride(URI.create(presignEndpoint))
                 .region(Region.of(region))
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(accessKey, secretKey)))
+                .serviceConfiguration(serviceConfig)
                 .build();
     }
 }

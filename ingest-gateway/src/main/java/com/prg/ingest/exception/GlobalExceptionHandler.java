@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -55,6 +56,25 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.builder()
                         .error(message)
                         .code("VALIDATION_ERROR")
+                        .build());
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
+        String message = "Malformed request body";
+        Throwable cause = ex.getCause();
+        if (cause instanceof com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException upe) {
+            message = "Unrecognized field: '" + upe.getPropertyName() + "'";
+        } else if (cause instanceof com.fasterxml.jackson.core.JsonParseException) {
+            message = "Invalid JSON format";
+        } else if (cause != null) {
+            message = cause.getMessage();
+        }
+        log.warn("Message not readable: {}", message);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.builder()
+                        .error(message)
+                        .code("BAD_REQUEST")
                         .build());
     }
 

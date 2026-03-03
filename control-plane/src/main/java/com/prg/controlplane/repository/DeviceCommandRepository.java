@@ -21,12 +21,14 @@ public interface DeviceCommandRepository extends JpaRepository<DeviceCommand, UU
     @Query("""
             SELECT c FROM DeviceCommand c
             WHERE c.deviceId = :deviceId
+              AND c.tenantId = :tenantId
               AND c.status = 'pending'
               AND (c.expiresAt IS NULL OR c.expiresAt > :now)
             ORDER BY c.createdTs ASC
             """)
-    List<DeviceCommand> findPendingCommandsByDeviceId(
+    List<DeviceCommand> findPendingCommandsByDeviceIdAndTenantId(
             @Param("deviceId") UUID deviceId,
+            @Param("tenantId") UUID tenantId,
             @Param("now") Instant now);
 
     @Query("""

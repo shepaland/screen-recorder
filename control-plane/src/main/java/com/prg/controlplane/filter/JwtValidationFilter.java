@@ -81,10 +81,21 @@ public class JwtValidationFilter extends OncePerRequestFilter {
         request.setAttribute(PRINCIPAL_ATTRIBUTE, principal);
 
         // Set MDC for structured logging
-        MDC.put("tenant_id", principal.getTenantId().toString());
-        MDC.put("user_id", principal.getUserId().toString());
+        if (principal.getTenantId() != null) {
+            MDC.put("tenant_id", principal.getTenantId().toString());
+        }
+        if (principal.getUserId() != null) {
+            MDC.put("user_id", principal.getUserId().toString());
+        }
+        if (principal.getDeviceId() != null) {
+            MDC.put("device_id", principal.getDeviceId().toString());
+        }
 
-        filterChain.doFilter(request, response);
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            MDC.clear();
+        }
     }
 
     @Override

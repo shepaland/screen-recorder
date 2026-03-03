@@ -117,7 +117,7 @@ public class DeviceService {
 
         // Find and deliver pending commands
         List<DeviceCommand> pendingCommands = deviceCommandRepository
-                .findPendingCommandsByDeviceId(deviceId, Instant.now());
+                .findPendingCommandsByDeviceIdAndTenantId(deviceId, principal.getTenantId(), Instant.now());
 
         // Mark commands as delivered
         Instant now = Instant.now();

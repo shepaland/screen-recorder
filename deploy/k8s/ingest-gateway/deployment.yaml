@@ -5,7 +5,7 @@ metadata:
   labels:
     app: ingest-gateway
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: ingest-gateway
@@ -14,12 +14,20 @@ spec:
       labels:
         app: ingest-gateway
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: ingest-gateway
           image: prg-ingest-gateway:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8084
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           envFrom:
             - configMapRef:
                 name: ingest-gateway-config
@@ -36,11 +44,13 @@ spec:
             httpGet:
               path: /actuator/health
               port: 8084
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 10
+            failureThreshold: 6
           livenessProbe:
             httpGet:
               path: /actuator/health
               port: 8084
-            initialDelaySeconds: 60
+            initialDelaySeconds: 180
             periodSeconds: 30
+            failureThreshold: 5

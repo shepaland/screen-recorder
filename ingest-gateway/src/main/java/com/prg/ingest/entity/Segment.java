@@ -47,7 +47,7 @@ public class Segment {
     private Long sizeBytes;
 
     @Column(name = "duration_ms")
-    private Long durationMs;
+    private Integer durationMs;
 
     @Column(name = "checksum_sha256")
     private String checksumSha256;
@@ -65,5 +65,6 @@ public class Segment {
         if (id == null) id = UUID.randomUUID();
         if (createdTs == null) createdTs = now;
         if (status == null) status = "uploaded";
+        if (metadata == null) metadata = Map.of();
     }
 }

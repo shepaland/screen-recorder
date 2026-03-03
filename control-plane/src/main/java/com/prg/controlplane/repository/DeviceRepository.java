@@ -20,7 +20,7 @@ public interface DeviceRepository extends JpaRepository<Device, UUID> {
             SELECT d FROM Device d
             WHERE d.tenantId = :tenantId
               AND (:status IS NULL OR d.status = :status)
-              AND (:search IS NULL OR LOWER(d.hostname) LIKE LOWER(CONCAT('%', :search, '%')))
+              AND (:search IS NULL OR LOWER(d.hostname) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))
             ORDER BY d.createdTs DESC
             """)
     Page<Device> findByTenantIdWithFilters(
