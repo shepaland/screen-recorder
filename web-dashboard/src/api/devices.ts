@@ -1,4 +1,4 @@
-import apiClient from './client';
+import { cpApiClient } from './client';
 import type {
   DeviceResponse,
   DeviceDetailResponse,
@@ -15,21 +15,21 @@ export interface DevicesListParams {
 }
 
 export async function getDevices(params?: DevicesListParams): Promise<PageResponse<DeviceResponse>> {
-  const response = await apiClient.get<PageResponse<DeviceResponse>>('/devices', { params });
+  const response = await cpApiClient.get<PageResponse<DeviceResponse>>('/devices', { params });
   return response.data;
 }
 
 export async function getDevice(id: string): Promise<DeviceDetailResponse> {
-  const response = await apiClient.get<DeviceDetailResponse>(`/devices/${id}`);
+  const response = await cpApiClient.get<DeviceDetailResponse>(`/devices/${id}`);
   return response.data;
 }
 
 export async function deleteDevice(id: string): Promise<void> {
-  await apiClient.delete(`/devices/${id}`);
+  await cpApiClient.delete(`/devices/${id}`);
 }
 
 export async function sendCommand(deviceId: string, data: CreateCommandRequest): Promise<DeviceCommandResponse> {
-  const response = await apiClient.post<DeviceCommandResponse>(`/devices/${deviceId}/commands`, data);
+  const response = await cpApiClient.post<DeviceCommandResponse>(`/devices/${deviceId}/commands`, data);
   return response.data;
 }
 
@@ -37,7 +37,7 @@ export async function getDeviceCommands(
   deviceId: string,
   params?: { page?: number; size?: number },
 ): Promise<PageResponse<DeviceCommandResponse>> {
-  const response = await apiClient.get<PageResponse<DeviceCommandResponse>>(
+  const response = await cpApiClient.get<PageResponse<DeviceCommandResponse>>(
     `/devices/${deviceId}/commands`,
     { params },
   );
