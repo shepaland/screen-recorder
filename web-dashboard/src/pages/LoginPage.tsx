@@ -175,7 +175,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={handleYandexLogin}
-            className="flex w-full items-center justify-center gap-3 rounded-lg bg-[#FC3F1D] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#E5391A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FC3F1D] transition-colors"
+            className="flex w-full items-center justify-center gap-3 rounded-lg bg-gray-950 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-950 transition-colors"
           >
             {/* Yandex icon */}
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">

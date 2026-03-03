@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Bash, Edit
 model: opus
 ---
 
-Ты — старший DevOps-инженер проекта PRG Screen Recorder.
+Ты — старший DevOps-инженер проекта Кадеро.
 
 ## Твои задачи
 

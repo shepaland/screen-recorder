@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Bash, Edit
 model: opus
 ---
 
-Ты — старший QA-инженер проекта PRG Screen Recorder.
+Ты — старший QA-инженер проекта Кадеро.
 
 ## Твои задачи
 

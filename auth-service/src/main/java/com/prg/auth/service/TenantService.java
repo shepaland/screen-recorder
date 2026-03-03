@@ -47,10 +47,12 @@ public class TenantService {
         if (principal.hasScope("global")) {
             tenants = tenantRepository.findByIsActiveTrue();
         } else {
-            tenants = tenantRepository.findById(principal.getTenantId())
-                    .filter(Tenant::getIsActive)
-                    .map(List::of)
-                    .orElse(List.of());
+            // Find all active tenants where the user has an active account
+            List<User> userAccounts = userRepository.findActiveUsersByUsername(principal.getUsername());
+            tenants = userAccounts.stream()
+                    .map(User::getTenant)
+                    .distinct()
+                    .toList();
         }
 
         return tenants.stream()

@@ -1,5 +1,5 @@
 # =============================================================================
-# NetworkPolicies for PRG Screen Recorder
+# NetworkPolicies for Кадеро
 # =============================================================================
 # Apply to any namespace: kubectl -n <namespace> apply -f network-policies.yaml
 #

@@ -48,6 +48,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
            "AND u.authProvider = 'password'")
     List<User> findActivePasswordUsersByUsername(@Param("username") String username);
 
+    @Query("SELECT u FROM User u JOIN FETCH u.tenant t " +
+           "WHERE u.username = :username AND u.isActive = true AND t.isActive = true")
+    List<User> findActiveUsersByUsername(@Param("username") String username);
+
     @Modifying
     @Query("UPDATE User u SET u.lastLoginTs = :loginTs WHERE u.id = :userId")
     void updateLastLoginTs(@Param("userId") UUID userId, @Param("loginTs") Instant loginTs);

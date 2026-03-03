@@ -107,8 +107,8 @@ export default function OnboardingPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-            PRG Screen Recorder
+          <h1 className="text-3xl font-bold tracking-[0.3em] text-gray-900">
+            КАДЕРО
           </h1>
           <h2 className="mt-3 text-xl font-semibold text-gray-700">
             Создайте компанию

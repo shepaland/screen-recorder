@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Bash, Edit
 model: opus
 ---
 
-Ты — старший fullstack-разработчик проекта PRG Screen Recorder.
+Ты — старший fullstack-разработчик проекта Кадеро.
 
 ## Твои задачи
 

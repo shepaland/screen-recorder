@@ -105,7 +105,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
     <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-gray-950 px-6 pb-4">
       {/* Logo */}
       <div className="flex h-16 shrink-0 items-center">
-        <span className="text-xl font-bold text-white">PRG Screen Recorder</span>
+        <span className="text-xl font-bold tracking-wider text-white">КАДЕРО</span>
       </div>
 
       <nav className="flex flex-1 flex-col">
