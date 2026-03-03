@@ -1,8 +1,18 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { getOAuthLoginUrl } from '../api/auth';
+import { useAuth } from '../hooks/useAuth';
 
 export default function OAuthLoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { isAuthenticated, isLoading } = useAuth();
+
+  // If already authenticated, redirect to home (fixes Back button issue)
+  if (!isLoading && isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+
+  const errorMessage = searchParams.get('error');
 
   const handleYandexLogin = () => {
     window.location.href = getOAuthLoginUrl();
@@ -17,6 +27,13 @@ export default function OAuthLoginPage() {
             Платформа записи экранов
           </p>
         </div>
+
+        {/* Error message from OAuth callback */}
+        {errorMessage && (
+          <div className="rounded-md bg-red-50 p-3">
+            <p className="text-sm text-red-700">{errorMessage}</p>
+          </div>
+        )}
 
         {/* Yandex OAuth button */}
         <button

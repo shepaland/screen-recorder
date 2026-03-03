@@ -11,9 +11,25 @@ import type {
   UpdateSettingsResponse,
 } from '../types';
 
+/**
+ * Backend returns roles as [{id, code, name}] objects,
+ * but frontend User type expects string[] of role codes.
+ * Normalize the user object to extract role codes.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeUser(raw: any): User {
+  if (raw && Array.isArray(raw.roles) && raw.roles.length > 0 && typeof raw.roles[0] === 'object') {
+    raw.roles = raw.roles.map((r: { code: string }) => r.code);
+  }
+  return raw as User;
+}
+
 export async function login(data: LoginRequest): Promise<LoginResponse> {
   const response = await apiClient.post<LoginResponse>('/auth/login', data);
   setAccessToken(response.data.access_token);
+  if (response.data.user) {
+    response.data.user = normalizeUser(response.data.user);
+  }
   return response.data;
 }
 
@@ -32,8 +48,8 @@ export async function logout(): Promise<void> {
 }
 
 export async function getMe(): Promise<User> {
-  const response = await apiClient.get<User>('/users/me');
-  return response.data;
+  const response = await apiClient.get('/users/me');
+  return normalizeUser(response.data);
 }
 
 // --- OAuth ---
@@ -46,12 +62,18 @@ export function getOAuthLoginUrl(): string {
 export async function selectTenant(data: SwitchTenantRequest): Promise<LoginResponse> {
   const response = await apiClient.post<LoginResponse>('/auth/oauth/select-tenant', data);
   setAccessToken(response.data.access_token);
+  if (response.data.user) {
+    response.data.user = normalizeUser(response.data.user);
+  }
   return response.data;
 }
 
 export async function switchTenant(tenantId: string): Promise<LoginResponse> {
   const response = await apiClient.post<LoginResponse>('/auth/switch-tenant', { tenant_id: tenantId });
   setAccessToken(response.data.access_token);
+  if (response.data.user) {
+    response.data.user = normalizeUser(response.data.user);
+  }
   return response.data;
 }
 

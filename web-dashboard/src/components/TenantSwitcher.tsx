@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronUpDownIcon, CheckIcon } from '@heroicons/react/20/solid';
+import { useNavigate } from 'react-router-dom';
+import { ChevronUpDownIcon, CheckIcon, PlusIcon } from '@heroicons/react/20/solid';
 import { BuildingOffice2Icon } from '@heroicons/react/24/outline';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../contexts/ToastContext';
@@ -7,6 +8,7 @@ import type { TenantPreview } from '../types';
 
 const ROLE_LABELS: Record<string, string> = {
   OWNER: 'Владелец',
+  TENANT_ADMIN: 'Администратор',
   MANAGER: 'Менеджер',
   ADMIN: 'Администратор',
   OPERATOR: 'Оператор',
@@ -16,6 +18,7 @@ const ROLE_LABELS: Record<string, string> = {
 export default function TenantSwitcher() {
   const { user, tenants, currentTenantId, switchTenant } = useAuth();
   const { addToast } = useToast();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -43,7 +46,6 @@ export default function TenantSwitcher() {
         await switchTenant(tenant.id);
         setIsOpen(false);
         addToast('success', `Переключено на "${tenant.name}"`);
-        // Reload the page to reset all component state
         window.location.href = import.meta.env.BASE_URL;
       } catch {
         addToast('error', 'Не удалось переключить компанию');
@@ -54,8 +56,8 @@ export default function TenantSwitcher() {
     [currentTenantId, switchTenant, addToast],
   );
 
-  // Don't render for password-based users (superadmin) or if no tenants loaded
-  if (!user || user.auth_provider !== 'oauth' || tenants.length <= 1) {
+  // Don't render for password-based users (superadmin)
+  if (!user || user.auth_provider !== 'oauth') {
     return null;
   }
 
@@ -63,12 +65,11 @@ export default function TenantSwitcher() {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Trigger button */}
+      {/* Trigger button -- always visible, shows current company name */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        disabled={isSwitching}
-        className="flex w-full items-center gap-3 rounded-lg bg-indigo-900/50 px-3 py-2.5 text-left text-sm transition-colors hover:bg-indigo-900/70"
+        className="flex w-full items-center gap-3 rounded-lg bg-indigo-900/50 px-3 py-2.5 text-left text-sm transition-colors hover:bg-indigo-900/70 cursor-pointer"
       >
         <BuildingOffice2Icon className="h-5 w-5 flex-shrink-0 text-indigo-300" />
         <div className="min-w-0 flex-1">
@@ -116,6 +117,21 @@ export default function TenantSwitcher() {
               </button>
             );
           })}
+
+          {/* Create new company */}
+          <div className="border-t border-gray-100 mt-1 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                navigate('/tenants/new');
+              }}
+              className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <PlusIcon className="h-4 w-4 flex-shrink-0 text-gray-400" />
+              <span className="font-medium">Создать компанию</span>
+            </button>
+          </div>
         </div>
       )}
     </div>

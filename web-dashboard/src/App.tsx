@@ -19,8 +19,8 @@ import DeviceDetailPage from './pages/DeviceDetailPage';
 import DeviceTokensListPage from './pages/DeviceTokensListPage';
 import DeviceTokenCreatePage from './pages/DeviceTokenCreatePage';
 import AuditLogPage from './pages/AuditLogPage';
-import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
+// ProfilePage merged into SettingsPage
 import TenantsPage from './pages/TenantsPage';
 import TenantCreatePage from './pages/TenantCreatePage';
 
@@ -171,12 +171,12 @@ function App() {
           }
         />
 
-        {/* Settings - any authenticated user */}
+        {/* Settings (includes profile info) - any authenticated user */}
         <Route path="/settings" element={<SettingsPage />} />
-
-        {/* Profile - any authenticated user */}
-        <Route path="/profile" element={<ProfilePage />} />
       </Route>
+
+      {/* Legacy redirect: /profile -> /settings */}
+      <Route path="/profile" element={<Navigate to="/settings" replace />} />
 
       {/* Catch-all redirect */}
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -5,7 +5,6 @@ import {
   ShieldCheckIcon,
   DocumentTextIcon,
   BuildingOfficeIcon,
-  UserCircleIcon,
   ComputerDesktopIcon,
   KeyIcon,
   Cog6ToothIcon,
@@ -36,14 +35,55 @@ const superAdminNavigation: NavItem[] = [
   { name: 'Tenants', href: '/tenants', icon: BuildingOfficeIcon, permission: 'TENANTS:READ' },
 ];
 
-/** Tenant-scoped navigation for regular OAuth users. */
-const tenantNavigation: NavItem[] = [
+/** Tenant-scoped items under the company name. */
+const tenantScopedNavigation: NavItem[] = [
   { name: 'Контрольная панель', href: '/', icon: HomeIcon, permission: 'DASHBOARD:VIEW' },
   { name: 'Токены регистрации', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
   { name: 'Устройства', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
   { name: 'Пользователи', href: '/users', icon: UsersIcon, permission: 'USERS:READ' },
+];
+
+/** Global items outside the company scope. */
+const globalNavigation: NavItem[] = [
+  { name: 'Компании', href: '/tenants', icon: BuildingOfficeIcon, permission: 'TENANTS:READ' },
   { name: 'Аудит', href: '/audit', icon: DocumentTextIcon, permission: 'AUDIT:READ' },
 ];
+
+function NavList({
+  items,
+  onClick,
+  indent = false,
+}: {
+  items: NavItem[];
+  onClick?: () => void;
+  indent?: boolean;
+}) {
+  return (
+    <ul role="list" className={`${indent ? 'ml-4' : '-mx-2'} space-y-1`}>
+      {items.map((item) => (
+        <PermissionGate key={item.name} permission={item.permission}>
+          <li>
+            <NavLink
+              to={item.href}
+              end={item.href === '/'}
+              onClick={onClick}
+              className={({ isActive }) =>
+                `group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 ${
+                  isActive
+                    ? 'bg-indigo-700 text-white'
+                    : 'text-indigo-200 hover:bg-indigo-700 hover:text-white'
+                }`
+              }
+            >
+              <item.icon className="h-6 w-6 shrink-0" aria-hidden="true" />
+              {item.name}
+            </NavLink>
+          </li>
+        </PermissionGate>
+      ))}
+    </ul>
+  );
+}
 
 export default function Sidebar({ onClose }: SidebarProps) {
   const { user } = useAuth();
@@ -53,7 +93,6 @@ export default function Sidebar({ onClose }: SidebarProps) {
   };
 
   const isSuperAdmin = user?.roles?.includes('SUPER_ADMIN');
-  const navigation = isSuperAdmin ? superAdminNavigation : tenantNavigation;
 
   return (
     <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-indigo-950 px-6 pb-4">
@@ -62,46 +101,37 @@ export default function Sidebar({ onClose }: SidebarProps) {
         <span className="text-xl font-bold text-white">PRG Screen Recorder</span>
       </div>
 
-      {/* Tenant switcher (only for OAuth users with multiple tenants) */}
-      {!isSuperAdmin && (
-        <div className="-mx-2">
-          <TenantSwitcher />
-        </div>
-      )}
-
       <nav className="flex flex-1 flex-col">
         <ul role="list" className="flex flex-1 flex-col gap-y-7">
-          {/* Main navigation */}
-          <li>
-            <ul role="list" className="-mx-2 space-y-1">
-              {navigation.map((item) => (
-                <PermissionGate key={item.name} permission={item.permission}>
-                  <li>
-                    <NavLink
-                      to={item.href}
-                      end={item.href === '/'}
-                      onClick={handleClick}
-                      className={({ isActive }) =>
-                        `group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 ${
-                          isActive
-                            ? 'bg-indigo-700 text-white'
-                            : 'text-indigo-200 hover:bg-indigo-700 hover:text-white'
-                        }`
-                      }
-                    >
-                      <item.icon
-                        className="h-6 w-6 shrink-0"
-                        aria-hidden="true"
-                      />
-                      {item.name}
-                    </NavLink>
-                  </li>
-                </PermissionGate>
-              ))}
-            </ul>
-          </li>
+          {isSuperAdmin ? (
+            /* ---- SuperAdmin: flat list (unchanged) ---- */
+            <li>
+              <NavList items={superAdminNavigation} onClick={handleClick} />
+            </li>
+          ) : (
+            /* ---- OAuth user: structured menu ---- */
+            <>
+              {/* Company name (tenant switcher) + tenant-scoped items */}
+              <li>
+                <div className="-mx-2 mb-2">
+                  <TenantSwitcher />
+                </div>
+                <NavList items={tenantScopedNavigation} onClick={handleClick} indent />
+              </li>
 
-          {/* Secondary navigation (bottom) */}
+              {/* Global items: Компании, Аудит */}
+              <li>
+                <div className="-mx-2 mb-2">
+                  <p className="px-3 text-xs font-semibold uppercase tracking-wider text-indigo-400">
+                    Управление
+                  </p>
+                </div>
+                <NavList items={globalNavigation} onClick={handleClick} />
+              </li>
+            </>
+          )}
+
+          {/* Bottom: Settings */}
           <li className="mt-auto">
             <ul role="list" className="-mx-2 space-y-1">
               <li>
@@ -118,22 +148,6 @@ export default function Sidebar({ onClose }: SidebarProps) {
                 >
                   <Cog6ToothIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
                   Настройки
-                </NavLink>
-              </li>
-              <li>
-                <NavLink
-                  to="/profile"
-                  onClick={handleClick}
-                  className={({ isActive }) =>
-                    `group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 ${
-                      isActive
-                        ? 'bg-indigo-700 text-white'
-                        : 'text-indigo-200 hover:bg-indigo-700 hover:text-white'
-                    }`
-                  }
-                >
-                  <UserCircleIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
-                  Профиль
                 </NavLink>
               </li>
             </ul>
