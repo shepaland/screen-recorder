@@ -6,16 +6,58 @@ namespace KaderoAgent.Capture;
 public class FfmpegProcess
 {
     private Process? _process;
+    private int _interactivePid = -1;
     private readonly string _ffmpegPath;
     private readonly ILogger _logger;
+    private readonly bool _isService;
 
     public FfmpegProcess(string ffmpegPath, ILogger logger)
     {
         _ffmpegPath = ffmpegPath;
         _logger = logger;
+        // Detect if running as a Windows service (Session 0)
+        _isService = !Environment.UserInteractive;
     }
 
     public void Start(string arguments)
+    {
+        if (_isService)
+        {
+            StartInUserSession(arguments);
+        }
+        else
+        {
+            StartDirect(arguments);
+        }
+    }
+
+    private void StartInUserSession(string arguments)
+    {
+        _logger.LogInformation("Running as service, launching FFmpeg in user session");
+
+        var pid = InteractiveProcessLauncher.LaunchInUserSession(
+            _ffmpegPath, arguments, null, _logger);
+
+        if (pid <= 0)
+        {
+            _logger.LogError("Failed to launch FFmpeg in user session");
+            return;
+        }
+
+        _interactivePid = pid;
+        try
+        {
+            _process = Process.GetProcessById(pid);
+            _logger.LogInformation("FFmpeg started in user session, PID={Pid}", pid);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "FFmpeg process PID={Pid} exited immediately", pid);
+            _interactivePid = -1;
+        }
+    }
+
+    private void StartDirect(string arguments)
     {
         _process = new Process
         {
@@ -38,7 +80,7 @@ public class FfmpegProcess
 
         _process.Start();
         _process.BeginErrorReadLine();
-        _logger.LogInformation("FFmpeg started, PID={Pid}", _process.Id);
+        _logger.LogInformation("FFmpeg started directly, PID={Pid}", _process.Id);
     }
 
     public void Stop()
@@ -47,14 +89,23 @@ public class FfmpegProcess
 
         try
         {
-            // Send 'q' to ffmpeg stdin for graceful stop
-            _process.StandardInput.Write("q");
-            _process.StandardInput.Flush();
-
-            if (!_process.WaitForExit(10000))
+            if (_isService && _interactivePid > 0)
             {
-                _logger.LogWarning("FFmpeg did not exit gracefully, killing");
+                // For interactive session process, just kill it
+                _logger.LogInformation("Killing FFmpeg PID={Pid}", _interactivePid);
                 _process.Kill();
+            }
+            else
+            {
+                // Send 'q' to ffmpeg stdin for graceful stop
+                _process.StandardInput.Write("q");
+                _process.StandardInput.Flush();
+
+                if (!_process.WaitForExit(10000))
+                {
+                    _logger.LogWarning("FFmpeg did not exit gracefully, killing");
+                    _process.Kill();
+                }
             }
         }
         catch (Exception ex)

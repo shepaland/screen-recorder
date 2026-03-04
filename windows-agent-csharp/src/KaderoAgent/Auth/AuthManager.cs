@@ -16,6 +16,12 @@ public class AuthManager
     private ServerConfig? _serverConfig;
     private string? _deviceId;
 
+    private void SyncDeviceId()
+    {
+        if (!string.IsNullOrEmpty(_deviceId))
+            _apiClient.SetDeviceId(_deviceId);
+    }
+
     public ServerConfig? ServerConfig => _serverConfig;
     public string? DeviceId => _deviceId;
     public bool IsAuthenticated => !string.IsNullOrEmpty(_tokenStore.AccessToken);
@@ -39,12 +45,14 @@ public class AuthManager
         _serverConfig = creds.ServerConfig;
         _tokenStore.RefreshToken = creds.RefreshToken;
         _tokenStore.AccessToken = creds.AccessToken;
+        SyncDeviceId();
 
         // Try refresh
         return await RefreshTokenAsync();
     }
 
-    public async Task<DeviceLoginResponse> RegisterAsync(string serverUrl, string registrationToken)
+    public async Task<DeviceLoginResponse> RegisterAsync(string serverUrl, string registrationToken,
+        string? username = null, string? password = null)
     {
         var hwId = HardwareId.Generate();
         var hostname = Environment.MachineName;
@@ -52,6 +60,8 @@ public class AuthManager
 
         var body = new
         {
+            username = username ?? "",
+            password = password ?? "",
             registration_token = registrationToken,
             device_info = new
             {
@@ -73,6 +83,7 @@ public class AuthManager
         _tokenStore.RefreshToken = response.RefreshToken;
         _tokenStore.AccessTokenExpiry = DateTime.UtcNow.AddSeconds(response.ExpiresIn);
         _serverConfig = response.ServerConfig;
+        SyncDeviceId();
 
         // Save credentials
         _credentialStore.Save(new StoredCredentials

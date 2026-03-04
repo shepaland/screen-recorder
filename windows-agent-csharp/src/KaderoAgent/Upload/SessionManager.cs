@@ -42,7 +42,7 @@ public class SessionManager
         };
 
         var response = await _apiClient.PostAsync<SessionResponse>(url, body, ct);
-        _currentSessionId = response?.SessionId;
+        _currentSessionId = response?.Id;
         _logger.LogInformation("Recording session started: {SessionId}", _currentSessionId);
         return _currentSessionId ?? throw new Exception("Failed to create session");
     }
@@ -64,7 +64,7 @@ public class SessionManager
 
 public class SessionResponse
 {
-    public string? SessionId { get; set; }
+    public string? Id { get; set; }
     public string? Status { get; set; }
     public string? StartedTs { get; set; }
 }

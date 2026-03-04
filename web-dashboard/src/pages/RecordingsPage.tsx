@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FilmIcon, PlayIcon, XMarkIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { FilmIcon, XMarkIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { getRecordings, getRecordingSegments, type Recording, type Segment } from '../api/ingest';
 
 function formatDuration(ms: number): string {

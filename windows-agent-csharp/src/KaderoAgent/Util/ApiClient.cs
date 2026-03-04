@@ -14,6 +14,7 @@ public class ApiClient
     private readonly TokenStore _tokenStore;
     private readonly ILogger<ApiClient> _logger;
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
+    private string? _deviceId;
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -29,6 +30,8 @@ public class ApiClient
         _http = new HttpClient();
         _http.Timeout = TimeSpan.FromSeconds(30);
     }
+
+    public void SetDeviceId(string deviceId) => _deviceId = deviceId;
 
     public async Task<T?> GetAsync<T>(string url, CancellationToken ct = default)
     {
@@ -52,6 +55,7 @@ public class ApiClient
         var response = await SendWithRetry(request, ct);
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync(ct);
+        if (string.IsNullOrWhiteSpace(json)) return default;
         return JsonSerializer.Deserialize<T>(json, JsonOptions);
     }
 
@@ -67,6 +71,7 @@ public class ApiClient
         var response = await SendWithRetry(request, ct);
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync(ct);
+        if (string.IsNullOrWhiteSpace(json)) return default;
         return JsonSerializer.Deserialize<T>(json, JsonOptions);
     }
 
@@ -85,6 +90,10 @@ public class ApiClient
         if (!string.IsNullOrEmpty(token))
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+        if (!string.IsNullOrEmpty(_deviceId))
+        {
+            request.Headers.TryAddWithoutValidation("X-Device-ID", _deviceId);
         }
     }
 
