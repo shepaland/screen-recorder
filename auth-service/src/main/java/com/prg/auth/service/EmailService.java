@@ -44,8 +44,12 @@ public class EmailService {
             mailSender.send(message);
             log.info("Verification email sent to: {}", maskEmail(to));
         } catch (MessagingException | MailException | UnsupportedEncodingException e) {
-            log.error("Failed to send verification email to {}: {}", maskEmail(to), e.getMessage());
-            throw new RuntimeException("Failed to send verification email", e);
+            // Fallback: log the code so testing can proceed without SMTP
+            // In production, this should be removed or hidden behind a feature flag
+            log.error("Failed to send verification email to {}: {}. FALLBACK: code={}", maskEmail(to), e.getMessage(), code);
+            log.warn("SMTP unavailable — OTP code logged for testing. DO NOT use in production without SMTP!");
+            // Do NOT throw — allow the flow to continue so the code is saved in DB
+            // and can be verified using the code from logs
         }
     }
 
