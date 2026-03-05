@@ -1,6 +1,7 @@
 using KaderoAgent.Auth;
 using KaderoAgent.Capture;
 using KaderoAgent.Configuration;
+using KaderoAgent.Ipc;
 using KaderoAgent.Service;
 using KaderoAgent.Upload;
 using KaderoAgent.Util;
@@ -19,12 +20,14 @@ public class HeartbeatService : BackgroundService
     private readonly ScreenCaptureManager _captureManager;
     private readonly UploadQueue _uploadQueue;
     private readonly MetricsCollector _metrics;
+    private readonly IStatusProvider _statusProvider;
     private readonly IOptions<AgentConfig> _config;
     private readonly ILogger<HeartbeatService> _logger;
 
     public HeartbeatService(AuthManager authManager, ApiClient apiClient, CredentialStore credentialStore,
         CommandHandler commandHandler, ScreenCaptureManager captureManager, UploadQueue uploadQueue,
-        MetricsCollector metrics, IOptions<AgentConfig> config, ILogger<HeartbeatService> logger)
+        MetricsCollector metrics, IStatusProvider statusProvider, IOptions<AgentConfig> config,
+        ILogger<HeartbeatService> logger)
     {
         _authManager = authManager;
         _apiClient = apiClient;
@@ -33,6 +36,7 @@ public class HeartbeatService : BackgroundService
         _captureManager = captureManager;
         _uploadQueue = uploadQueue;
         _metrics = metrics;
+        _statusProvider = statusProvider;
         _config = config;
         _logger = logger;
     }
@@ -74,6 +78,14 @@ public class HeartbeatService : BackgroundService
 
                 var response = await _apiClient.PutAsync<HeartbeatResponse>(url, body, ct);
 
+                // Update status provider after successful heartbeat
+                if (_statusProvider is AgentStatusProvider asp)
+                {
+                    asp.SetConnectionStatus("connected");
+                    asp.SetLastHeartbeat(DateTime.UtcNow);
+                    asp.SetLastError(null);
+                }
+
                 // Process pending commands
                 if (response?.PendingCommands != null)
                 {
@@ -88,6 +100,13 @@ public class HeartbeatService : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Heartbeat failed");
+
+                // Update status provider on error
+                if (_statusProvider is AgentStatusProvider asp)
+                {
+                    asp.SetConnectionStatus("error");
+                    asp.SetLastError(ex.Message);
+                }
             }
 
             await Task.Delay(TimeSpan.FromSeconds(interval), ct);

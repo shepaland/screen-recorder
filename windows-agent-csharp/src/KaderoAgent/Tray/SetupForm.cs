@@ -17,6 +17,7 @@ public class SetupForm : Form
     {
         _services = services;
         InitializeComponent();
+        LoadPendingRegistration();
     }
 
     private void InitializeComponent()
@@ -65,6 +66,26 @@ public class SetupForm : Form
         Controls.Add(_statusLabel);
     }
 
+    /// <summary>
+    /// Pre-fills server URL and token from installer's pending registration config.
+    /// </summary>
+    private void LoadPendingRegistration()
+    {
+        try
+        {
+            var credStore = _services.GetRequiredService<CredentialStore>();
+            var pending = credStore.LoadPendingRegistration();
+            if (pending != null)
+            {
+                if (!string.IsNullOrEmpty(pending.ServerUrl))
+                    _serverUrlBox.Text = pending.ServerUrl;
+                if (!string.IsNullOrEmpty(pending.RegistrationToken))
+                    _tokenBox.Text = pending.RegistrationToken;
+            }
+        }
+        catch { /* ignore if not available */ }
+    }
+
     private async void OnConnect(object? sender, EventArgs e)
     {
         _connectBtn.Enabled = false;
@@ -75,6 +96,10 @@ public class SetupForm : Form
         {
             var authManager = _services.GetRequiredService<AuthManager>();
             var response = await authManager.RegisterAsync(_serverUrlBox.Text.Trim(), _tokenBox.Text.Trim());
+
+            // Clear pending registration after successful registration
+            var credStore = _services.GetRequiredService<CredentialStore>();
+            credStore.ClearPendingRegistration();
 
             _statusLabel.Text = $"Устройство зарегистрировано: {response.DeviceId}";
             _statusLabel.ForeColor = System.Drawing.Color.Green;
