@@ -67,10 +67,15 @@ Name: "{group}\{cm:UninstallProgram,Kadero Agent}"; Filename: "{uninstallexe}"
 ; Post-install actions (sequential, order matters)
 ; ---------------------------------------------------------------------------
 [Run]
-; Protect segments directory: only SYSTEM and Administrators have access
+; Protect root Kadero directory: only SYSTEM and Administrators
 Filename: "icacls.exe"; \
-  Parameters: """{commonappdata}\Kadero\segments"" /inheritance:r /grant:r ""NT AUTHORITY\SYSTEM:(OI)(CI)F"" /grant:r ""BUILTIN\Administrators:(OI)(CI)F"""; \
+  Parameters: """{commonappdata}\Kadero"" /inheritance:r /grant:r ""*S-1-5-18:(OI)(CI)F"" /grant:r ""*S-1-5-32-544:(OI)(CI)F"""; \
   StatusMsg: "Настройка прав доступа..."; \
+  Flags: runhidden
+
+; Protect segments directory separately (double protection)
+Filename: "icacls.exe"; \
+  Parameters: """{commonappdata}\Kadero\segments"" /inheritance:r /grant:r ""*S-1-5-18:(OI)(CI)F"" /grant:r ""*S-1-5-32-544:(OI)(CI)F"""; \
   Flags: runhidden
 
 ; Register device with server (headless, saves config)
@@ -123,6 +128,10 @@ Filename: "cmd.exe"; Parameters: "/c timeout /t 3 /nobreak >nul"; \
 ; Delete the service
 Filename: "sc.exe"; Parameters: "delete KaderoAgent"; \
   RunOnceId: "DeleteService"; Flags: runhidden
+
+[InstallDelete]
+Type: files; Name: "{app}\unins*.exe"
+Type: files; Name: "{app}\unins*.dat"
 
 ; ---------------------------------------------------------------------------
 ; Pascal Script: custom wizard page, validation, silent install support

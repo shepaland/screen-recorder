@@ -100,7 +100,8 @@ public class PipeServer : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    response = new PipeResponse { Success = false, Error = ex.Message };
+                    _logger.LogError(ex, "Pipe request processing error");
+                    response = new PipeResponse { Success = false, Error = "Operation failed. Check service logs." };
                 }
 
                 var json = JsonSerializer.Serialize(response, _jsonOptions);
@@ -133,9 +134,8 @@ public class PipeServer : BackgroundService
                 return new PipeResponse { Success = result, Status = _statusProvider.GetCurrentStatus() };
 
             case "restart_service":
-                // Tray can request restart -- service exits, SC auto-restarts
-                _ = Task.Run(async () => { await Task.Delay(500); Environment.Exit(0); }, ct);
-                return new PipeResponse { Success = true };
+                // Removed: restart via pipe is a DoS risk. Use sc.exe with UAC elevation instead.
+                return new PipeResponse { Success = false, Error = "Restart service via sc.exe (requires elevation)" };
 
             default:
                 return new PipeResponse { Success = false, Error = $"Unknown command: {request.Command}" };

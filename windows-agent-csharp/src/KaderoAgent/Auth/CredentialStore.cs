@@ -13,6 +13,8 @@ public class CredentialStore
     {
         var dir = config.Value.DataPath;
         Directory.CreateDirectory(dir);
+        // Ensure data directory has restricted ACL (SYSTEM + Admins only)
+        try { DirectoryAclHelper.SecureDirectory(dir); } catch { /* non-fatal on non-Windows or limited perms */ }
         _filePath = Path.Combine(dir, "credentials.enc");
     }
 
@@ -53,13 +55,14 @@ public class CredentialStore
     public void SavePendingRegistration(string serverUrl, string registrationToken)
     {
         var dir = Path.GetDirectoryName(_filePath)!;
-        var pendingPath = Path.Combine(dir, "pending_registration.json");
+        var pendingPath = Path.Combine(dir, "pending_registration.enc");
         var json = JsonSerializer.Serialize(new PendingRegistration
         {
             ServerUrl = serverUrl,
             RegistrationToken = registrationToken
         });
-        File.WriteAllText(pendingPath, json);
+        var encrypted = CryptoUtil.Encrypt(json, HardwareId.Generate());
+        File.WriteAllBytes(pendingPath, encrypted);
     }
 
     /// <summary>
@@ -68,14 +71,32 @@ public class CredentialStore
     public PendingRegistration? LoadPendingRegistration()
     {
         var dir = Path.GetDirectoryName(_filePath)!;
-        var pendingPath = Path.Combine(dir, "pending_registration.json");
-        if (!File.Exists(pendingPath)) return null;
-        try
+        // Try encrypted format first, fallback to legacy plaintext
+        var encPath = Path.Combine(dir, "pending_registration.enc");
+        var jsonPath = Path.Combine(dir, "pending_registration.json");
+
+        if (File.Exists(encPath))
         {
-            var json = File.ReadAllText(pendingPath);
-            return JsonSerializer.Deserialize<PendingRegistration>(json);
+            try
+            {
+                var encrypted = File.ReadAllBytes(encPath);
+                var json = CryptoUtil.Decrypt(encrypted, HardwareId.Generate());
+                return JsonSerializer.Deserialize<PendingRegistration>(json);
+            }
+            catch { /* fall through to try legacy */ }
         }
-        catch { return null; }
+
+        if (File.Exists(jsonPath))
+        {
+            try
+            {
+                var json = File.ReadAllText(jsonPath);
+                return JsonSerializer.Deserialize<PendingRegistration>(json);
+            }
+            catch { return null; }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -84,8 +105,10 @@ public class CredentialStore
     public void ClearPendingRegistration()
     {
         var dir = Path.GetDirectoryName(_filePath)!;
-        var pendingPath = Path.Combine(dir, "pending_registration.json");
-        if (File.Exists(pendingPath)) File.Delete(pendingPath);
+        var encPath = Path.Combine(dir, "pending_registration.enc");
+        var jsonPath = Path.Combine(dir, "pending_registration.json");
+        if (File.Exists(encPath)) File.Delete(encPath);
+        if (File.Exists(jsonPath)) File.Delete(jsonPath); // Clean up legacy
     }
 }
 

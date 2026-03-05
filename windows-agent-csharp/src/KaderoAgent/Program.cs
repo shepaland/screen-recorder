@@ -61,54 +61,30 @@ if (args.Contains("--service"))
 
 var host = builder.Build();
 
-// Headless registration:
-//   Full:    --register --server-url=<url> --token=<token> --username=<user> --password=<pass>
-//   Config:  --register --server-url=<url> --token=<token>   (saves config for later setup)
+// Headless config-only registration:
+//   KaderoAgent --register --server-url=<url> --token=<token>
+// Saves server URL and token for later setup completion via SetupForm or Tray app.
 if (args.Contains("--register"))
 {
     var serverUrl = args.FirstOrDefault(a => a.StartsWith("--server-url="))?.Split('=', 2)[1];
     var token = args.FirstOrDefault(a => a.StartsWith("--token="))?.Split('=', 2)[1];
-    var username = args.FirstOrDefault(a => a.StartsWith("--username="))?.Split('=', 2)[1];
-    var password = args.FirstOrDefault(a => a.StartsWith("--password="))?.Split('=', 2)[1];
 
     if (string.IsNullOrEmpty(serverUrl) || string.IsNullOrEmpty(token))
     {
-        Console.WriteLine("Usage:");
-        Console.WriteLine("  Full:   KaderoAgent --register --server-url=<url> --token=<token> --username=<user> --password=<pass>");
-        Console.WriteLine("  Config: KaderoAgent --register --server-url=<url> --token=<token>");
+        Console.WriteLine("Usage: KaderoAgent --register --server-url=<url> --token=<token>");
         return;
     }
 
-    if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
-    {
-        // Full registration with device-login API
-        Console.WriteLine($"Registering device with server: {serverUrl}");
-        var authManager = host.Services.GetRequiredService<AuthManager>();
-        try
-        {
-            var response = await authManager.RegisterAsync(serverUrl, token, username, password);
-            Console.WriteLine($"Device registered: {response.DeviceId}");
-            Console.WriteLine("Registration successful. Start the service with: sc start KaderoAgent");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Registration failed: {ex.Message}");
-            Environment.Exit(1);
-        }
-    }
-    else
-    {
-        // Config-only mode: save server URL and registration token for later setup
-        Console.WriteLine($"Saving server configuration: {serverUrl}");
-        var credStore = host.Services.GetRequiredService<CredentialStore>();
-        credStore.SavePendingRegistration(serverUrl, token);
-        Console.WriteLine("Configuration saved. Complete registration via Setup Form or Tray application.");
-    }
+    Console.WriteLine($"Saving server configuration: {serverUrl}");
+    var credStore = host.Services.GetRequiredService<CredentialStore>();
+    credStore.SavePendingRegistration(serverUrl, token);
+    Console.WriteLine("Configuration saved. Complete registration via Setup Form or Tray application.");
     return;
 }
 
-// If --setup flag or no credentials, show setup form
-if (args.Contains("--setup") || !host.Services.GetRequiredService<CredentialStore>().HasCredentials())
+// If --setup flag or no credentials, show setup form (not in service mode)
+if (!args.Contains("--service") &&
+    (args.Contains("--setup") || !host.Services.GetRequiredService<CredentialStore>().HasCredentials()))
 {
     Application.EnableVisualStyles();
     Application.SetCompatibleTextRenderingDefault(false);

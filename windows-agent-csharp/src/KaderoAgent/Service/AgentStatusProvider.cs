@@ -16,6 +16,7 @@ public class AgentStatusProvider : IStatusProvider
     private readonly MetricsCollector _metrics;
     private readonly IOptions<AgentConfig> _config;
 
+    private readonly object _lock = new();
     private string _connectionStatus = "disconnected";
     private string? _lastError;
     private DateTime? _lastHeartbeatTs;
@@ -32,18 +33,28 @@ public class AgentStatusProvider : IStatusProvider
         _config = config;
     }
 
-    public void SetConnectionStatus(string status) => _connectionStatus = status;
-    public void SetLastError(string? error) => _lastError = error;
-    public void SetLastHeartbeat(DateTime ts) => _lastHeartbeatTs = ts;
+    public void SetConnectionStatus(string status) { lock (_lock) _connectionStatus = status; }
+    public void SetLastError(string? error) { lock (_lock) _lastError = error; }
+    public void SetLastHeartbeat(DateTime ts) { lock (_lock) _lastHeartbeatTs = ts; }
 
     public AgentStatus GetCurrentStatus()
     {
         var serverConfig = _authManager.ServerConfig;
         var creds = _credentialStore.Load();
 
+        string connStatus;
+        string? lastError;
+        DateTime? lastHb;
+        lock (_lock)
+        {
+            connStatus = _connectionStatus;
+            lastError = _lastError;
+            lastHb = _lastHeartbeatTs;
+        }
+
         return new AgentStatus
         {
-            ConnectionStatus = _authManager.IsAuthenticated ? _connectionStatus : "disconnected",
+            ConnectionStatus = _authManager.IsAuthenticated ? connStatus : "disconnected",
             RecordingStatus = _captureManager.IsRecording ? "recording" : "stopped",
             DeviceId = _authManager.DeviceId,
             ServerUrl = creds?.ServerUrl,
@@ -55,8 +66,8 @@ public class AgentStatusProvider : IStatusProvider
             MemoryMb = _metrics.GetMemoryUsageMb(),
             DiskFreeGb = _metrics.GetDiskFreeGb(),
             SegmentsQueued = _uploadQueue.QueuedCount,
-            LastHeartbeatTs = _lastHeartbeatTs,
-            LastError = _lastError
+            LastHeartbeatTs = lastHb,
+            LastError = lastError
         };
     }
 }

@@ -37,7 +37,7 @@ public class SetupForm : Form
         _serverUrlBox = new TextBox
         {
             Location = new(20, y), Size = new(390, 25),
-            Text = "https://services-test.shepaland.ru/screenrecorder"
+            Text = "https://"
         };
         Controls.Add(_serverUrlBox);
         y += 35;
