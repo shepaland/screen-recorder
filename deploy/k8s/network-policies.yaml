@@ -128,6 +128,13 @@ spec:
       ports:
         - protocol: TCP
           port: 443
+    # SMTP (sm16.hosting.reg.ru:465, email OTP verification)
+    - to:
+        - ipBlock:
+            cidr: 31.31.196.0/24
+      ports:
+        - protocol: TCP
+          port: 465
     # DNS (kube-dns in kube-system)
     - to:
         - namespaceSelector:

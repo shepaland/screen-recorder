@@ -19,6 +19,10 @@ data:
   CONTROL_PLANE_BASE_URL: "https://services-test.shepaland.ru/screenrecorder/api/cp/v1/devices"
   YANDEX_OAUTH_CALLBACK_URL: "https://services-test.shepaland.ru/screenrecorder/api/v1/auth/oauth/yandex/callback"
   FRONTEND_BASE_URL: "https://services-test.shepaland.ru/screenrecorder"
+  SMTP_HOST: "sm16.hosting.reg.ru"
+  SMTP_PORT: "465"
+  EMAIL_FROM: "otp@shepaland.ru"
+  EMAIL_FROM_NAME: "Кадеро"
 ---
 apiVersion: v1
 kind: ConfigMap
