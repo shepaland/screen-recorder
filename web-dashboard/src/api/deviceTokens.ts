@@ -1,5 +1,4 @@
 import apiClient from './client';
-import { cpApiClient } from './client';
 import type { DeviceTokenResponse, CreateDeviceTokenRequest } from '../types/device';
 import type { PageResponse } from '../types/common';
 
@@ -48,6 +47,6 @@ export async function deleteDeviceToken(id: string): Promise<void> {
 }
 
 export async function getTokenDevices(tokenId: string): Promise<TokenDevicesResponse> {
-  const response = await cpApiClient.get<TokenDevicesResponse>(`/device-tokens/${tokenId}/devices`);
+  const response = await apiClient.get<TokenDevicesResponse>(`/device-tokens/${tokenId}/devices`);
   return response.data;
 }
