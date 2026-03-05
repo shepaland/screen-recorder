@@ -48,8 +48,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
            "AND u.authProvider = 'password'")
     List<User> findActivePasswordUsersByUsername(@Param("username") String username);
 
-    @Query("SELECT u FROM User u JOIN FETCH u.tenant t " +
-           "WHERE u.username = :username AND u.isActive = true AND t.isActive = true")
+    @Query("SELECT u FROM User u JOIN FETCH u.tenant t LEFT JOIN FETCH u.roles " +
+           "WHERE u.username = :username AND u.isActive = true AND t.isActive = true " +
+           "ORDER BY t.createdTs ASC")
     List<User> findActiveUsersByUsername(@Param("username") String username);
 
     @Modifying

@@ -1,5 +1,6 @@
 package com.prg.auth.controller;
 
+import com.prg.auth.dto.request.CloneRoleRequest;
 import com.prg.auth.dto.request.CreateRoleRequest;
 import com.prg.auth.dto.request.UpdateRoleRequest;
 import com.prg.auth.dto.response.PageResponse;
@@ -53,6 +54,19 @@ public class RoleController {
         requirePermission(principal, "ROLES:CREATE");
         RoleResponse response = roleService.createRole(
                 request, principal.getTenantId(), principal,
+                getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/{id}/clone")
+    public ResponseEntity<RoleResponse> cloneRole(
+            @PathVariable UUID id,
+            @Valid @RequestBody CloneRoleRequest request,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest httpRequest) {
+        requirePermission(principal, "ROLES:CREATE");
+        RoleResponse response = roleService.cloneRole(
+                id, request, principal.getTenantId(), principal,
                 getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

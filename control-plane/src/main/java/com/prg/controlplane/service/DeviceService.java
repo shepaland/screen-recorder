@@ -9,6 +9,7 @@ import com.prg.controlplane.exception.AccessDeniedException;
 import com.prg.controlplane.exception.ResourceNotFoundException;
 import com.prg.controlplane.repository.DeviceCommandRepository;
 import com.prg.controlplane.repository.DeviceRepository;
+import com.prg.controlplane.repository.RecordingSessionRepository;
 import com.prg.controlplane.security.DevicePrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ public class DeviceService {
 
     private final DeviceRepository deviceRepository;
     private final DeviceCommandRepository deviceCommandRepository;
+    private final RecordingSessionRepository recordingSessionRepository;
 
     @Value("${prg.device.default-heartbeat-interval-sec:30}")
     private int defaultHeartbeatIntervalSec;
@@ -78,14 +80,36 @@ public class DeviceService {
     }
 
     @Transactional
-    public void deactivateDevice(UUID deviceId, UUID tenantId) {
+    public void deactivateDevice(UUID deviceId, UUID tenantId, UUID userId,
+                                  String ipAddress, String userAgent) {
         Device device = findDeviceByIdAndTenant(deviceId, tenantId);
 
+        Instant now = Instant.now();
+
+        // 1. Interrupt active recording sessions for this device
+        int interruptedSessions = recordingSessionRepository
+                .interruptActiveSessionsByDeviceId(deviceId, tenantId, now);
+        if (interruptedSessions > 0) {
+            log.info("Interrupted {} active recording sessions for device being deactivated: device_id={}, tenant_id={}",
+                    interruptedSessions, deviceId, tenantId);
+        }
+
+        // 2. Expire pending commands that can no longer be delivered
+        int expiredCommands = deviceCommandRepository
+                .expirePendingCommandsByDeviceId(deviceId, tenantId);
+        if (expiredCommands > 0) {
+            log.info("Expired {} pending commands for device being deactivated: device_id={}, tenant_id={}",
+                    expiredCommands, deviceId, tenantId);
+        }
+
+        // 3. Deactivate the device itself
         device.setIsActive(false);
         device.setStatus("offline");
         deviceRepository.save(device);
 
-        log.info("Device deactivated: id={}, hostname={}, tenant_id={}", device.getId(), device.getHostname(), tenantId);
+        log.info("Device deactivated: id={}, hostname={}, tenant_id={}, user_id={}, ip={}, interrupted_sessions={}, expired_commands={}",
+                device.getId(), device.getHostname(), tenantId, userId, ipAddress,
+                interruptedSessions, expiredCommands);
     }
 
     @Transactional

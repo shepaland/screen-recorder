@@ -335,30 +335,41 @@ public class AuthService {
 
     /**
      * Switch the current authenticated user to a different tenant.
-     * Requires that the user's OAuth identity is linked to a user in the target tenant.
+     * Supports both OAuth and password users.
+     * OAuth users are resolved via OAuthIdentity links; password users via username across tenants.
      */
     @Transactional
     public AuthResult<LoginResponse> switchTenant(UUID currentUserId, UUID targetTenantId,
                                                    String ipAddress, String userAgent) {
-        // Find current user's OAuth link
-        UserOAuthLink currentLink = userOAuthLinkRepository.findByUserId(currentUserId)
-                .orElseThrow(() -> new AccessDeniedException(
-                        "Tenant switching is only available for OAuth users", "OAUTH_REQUIRED"));
+        User targetUser;
+        Tenant targetTenant;
 
-        OAuthIdentity identity = currentLink.getOauthIdentity();
+        // Try OAuth path first
+        UserOAuthLink currentLink = userOAuthLinkRepository.findByUserId(currentUserId).orElse(null);
 
-        // Find all active links for this identity
-        List<UserOAuthLink> activeLinks = userOAuthLinkRepository.findActiveLinksWithUserAndTenant(identity.getId());
+        if (currentLink != null) {
+            // OAuth user: find target via identity links
+            OAuthIdentity identity = currentLink.getOauthIdentity();
+            List<UserOAuthLink> activeLinks = userOAuthLinkRepository.findActiveLinksWithUserAndTenant(identity.getId());
+            UserOAuthLink targetLink = activeLinks.stream()
+                    .filter(link -> link.getUser().getTenant().getId().equals(targetTenantId))
+                    .findFirst()
+                    .orElseThrow(() -> new AccessDeniedException(
+                            "You do not have access to the requested tenant"));
+            targetUser = targetLink.getUser();
+        } else {
+            // Password user: find target via username across all tenants
+            User currentUser = userRepository.findById(currentUserId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found", "USER_NOT_FOUND"));
+            List<User> allUsers = userRepository.findActiveUsersByUsername(currentUser.getUsername());
+            targetUser = allUsers.stream()
+                    .filter(u -> u.getTenant().getId().equals(targetTenantId))
+                    .findFirst()
+                    .orElseThrow(() -> new AccessDeniedException(
+                            "You do not have access to the requested tenant"));
+        }
 
-        // Find the link for the target tenant
-        UserOAuthLink targetLink = activeLinks.stream()
-                .filter(link -> link.getUser().getTenant().getId().equals(targetTenantId))
-                .findFirst()
-                .orElseThrow(() -> new AccessDeniedException(
-                        "You do not have access to the requested tenant"));
-
-        User targetUser = targetLink.getUser();
-        Tenant targetTenant = targetUser.getTenant();
+        targetTenant = targetUser.getTenant();
 
         if (!targetUser.getIsActive()) {
             throw new AccessDeniedException("Your account in the target tenant is disabled");
@@ -444,24 +455,29 @@ public class AuthService {
                 .orElse(null);
 
         if (currentLink == null) {
-            // Password-only user, return just their current tenant
-            User user = userRepository.findById(currentUserId)
+            // Password user — find ALL tenants where this username has an active account
+            User currentUser = userRepository.findById(currentUserId)
                     .orElseThrow(() -> new ResourceNotFoundException("User not found", "USER_NOT_FOUND"));
-            Tenant tenant = user.getTenant();
-            String primaryRole = user.getRoles().stream()
-                    .map(r -> r.getCode())
-                    .findFirst()
-                    .orElse(null);
-            OAuthCallbackResponse.TenantPreview preview = OAuthCallbackResponse.TenantPreview.builder()
-                    .id(tenant.getId())
-                    .name(tenant.getName())
-                    .slug(tenant.getSlug())
-                    .role(primaryRole)
-                    .isCurrent(true)
-                    .createdTs(tenant.getCreatedTs())
-                    .build();
+            List<User> allUsers = userRepository.findActiveUsersByUsername(currentUser.getUsername());
+            List<OAuthCallbackResponse.TenantPreview> tenants = allUsers.stream()
+                    .map(user -> {
+                        Tenant tenant = user.getTenant();
+                        String primaryRole = user.getRoles().stream()
+                                .map(r -> r.getCode())
+                                .findFirst()
+                                .orElse(null);
+                        return OAuthCallbackResponse.TenantPreview.builder()
+                                .id(tenant.getId())
+                                .name(tenant.getName())
+                                .slug(tenant.getSlug())
+                                .role(primaryRole)
+                                .isCurrent(user.getId().equals(currentUserId))
+                                .createdTs(tenant.getCreatedTs())
+                                .build();
+                    })
+                    .toList();
             return MyTenantsResponse.builder()
-                    .tenants(List.of(preview))
+                    .tenants(tenants)
                     .build();
         }
 

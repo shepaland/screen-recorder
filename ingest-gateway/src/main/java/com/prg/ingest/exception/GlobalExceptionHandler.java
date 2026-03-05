@@ -36,6 +36,16 @@ public class GlobalExceptionHandler {
                         .build());
     }
 
+    @ExceptionHandler(RecordingActiveException.class)
+    public ResponseEntity<ErrorResponse> handleRecordingActive(RecordingActiveException ex) {
+        log.warn("Recording is active: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.builder()
+                        .error(ex.getMessage())
+                        .code(ex.getCode())
+                        .build());
+    }
+
     @ExceptionHandler(UploadException.class)
     public ResponseEntity<ErrorResponse> handleUploadError(UploadException ex) {
         log.error("Upload error: {}", ex.getMessage());

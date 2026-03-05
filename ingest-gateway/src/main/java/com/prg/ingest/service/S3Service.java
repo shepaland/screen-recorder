@@ -5,12 +5,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -92,6 +95,56 @@ public class S3Service {
         } catch (S3Exception e) {
             log.error("Error checking/creating S3 bucket '{}': {}", bucket, e.getMessage());
         }
+    }
+
+    /**
+     * Batch delete multiple objects from S3.
+     * Returns a list of keys that failed to delete (empty list on full success).
+     * Already-deleted keys are NOT treated as errors (idempotent).
+     */
+    public List<String> deleteObjects(List<String> s3Keys) {
+        if (s3Keys.isEmpty()) {
+            return List.of();
+        }
+
+        List<ObjectIdentifier> objectIds = s3Keys.stream()
+                .map(key -> ObjectIdentifier.builder().key(key).build())
+                .toList();
+
+        Delete delete = Delete.builder()
+                .objects(objectIds)
+                .quiet(false)
+                .build();
+
+        DeleteObjectsResponse response = s3Client.deleteObjects(
+                DeleteObjectsRequest.builder()
+                        .bucket(bucket)
+                        .delete(delete)
+                        .build());
+
+        List<String> failedKeys = new ArrayList<>();
+        if (response.errors() != null) {
+            for (S3Error error : response.errors()) {
+                log.warn("Failed to delete S3 object: key={}, code={}, message={}",
+                        error.key(), error.code(), error.message());
+                failedKeys.add(error.key());
+            }
+        }
+
+        log.info("Deleted {} objects from S3, {} failed",
+                s3Keys.size() - failedKeys.size(), failedKeys.size());
+        return failedKeys;
+    }
+
+    /**
+     * Get an InputStream for an S3 object.
+     * Caller is responsible for closing the returned stream.
+     */
+    public ResponseInputStream<GetObjectResponse> getObject(String key) {
+        return s3Client.getObject(GetObjectRequest.builder()
+                .bucket(bucket)
+                .key(key)
+                .build());
     }
 
     public int getPresignExpirySec() {

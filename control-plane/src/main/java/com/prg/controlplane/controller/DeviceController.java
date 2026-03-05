@@ -69,7 +69,9 @@ public class DeviceController {
         DevicePrincipal principal = getPrincipal(httpRequest);
         requirePermission(principal, "DEVICES:DELETE");
 
-        deviceService.deactivateDevice(id, principal.getTenantId());
+        deviceService.deactivateDevice(id, principal.getTenantId(),
+                principal.getUserId(), getClientIp(httpRequest),
+                httpRequest.getHeader("User-Agent"));
         return ResponseEntity.noContent().build();
     }
 

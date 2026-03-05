@@ -1,5 +1,6 @@
 package com.prg.auth.service;
 
+import com.prg.auth.dto.request.CloneRoleRequest;
 import com.prg.auth.dto.request.CreateRoleRequest;
 import com.prg.auth.dto.request.UpdateRoleRequest;
 import com.prg.auth.dto.response.PageResponse;
@@ -153,6 +154,55 @@ public class RoleService {
                 Map.of("code", role.getCode()), ipAddress, userAgent, null);
 
         log.info("Role deleted: id={}, code={}, tenant_id={}", roleId, role.getCode(), tenantId);
+    }
+
+    @Transactional
+    public RoleResponse cloneRole(UUID sourceRoleId, CloneRoleRequest request, UUID tenantId,
+                                   UserPrincipal principal, String ipAddress, String userAgent) {
+        // 1. Find source role with permissions
+        Role sourceRole = roleRepository.findByIdAndTenantIdWithPermissions(sourceRoleId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Role not found", "ROLE_NOT_FOUND"));
+
+        // 2. Check code uniqueness within tenant
+        if (roleRepository.existsByTenantIdAndCode(tenantId, request.getCode())) {
+            throw new DuplicateResourceException(
+                    "Role code already exists in this tenant", "ROLE_CODE_ALREADY_EXISTS");
+        }
+
+        // 3. Get tenant
+        Tenant tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tenant not found", "TENANT_NOT_FOUND"));
+
+        // 4. Create clone (ALWAYS is_system = false)
+        String description = request.getDescription() != null
+                ? request.getDescription()
+                : sourceRole.getDescription();
+
+        Role clonedRole = Role.builder()
+                .tenant(tenant)
+                .code(request.getCode())
+                .name(request.getName())
+                .description(description)
+                .isSystem(false)
+                .permissions(new HashSet<>(sourceRole.getPermissions()))
+                .build();
+
+        clonedRole = roleRepository.save(clonedRole);
+
+        // 5. Audit
+        auditService.logAction(tenantId, principal.getUserId(), "ROLE_CLONED", "ROLES", clonedRole.getId(),
+                Map.of(
+                    "source_role_id", sourceRoleId.toString(),
+                    "source_role_code", sourceRole.getCode(),
+                    "new_code", clonedRole.getCode(),
+                    "permissions_count", clonedRole.getPermissions().size()
+                ),
+                ipAddress, userAgent, null);
+
+        log.info("Role cloned: source_id={}, new_id={}, code={}, tenant_id={}",
+                sourceRoleId, clonedRole.getId(), clonedRole.getCode(), tenantId);
+
+        return toDetailResponse(clonedRole);
     }
 
     private RoleResponse toListResponse(Role role) {

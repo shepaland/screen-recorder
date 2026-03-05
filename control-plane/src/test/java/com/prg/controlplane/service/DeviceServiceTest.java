@@ -11,6 +11,7 @@ import com.prg.controlplane.exception.AccessDeniedException;
 import com.prg.controlplane.exception.ResourceNotFoundException;
 import com.prg.controlplane.repository.DeviceCommandRepository;
 import com.prg.controlplane.repository.DeviceRepository;
+import com.prg.controlplane.repository.RecordingSessionRepository;
 import com.prg.controlplane.security.DevicePrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,6 +40,9 @@ class DeviceServiceTest {
 
     @Mock
     private DeviceCommandRepository deviceCommandRepository;
+
+    @Mock
+    private RecordingSessionRepository recordingSessionRepository;
 
     @InjectMocks
     private DeviceService deviceService;
@@ -210,13 +214,18 @@ class DeviceServiceTest {
     }
 
     @Test
-    @DisplayName("Deactivate device - sets offline and inactive")
+    @DisplayName("Deactivate device - sets offline and inactive, interrupts sessions, expires commands")
     void testDeactivateDevice_setsOffline() {
+        UUID userId = UUID.randomUUID();
         when(deviceRepository.findByIdAndTenantId(deviceId, tenantId)).thenReturn(Optional.of(device));
         when(deviceRepository.save(any(Device.class))).thenAnswer(i -> i.getArgument(0));
+        when(recordingSessionRepository.interruptActiveSessionsByDeviceId(eq(deviceId), eq(tenantId), any(Instant.class))).thenReturn(0);
+        when(deviceCommandRepository.expirePendingCommandsByDeviceId(eq(deviceId), eq(tenantId))).thenReturn(0);
 
-        deviceService.deactivateDevice(deviceId, tenantId);
+        deviceService.deactivateDevice(deviceId, tenantId, userId, "10.0.0.1", "TestAgent");
 
+        verify(recordingSessionRepository).interruptActiveSessionsByDeviceId(eq(deviceId), eq(tenantId), any(Instant.class));
+        verify(deviceCommandRepository).expirePendingCommandsByDeviceId(deviceId, tenantId);
         verify(deviceRepository).save(argThat(d -> {
             assertThat(d.getIsActive()).isFalse();
             assertThat(d.getStatus()).isEqualTo("offline");

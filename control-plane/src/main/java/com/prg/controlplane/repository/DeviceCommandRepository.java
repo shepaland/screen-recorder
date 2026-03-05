@@ -4,6 +4,7 @@ import com.prg.controlplane.entity.DeviceCommand;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -55,4 +56,22 @@ public interface DeviceCommandRepository extends JpaRepository<DeviceCommand, UU
             @Param("deviceId") UUID deviceId,
             @Param("tenantId") UUID tenantId,
             @Param("limit") int limit);
+
+    /**
+     * Expire all pending commands for a device.
+     * Used during device deactivation -- pending commands can no longer be delivered.
+     *
+     * @return number of commands expired
+     */
+    @Modifying
+    @Query("""
+            UPDATE DeviceCommand c
+            SET c.status = 'expired'
+            WHERE c.deviceId = :deviceId
+              AND c.tenantId = :tenantId
+              AND c.status = 'pending'
+            """)
+    int expirePendingCommandsByDeviceId(
+            @Param("deviceId") UUID deviceId,
+            @Param("tenantId") UUID tenantId);
 }

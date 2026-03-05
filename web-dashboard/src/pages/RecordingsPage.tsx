@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FilmIcon, XMarkIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
-import { getRecordings, getRecordingSegments, type Recording, type Segment } from '../api/ingest';
+import { FilmIcon, XMarkIcon, ArrowPathIcon, ArrowDownTrayIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { getRecordings, getRecordingSegments, deleteRecording, downloadRecording, type Recording, type Segment } from '../api/ingest';
+import ConfirmDialog from '../components/ConfirmDialog';
+import PermissionGate from '../components/PermissionGate';
+import { useToast } from '../contexts/ToastContext';
 
 function formatDuration(ms: number): string {
   if (!ms) return '--';
@@ -49,6 +52,8 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function RecordingsPage() {
+  const { addToast } = useToast();
+
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +63,11 @@ export default function RecordingsPage() {
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
+
+  // Delete dialog
+  const [deleteTarget, setDeleteTarget] = useState<Recording | null>(null);
+  // Download state
+  const [downloading, setDownloading] = useState(false);
 
   const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -90,6 +100,41 @@ export default function RecordingsPage() {
       setSegments(data.segments || []);
     } catch (err) {
       console.error('Failed to load segments', err);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteRecording(deleteTarget.id);
+      addToast('success', 'Запись удалена');
+      if (selectedRecording?.id === deleteTarget.id) {
+        setSelectedRecording(null);
+      }
+      loadRecordings();
+    } catch {
+      addToast('error', 'Не удалось удалить запись');
+    }
+    setDeleteTarget(null);
+  };
+
+  const handleDownload = async (recording: Recording) => {
+    setDownloading(true);
+    try {
+      const { blob, filename } = await downloadRecording(recording.id);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      addToast('success', 'Скачивание началось');
+    } catch {
+      addToast('error', 'Не удалось скачать запись');
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -188,13 +233,43 @@ export default function RecordingsPage() {
               <h2 className="text-lg font-semibold text-gray-900">{selectedRecording.device_hostname}</h2>
               <p className="text-sm text-gray-500">{formatTime(selectedRecording.started_ts)}</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setSelectedRecording(null)}
-              className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-            >
-              <XMarkIcon className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Download button */}
+              <PermissionGate permission="RECORDINGS:EXPORT">
+                {selectedRecording.status === 'completed' && segments.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(selectedRecording)}
+                    disabled={downloading}
+                    className="p-2 rounded-md text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors disabled:opacity-50"
+                    title="Скачать запись"
+                  >
+                    <ArrowDownTrayIcon className={`h-5 w-5 ${downloading ? 'animate-bounce' : ''}`} />
+                  </button>
+                )}
+              </PermissionGate>
+              {/* Delete button */}
+              <PermissionGate permission="RECORDINGS:DELETE">
+                {selectedRecording.status !== 'active' && (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(selectedRecording)}
+                    className="p-2 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    title="Удалить запись"
+                  >
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
+                )}
+              </PermissionGate>
+              {/* Close button */}
+              <button
+                type="button"
+                onClick={() => setSelectedRecording(null)}
+                className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
           {/* Video player */}
@@ -283,6 +358,17 @@ export default function RecordingsPage() {
           </div>
         </div>
       )}
+
+      {/* Delete confirmation dialog */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Удалить запись"
+        message={`Вы уверены, что хотите удалить запись с устройства "${deleteTarget?.device_hostname}" от ${formatTime(deleteTarget?.started_ts ?? null)}? Все видеосегменты будут удалены из хранилища. Это действие необратимо.`}
+        confirmText="Удалить"
+        cancelText="Отмена"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

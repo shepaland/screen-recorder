@@ -3,6 +3,7 @@ package com.prg.ingest.repository;
 import com.prg.ingest.entity.Segment;
 import com.prg.ingest.entity.SegmentId;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -19,6 +20,12 @@ public interface SegmentRepository extends JpaRepository<Segment, SegmentId> {
 
     @Query("SELECT s FROM Segment s WHERE s.sessionId = :sessionId AND s.tenantId = :tenantId ORDER BY s.sequenceNum ASC")
     List<Segment> findBySessionIdAndTenantIdOrderBySequenceNum(
+            @Param("sessionId") UUID sessionId,
+            @Param("tenantId") UUID tenantId);
+
+    @Modifying
+    @Query("DELETE FROM Segment s WHERE s.sessionId = :sessionId AND s.tenantId = :tenantId")
+    int deleteBySessionIdAndTenantId(
             @Param("sessionId") UUID sessionId,
             @Param("tenantId") UUID tenantId);
 }

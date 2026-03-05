@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 import DataTable, { type Column } from '../components/DataTable';
 import DeviceStatusBadge from '../components/DeviceStatusBadge';
-import { getDevices, type DevicesListParams } from '../api/devices';
+import PermissionGate from '../components/PermissionGate';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { getDevices, deleteDevice, type DevicesListParams } from '../api/devices';
 import type { DeviceResponse } from '../types';
 import { useToast } from '../contexts/ToastContext';
 import { timeAgo } from '../utils/timeAgo';
@@ -26,6 +28,9 @@ export default function DevicesListPage() {
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+
+  // Delete dialog
+  const [deleteTarget, setDeleteTarget] = useState<DeviceResponse | null>(null);
 
   // Track whether this is a silent auto-refresh (don't show loading spinner)
   const isAutoRefresh = useRef(false);
@@ -134,19 +139,47 @@ export default function DevicesListPage() {
       key: 'actions',
       title: 'Действия',
       render: (device) => (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            navigate(`/devices/${device.id}`);
-          }}
-          className="text-sm text-indigo-600 hover:text-indigo-800"
-        >
-          Детали
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/devices/${device.id}`);
+            }}
+            className="text-sm text-indigo-600 hover:text-indigo-800"
+          >
+            Детали
+          </button>
+          <PermissionGate permission="DEVICES:DELETE">
+            {device.status === 'offline' && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteTarget(device);
+                }}
+                className="text-sm text-red-600 hover:text-red-800"
+              >
+                Удалить
+              </button>
+            )}
+          </PermissionGate>
+        </div>
       ),
     },
   ];
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteDevice(deleteTarget.id);
+      addToast('success', `Устройство "${deleteTarget.hostname}" деактивировано`);
+      fetchDevices();
+    } catch {
+      addToast('error', 'Не удалось удалить устройство');
+    }
+    setDeleteTarget(null);
+  };
 
   return (
     <div>
@@ -221,6 +254,17 @@ export default function DevicesListPage() {
           emptyMessage="Устройства не найдены"
         />
       </div>
+
+      {/* Delete confirmation dialog */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Удалить устройство"
+        message={`Вы уверены, что хотите удалить устройство "${deleteTarget?.hostname}"? Активные сессии записи будут прерваны, ожидающие команды отменены. Устройство будет деактивировано.`}
+        confirmText="Удалить"
+        cancelText="Отмена"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

@@ -74,4 +74,21 @@ export async function getRecordingSegments(id: string): Promise<RecordingSegment
   return response.data;
 }
 
+export async function deleteRecording(id: string): Promise<void> {
+  await ingestApiClient.delete(`/recordings/${id}`);
+}
+
+export async function downloadRecording(id: string): Promise<{ blob: Blob; filename: string }> {
+  const response = await ingestApiClient.get(`/recordings/${id}/download`, {
+    responseType: 'blob',
+  });
+  const contentDisposition = response.headers['content-disposition'];
+  let filename = `recording-${id}`;
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename="?([^"]+)"?/);
+    if (match) filename = match[1];
+  }
+  return { blob: response.data, filename };
+}
+
 export default ingestApiClient;
