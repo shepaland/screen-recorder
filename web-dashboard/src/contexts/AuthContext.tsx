@@ -6,7 +6,7 @@ import {
   useRef,
   type ReactNode,
 } from 'react';
-import type { User, LoginRequest, TenantPreview } from '../types';
+import type { User, LoginRequest, TenantPreview, VerifyOtpResponse } from '../types';
 import * as authApi from '../api/auth';
 import { setAccessToken } from '../api/client';
 
@@ -15,6 +15,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (credentials: LoginRequest) => Promise<void>;
+  loginWithEmail: (verifyResponse: VerifyOtpResponse) => Promise<void>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<void>;
   switchTenant: (tenantId: string) => Promise<void>;
@@ -113,6 +114,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(response.user);
       scheduleRefresh(response.access_token);
       await loadTenants(response.user);
+    },
+    [scheduleRefresh, loadTenants],
+  );
+
+  const loginWithEmail = useCallback(
+    async (verifyResponse: VerifyOtpResponse) => {
+      currentTokenRef.current = verifyResponse.access_token;
+      setUser(verifyResponse.user);
+      scheduleRefresh(verifyResponse.access_token);
+      await loadTenants(verifyResponse.user);
     },
     [scheduleRefresh, loadTenants],
   );
@@ -218,6 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: !!user,
     isLoading,
     login,
+    loginWithEmail,
     logout,
     refreshToken,
     switchTenant,

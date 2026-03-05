@@ -57,6 +57,9 @@ public class SecurityConfig {
                                 "/api/v1/auth/oauth/yandex/callback",
                                 "/api/v1/auth/oauth/select-tenant",
                                 "/api/v1/auth/oauth/onboarding",
+                                "/api/v1/auth/register/initiate",
+                                "/api/v1/auth/register/verify",
+                                "/api/v1/auth/register/resend",
                                 "/actuator/health",
                                 "/actuator/info"
                         ).permitAll()

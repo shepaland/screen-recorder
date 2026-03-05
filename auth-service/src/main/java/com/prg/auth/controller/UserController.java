@@ -2,13 +2,17 @@ package com.prg.auth.controller;
 
 import com.prg.auth.dto.request.ChangePasswordRequest;
 import com.prg.auth.dto.request.CreateUserRequest;
+import com.prg.auth.dto.request.SetPasswordRequest;
+import com.prg.auth.dto.request.UpdateProfileRequest;
 import com.prg.auth.dto.request.UpdateUserRequest;
 import com.prg.auth.dto.request.UpdateUserSettingsRequest;
 import com.prg.auth.dto.response.PageResponse;
+import com.prg.auth.dto.response.UpdateProfileResponse;
 import com.prg.auth.dto.response.UserResponse;
 import com.prg.auth.dto.response.UserSettingsResponse;
 import com.prg.auth.exception.AccessDeniedException;
 import com.prg.auth.security.UserPrincipal;
+import com.prg.auth.service.EmailOtpService;
 import com.prg.auth.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -26,6 +30,7 @@ import java.util.UUID;
 public class UserController {
 
     private final UserService userService;
+    private final EmailOtpService emailOtpService;
 
     @GetMapping
     public ResponseEntity<PageResponse<UserResponse>> getUsers(
@@ -121,6 +126,38 @@ public class UserController {
                 principal.getUserId(), principal.getTenantId(), request,
                 getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * PUT /api/v1/users/me/profile
+     * Update current user's first name and last name (onboarding).
+     */
+    @PutMapping("/me/profile")
+    public ResponseEntity<UpdateProfileResponse> updateMyProfile(
+            @Valid @RequestBody UpdateProfileRequest request,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest httpRequest) {
+        UpdateProfileResponse response = emailOtpService.updateProfile(
+                principal.getUserId(), principal.getTenantId(),
+                request.getFirstName(), request.getLastName(),
+                getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * POST /api/v1/users/me/password
+     * Set or change password for the current user.
+     */
+    @PostMapping("/me/password")
+    public ResponseEntity<Void> setMyPassword(
+            @Valid @RequestBody SetPasswordRequest request,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest httpRequest) {
+        emailOtpService.setPassword(
+                principal.getUserId(), principal.getTenantId(),
+                request.getCurrentPassword(), request.getNewPassword(),
+                getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
+        return ResponseEntity.noContent().build();
     }
 
     private void requirePermission(UserPrincipal principal, String permission) {

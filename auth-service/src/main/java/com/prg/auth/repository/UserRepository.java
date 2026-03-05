@@ -45,8 +45,13 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @Query("SELECT u FROM User u JOIN FETCH u.roles r JOIN FETCH r.permissions JOIN u.tenant t " +
            "WHERE u.username = :username AND u.isActive = true AND t.isActive = true " +
-           "AND u.authProvider = 'password'")
+           "AND u.passwordHash IS NOT NULL")
     List<User> findActivePasswordUsersByUsername(@Param("username") String username);
+
+    @Query("SELECT u FROM User u JOIN FETCH u.roles r JOIN FETCH r.permissions JOIN u.tenant t " +
+           "WHERE LOWER(u.email) = LOWER(:email) AND u.isActive = true AND t.isActive = true " +
+           "ORDER BY t.createdTs ASC")
+    List<User> findActiveUsersByEmail(@Param("email") String email);
 
     @Query("SELECT u FROM User u JOIN FETCH u.tenant t LEFT JOIN FETCH u.roles " +
            "WHERE u.username = :username AND u.isActive = true AND t.isActive = true " +

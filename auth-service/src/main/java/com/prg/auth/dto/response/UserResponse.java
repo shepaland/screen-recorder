@@ -22,6 +22,8 @@ public class UserResponse {
     private String firstName;
     private String lastName;
     private String authProvider;
+    private Boolean emailVerified;
+    private Boolean isPasswordSet;
     private String avatarUrl;
     private Boolean isActive;
     private List<RoleResponse> roles;

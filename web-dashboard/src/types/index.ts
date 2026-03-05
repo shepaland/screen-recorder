@@ -12,6 +12,14 @@ export type {
   SwitchTenantRequest,
   UserSettings,
   UpdateSettingsResponse,
+  InitiateOtpRequest,
+  InitiateOtpResponse,
+  VerifyOtpRequest,
+  VerifyOtpResponse,
+  ResendOtpRequest,
+  UpdateProfileRequest,
+  UpdateProfileResponse,
+  SetPasswordRequest,
 } from './auth';
 export type {
   UserResponse,

@@ -29,6 +29,25 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
 
+  mail:
+    host: ${SMTP_HOST:sm16.hosting.reg.ru}
+    port: ${SMTP_PORT:465}
+    username: ${SMTP_USERNAME:otp@shepaland.ru}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+          starttls:
+            enable: false
+          connectiontimeout: 5000
+          timeout: 10000
+          writetimeout: 10000
+        transport:
+          protocol: smtp
+
   jackson:
     property-naming-strategy: SNAKE_CASE
     serialization:
@@ -66,6 +85,21 @@ prg:
     intermediate-token-ttl: 600
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+  email-otp:
+    code-ttl: 600
+    code-length: 6
+    max-verify-attempts: 10
+    block-duration: 1800
+    send-cooldown: 60
+    send-window-max: 5
+    send-window-duration: 1800
+    ip-burst-max: 20
+    ip-burst-window: 300
+    hmac-secret: ${OTP_HMAC_SECRET:default-dev-hmac-secret-change-in-production-min-32-chars}
+    max-tenants-per-email: 10
+  email:
+    from: ${EMAIL_FROM:otp@shepaland.ru}
+    from-name: ${EMAIL_FROM_NAME:Кадеро}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:80}
 

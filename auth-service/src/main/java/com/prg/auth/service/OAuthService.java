@@ -210,6 +210,8 @@ public class OAuthService {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .authProvider(user.getAuthProvider())
+                .emailVerified(user.getEmailVerified())
+                .isPasswordSet(user.getIsPasswordSet())
                 .roles(roleResponses)
                 .permissions(permissions)
                 .settings(user.getSettings())

@@ -9,6 +9,14 @@ import type {
   OnboardingRequest,
   OnboardingResponse,
   UpdateSettingsResponse,
+  InitiateOtpRequest,
+  InitiateOtpResponse,
+  VerifyOtpRequest,
+  VerifyOtpResponse,
+  ResendOtpRequest,
+  UpdateProfileRequest,
+  UpdateProfileResponse,
+  SetPasswordRequest,
 } from '../types';
 
 /**
@@ -93,4 +101,36 @@ export async function onboarding(data: OnboardingRequest, oauthToken: string): P
 export async function updateMySettings(data: { session_ttl_days?: number }): Promise<UpdateSettingsResponse> {
   const response = await apiClient.put<UpdateSettingsResponse>('/users/me/settings', data);
   return response.data;
+}
+
+// --- Email OTP ---
+
+export async function initiateEmailOtp(data: InitiateOtpRequest): Promise<InitiateOtpResponse> {
+  const response = await apiClient.post<InitiateOtpResponse>('/auth/register/initiate', data);
+  return response.data;
+}
+
+export async function verifyEmailOtp(data: VerifyOtpRequest): Promise<VerifyOtpResponse> {
+  const response = await apiClient.post<VerifyOtpResponse>('/auth/register/verify', data);
+  setAccessToken(response.data.access_token);
+  if (response.data.user) {
+    response.data.user = normalizeUser(response.data.user);
+  }
+  return response.data;
+}
+
+export async function resendEmailOtp(data: ResendOtpRequest): Promise<InitiateOtpResponse> {
+  const response = await apiClient.post<InitiateOtpResponse>('/auth/register/resend', data);
+  return response.data;
+}
+
+// --- Profile & Password ---
+
+export async function updateMyProfile(data: UpdateProfileRequest): Promise<UpdateProfileResponse> {
+  const response = await apiClient.put<UpdateProfileResponse>('/users/me/profile', data);
+  return response.data;
+}
+
+export async function setMyPassword(data: SetPasswordRequest): Promise<void> {
+  await apiClient.post('/users/me/password', data);
 }

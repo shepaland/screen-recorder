@@ -287,6 +287,8 @@ public class UserService {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .authProvider(user.getAuthProvider())
+                .emailVerified(user.getEmailVerified())
+                .isPasswordSet(user.getIsPasswordSet())
                 .isActive(user.getIsActive())
                 .roles(roleResponses)
                 .permissions(permissions)

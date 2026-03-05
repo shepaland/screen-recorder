@@ -52,6 +52,14 @@ public class User {
     @Column(name = "last_name", length = 255)
     private String lastName;
 
+    @Column(name = "email_verified", nullable = false)
+    @Builder.Default
+    private Boolean emailVerified = false;
+
+    @Column(name = "is_password_set", nullable = false)
+    @Builder.Default
+    private Boolean isPasswordSet = true;
+
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
 
@@ -84,6 +92,8 @@ public class User {
         if (updatedTs == null) updatedTs = Instant.now();
         if (isActive == null) isActive = true;
         if (authProvider == null) authProvider = "password";
+        if (emailVerified == null) emailVerified = false;
+        if (isPasswordSet == null) isPasswordSet = true;
         if (settings == null) settings = new HashMap<>();
     }
 
