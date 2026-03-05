@@ -1,10 +1,15 @@
 using System.Windows.Forms;
+using System.Drawing;
 using KaderoAgent.Auth;
 using KaderoAgent.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KaderoAgent.Tray;
 
+/// <summary>
+/// Setup form with glass/acrylic UI style.
+/// Shown on first launch for device registration.
+/// </summary>
 public class SetupForm : Form
 {
     private readonly IServiceProvider _services;
@@ -16,6 +21,7 @@ public class SetupForm : Form
     public SetupForm(IServiceProvider services)
     {
         _services = services;
+        SetStyle(ControlStyles.SupportsTransparentBackColor | ControlStyles.OptimizedDoubleBuffer, true);
         InitializeComponent();
         LoadPendingRegistration();
     }
@@ -23,52 +29,63 @@ public class SetupForm : Form
     private void InitializeComponent()
     {
         Text = "Кадеро — Настройка агента";
-        Size = new System.Drawing.Size(450, 300);
-        StartPosition = FormStartPosition.CenterScreen;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
+        Size = new Size(420, 320);
         MaximizeBox = false;
+        ShowInTaskbar = true;
+        Icon = SystemIcons.Application;
 
-        var y = 20;
+        // Glass effect
+        GlassHelper.ApplyGlassEffect(this);
+        GlassHelper.PositionCenter(this);
 
-        var serverLabel = new Label { Text = "Адрес сервера:", Location = new(20, y), AutoSize = true };
-        Controls.Add(serverLabel);
-        y += 25;
+        // Paint border
+        Paint += (_, e) => GlassHelper.PaintGlassBorder(this, e);
 
-        _serverUrlBox = new TextBox
-        {
-            Location = new(20, y), Size = new(390, 25),
-            Text = "https://"
-        };
+        // ── Title bar ──
+        var titleBar = GlassHelper.CreateTitleBar(this, "Настройка агента", Width);
+        Controls.Add(titleBar);
+        GlassHelper.EnableDrag(this);
+
+        var y = 52;
+        var left = 24;
+        var fieldWidth = Width - 48;
+
+        // Server URL
+        Controls.Add(GlassHelper.CreateLabel("Адрес сервера", left, y, 200, secondary: true));
+        y += 22;
+        _serverUrlBox = GlassHelper.CreateTextBox(left, y, fieldWidth);
+        _serverUrlBox.Text = "https://";
         Controls.Add(_serverUrlBox);
-        y += 35;
+        y += 40;
 
-        var tokenLabel = new Label { Text = "Токен регистрации:", Location = new(20, y), AutoSize = true };
-        Controls.Add(tokenLabel);
-        y += 25;
-
-        _tokenBox = new TextBox { Location = new(20, y), Size = new(390, 25), PlaceholderText = "drt_..." };
+        // Token
+        Controls.Add(GlassHelper.CreateLabel("Токен регистрации", left, y, 200, secondary: true));
+        y += 22;
+        _tokenBox = GlassHelper.CreateTextBox(left, y, fieldWidth, placeholder: "drt_...");
         Controls.Add(_tokenBox);
-        y += 45;
+        y += 48;
 
-        _connectBtn = new Button
-        {
-            Text = "Подключить", Location = new(150, y), Size = new(130, 35)
-        };
+        // Connect button (centered)
+        var btnWidth = 160;
+        _connectBtn = GlassHelper.CreateAccentButton("Подключить", (Width - btnWidth) / 2, y, btnWidth, 38);
         _connectBtn.Click += OnConnect;
         Controls.Add(_connectBtn);
-        y += 50;
+        y += 52;
 
+        // Status
         _statusLabel = new Label
         {
-            Text = "", Location = new(20, y), Size = new(390, 40),
-            ForeColor = System.Drawing.Color.Red
+            Text = "",
+            Location = new Point(left, y),
+            Size = new Size(fieldWidth, 40),
+            ForeColor = GlassHelper.StatusRed,
+            BackColor = Color.Transparent,
+            Font = new Font("Segoe UI", 9),
+            TextAlign = ContentAlignment.MiddleCenter
         };
         Controls.Add(_statusLabel);
     }
 
-    /// <summary>
-    /// Pre-fills server URL and token from installer's pending registration config.
-    /// </summary>
     private void LoadPendingRegistration()
     {
         try
@@ -90,19 +107,18 @@ public class SetupForm : Form
     {
         _connectBtn.Enabled = false;
         _statusLabel.Text = "Подключение...";
-        _statusLabel.ForeColor = System.Drawing.Color.Gray;
+        _statusLabel.ForeColor = GlassHelper.TextSecondary;
 
         try
         {
             var authManager = _services.GetRequiredService<AuthManager>();
             var response = await authManager.RegisterAsync(_serverUrlBox.Text.Trim(), _tokenBox.Text.Trim());
 
-            // Clear pending registration after successful registration
             var credStore = _services.GetRequiredService<CredentialStore>();
             credStore.ClearPendingRegistration();
 
             _statusLabel.Text = $"Устройство зарегистрировано: {response.DeviceId}";
-            _statusLabel.ForeColor = System.Drawing.Color.Green;
+            _statusLabel.ForeColor = GlassHelper.StatusGreen;
 
             await Task.Delay(2000);
             Close();
@@ -110,7 +126,7 @@ public class SetupForm : Form
         catch (Exception ex)
         {
             _statusLabel.Text = $"Ошибка: {ex.Message}";
-            _statusLabel.ForeColor = System.Drawing.Color.Red;
+            _statusLabel.ForeColor = GlassHelper.StatusRed;
             _connectBtn.Enabled = true;
         }
     }

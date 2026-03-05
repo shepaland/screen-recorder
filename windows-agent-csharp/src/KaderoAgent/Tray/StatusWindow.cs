@@ -5,8 +5,8 @@ using System.Drawing;
 using KaderoAgent.Ipc;
 
 /// <summary>
-/// Status window shown on double-click of tray icon.
-/// Shows connection status, recording status, parameters, and allows editing server URL/token.
+/// Status window with glass/acrylic UI style.
+/// Borderless, draggable, opens at bottom-right corner above taskbar.
 /// </summary>
 public class StatusWindow : Form
 {
@@ -48,6 +48,7 @@ public class StatusWindow : Form
     {
         _pipeClient = pipeClient;
         _onReconnect = onReconnect;
+        SetStyle(ControlStyles.SupportsTransparentBackColor | ControlStyles.OptimizedDoubleBuffer, true);
         InitializeComponent();
         StartAutoRefresh();
     }
@@ -55,173 +56,162 @@ public class StatusWindow : Form
     private void InitializeComponent()
     {
         Text = "Кадеро — Статус агента";
-        Size = new Size(520, 700);
-        StartPosition = FormStartPosition.CenterScreen;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = false;
-        MinimizeBox = true;
+        Size = new Size(480, 720);
         ShowInTaskbar = true;
+        MaximizeBox = false;
+        MinimizeBox = false;
         Icon = SystemIcons.Application;
 
-        var y = 15;
-        var leftCol = 20;
-        var rightCol = 180;
-        var width = 300;
+        // Glass effect
+        GlassHelper.ApplyGlassEffect(this);
+        GlassHelper.PositionBottomRight(this);
 
-        // === Connection Status ===
-        AddSectionHeader("Подключение", ref y);
-        _connectionIndicator = AddIndicator(leftCol, y);
-        _connectionStatusLabel = AddLabel("Неизвестно", rightCol - 40, y, width);
-        y += 30;
+        // Paint border
+        Paint += (_, e) => GlassHelper.PaintGlassBorder(this, e);
 
-        // === Recording Status ===
-        _recordingIndicator = AddIndicator(leftCol, y);
-        _recordingStatusLabel = AddLabel("Неизвестно", rightCol - 40, y, width);
-        y += 35;
+        // ── Title bar ──
+        var titleBar = GlassHelper.CreateTitleBar(this, "Кадеро", Width);
+        Controls.Add(titleBar);
 
-        // === Device ID ===
-        AddLabel("ID устройства:", leftCol, y, 150, bold: true);
-        _deviceIdValue = AddLabel("—", rightCol, y, width);
-        y += 25;
+        // Enable drag on form background too
+        GlassHelper.EnableDrag(this);
 
-        // === Parameters Section ===
-        AddSectionHeader("Параметры записи", ref y);
+        var y = 48;
+        var left = 20;
+        var valX = 170;
+        var fullWidth = Width - 40;
 
-        AddLabel("FPS:", leftCol, y, 150, bold: true);
-        _fpsValue = AddLabel("—", rightCol, y, width);
-        y += 22;
-
-        AddLabel("Качество:", leftCol, y, 150, bold: true);
-        _qualityValue = AddLabel("—", rightCol, y, width);
-        y += 22;
-
-        AddLabel("Длит. сегмента:", leftCol, y, 150, bold: true);
-        _segmentValue = AddLabel("—", rightCol, y, width);
-        y += 22;
-
-        AddLabel("Heartbeat:", leftCol, y, 150, bold: true);
-        _heartbeatValue = AddLabel("—", rightCol, y, width);
-        y += 30;
-
-        // === Metrics Section ===
-        AddSectionHeader("Метрики", ref y);
-
-        AddLabel("CPU:", leftCol, y, 80, bold: true);
-        _cpuValue = AddLabel("—", leftCol + 80, y, 80);
-        AddLabel("RAM:", leftCol + 170, y, 80, bold: true);
-        _memoryValue = AddLabel("—", leftCol + 240, y, 80);
-        y += 22;
-
-        AddLabel("Диск:", leftCol, y, 80, bold: true);
-        _diskValue = AddLabel("—", leftCol + 80, y, 80);
-        AddLabel("Очередь:", leftCol + 170, y, 80, bold: true);
-        _queueValue = AddLabel("—", leftCol + 240, y, 80);
-        y += 22;
-
-        AddLabel("Посл. heartbeat:", leftCol, y, 150, bold: true);
-        _lastHeartbeatValue = AddLabel("—", rightCol, y, width);
-        y += 35;
-
-        // === Settings Section ===
-        AddSectionHeader("Настройки подключения", ref y);
-
-        AddLabel("Адрес сервера:", leftCol, y, 150, bold: true);
-        y += 22;
-        _serverUrlBox = new TextBox { Location = new Point(leftCol, y), Size = new Size(460, 25) };
-        Controls.Add(_serverUrlBox);
-        y += 32;
-
-        AddLabel("Токен регистрации:", leftCol, y, 200, bold: true);
-        y += 22;
-        _tokenBox = new TextBox { Location = new Point(leftCol, y), Size = new Size(460, 25), PlaceholderText = "drt_... (оставьте пустым для текущего)" };
-        Controls.Add(_tokenBox);
-        y += 32;
-
-        AddLabel("Имя пользователя:", leftCol, y, 200, bold: true);
-        _usernameBox = new TextBox { Location = new Point(rightCol, y - 2), Size = new Size(300, 25) };
-        Controls.Add(_usernameBox);
+        // ── Connection Status ──
+        Controls.Add(GlassHelper.CreateSectionHeader("Подключение", left, y));
         y += 28;
 
-        AddLabel("Пароль:", leftCol, y, 200, bold: true);
-        _passwordBox = new TextBox { Location = new Point(rightCol, y - 2), Size = new Size(300, 25), UseSystemPasswordChar = true };
-        Controls.Add(_passwordBox);
-        y += 35;
+        _connectionIndicator = GlassHelper.CreateIndicator(left, y, GlassHelper.StatusGray);
+        Controls.Add(_connectionIndicator);
+        _connectionStatusLabel = GlassHelper.CreateLabel("Неизвестно", left + 22, y, 300);
+        Controls.Add(_connectionStatusLabel);
+        y += 24;
 
-        _reconnectBtn = new Button
-        {
-            Text = "Переподключиться",
-            Location = new Point(leftCol, y),
-            Size = new Size(160, 35),
-            BackColor = Color.FromArgb(183, 28, 28),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Cursor = Cursors.Hand
-        };
-        _reconnectBtn.FlatAppearance.BorderSize = 0;
+        _recordingIndicator = GlassHelper.CreateIndicator(left, y, GlassHelper.StatusGray);
+        Controls.Add(_recordingIndicator);
+        _recordingStatusLabel = GlassHelper.CreateLabel("Неизвестно", left + 22, y, 300);
+        Controls.Add(_recordingStatusLabel);
+        y += 30;
+
+        // Separator
+        Controls.Add(GlassHelper.CreateSeparator(left, y, fullWidth));
+        y += 12;
+
+        // ── Device ID ──
+        Controls.Add(GlassHelper.CreateLabel("ID устройства", left, y, 140, bold: true, secondary: true));
+        _deviceIdValue = GlassHelper.CreateLabel("—", valX, y, 280);
+        Controls.Add(_deviceIdValue);
+        y += 28;
+
+        // ── Parameters Section ──
+        Controls.Add(GlassHelper.CreateSectionHeader("Параметры записи", left, y));
+        y += 28;
+
+        Controls.Add(GlassHelper.CreateLabel("FPS", left, y, 140, secondary: true));
+        _fpsValue = GlassHelper.CreateLabel("—", valX, y, 200);
+        Controls.Add(_fpsValue);
+        y += 22;
+
+        Controls.Add(GlassHelper.CreateLabel("Качество", left, y, 140, secondary: true));
+        _qualityValue = GlassHelper.CreateLabel("—", valX, y, 200);
+        Controls.Add(_qualityValue);
+        y += 22;
+
+        Controls.Add(GlassHelper.CreateLabel("Сегмент", left, y, 140, secondary: true));
+        _segmentValue = GlassHelper.CreateLabel("—", valX, y, 200);
+        Controls.Add(_segmentValue);
+        y += 22;
+
+        Controls.Add(GlassHelper.CreateLabel("Heartbeat", left, y, 140, secondary: true));
+        _heartbeatValue = GlassHelper.CreateLabel("—", valX, y, 200);
+        Controls.Add(_heartbeatValue);
+        y += 28;
+
+        // Separator
+        Controls.Add(GlassHelper.CreateSeparator(left, y, fullWidth));
+        y += 12;
+
+        // ── Metrics Section ──
+        Controls.Add(GlassHelper.CreateSectionHeader("Метрики", left, y));
+        y += 28;
+
+        Controls.Add(GlassHelper.CreateLabel("CPU", left, y, 60, secondary: true));
+        _cpuValue = GlassHelper.CreateLabel("—", left + 60, y, 70);
+        Controls.Add(_cpuValue);
+        Controls.Add(GlassHelper.CreateLabel("RAM", left + 140, y, 60, secondary: true));
+        _memoryValue = GlassHelper.CreateLabel("—", left + 200, y, 80);
+        Controls.Add(_memoryValue);
+        y += 22;
+
+        Controls.Add(GlassHelper.CreateLabel("Диск", left, y, 60, secondary: true));
+        _diskValue = GlassHelper.CreateLabel("—", left + 60, y, 70);
+        Controls.Add(_diskValue);
+        Controls.Add(GlassHelper.CreateLabel("Очередь", left + 140, y, 70, secondary: true));
+        _queueValue = GlassHelper.CreateLabel("—", left + 210, y, 70);
+        Controls.Add(_queueValue);
+        y += 22;
+
+        Controls.Add(GlassHelper.CreateLabel("Посл. heartbeat", left, y, 140, secondary: true));
+        _lastHeartbeatValue = GlassHelper.CreateLabel("—", valX, y, 280);
+        Controls.Add(_lastHeartbeatValue);
+        y += 28;
+
+        // Separator
+        Controls.Add(GlassHelper.CreateSeparator(left, y, fullWidth));
+        y += 12;
+
+        // ── Settings Section ──
+        Controls.Add(GlassHelper.CreateSectionHeader("Настройки подключения", left, y));
+        y += 28;
+
+        Controls.Add(GlassHelper.CreateLabel("Адрес сервера", left, y, 200, secondary: true));
+        y += 20;
+        _serverUrlBox = GlassHelper.CreateTextBox(left, y, fullWidth);
+        Controls.Add(_serverUrlBox);
+        y += 36;
+
+        Controls.Add(GlassHelper.CreateLabel("Токен регистрации", left, y, 200, secondary: true));
+        y += 20;
+        _tokenBox = GlassHelper.CreateTextBox(left, y, fullWidth, placeholder: "drt_... (оставьте пустым для текущего)");
+        Controls.Add(_tokenBox);
+        y += 36;
+
+        Controls.Add(GlassHelper.CreateLabel("Имя пользователя", left, y, 160, secondary: true));
+        _usernameBox = GlassHelper.CreateTextBox(valX, y - 2, fullWidth - valX + left);
+        Controls.Add(_usernameBox);
+        y += 30;
+
+        Controls.Add(GlassHelper.CreateLabel("Пароль", left, y, 160, secondary: true));
+        _passwordBox = GlassHelper.CreateTextBox(valX, y - 2, fullWidth - valX + left, password: true);
+        Controls.Add(_passwordBox);
+        y += 38;
+
+        _reconnectBtn = GlassHelper.CreateAccentButton("Переподключиться", left, y);
         _reconnectBtn.Click += OnReconnect;
         Controls.Add(_reconnectBtn);
 
         _statusMessage = new Label
         {
-            Location = new Point(leftCol + 170, y + 8),
-            Size = new Size(300, 25),
-            ForeColor = Color.Gray,
+            Location = new Point(left + 170, y + 8),
+            Size = new Size(260, 25),
+            ForeColor = GlassHelper.TextSecondary,
+            BackColor = Color.Transparent,
+            Font = new Font("Segoe UI", 9),
             Text = ""
         };
         Controls.Add(_statusMessage);
     }
 
-    private void AddSectionHeader(string text, ref int y)
-    {
-        var label = new Label
-        {
-            Text = text,
-            Location = new Point(20, y),
-            AutoSize = true,
-            Font = new Font(Font.FontFamily, 10, FontStyle.Bold),
-            ForeColor = Color.FromArgb(183, 28, 28) // Alfa-Bank red
-        };
-        Controls.Add(label);
-        y += 25;
-    }
-
-    private Panel AddIndicator(int x, int y)
-    {
-        var panel = new Panel
-        {
-            Location = new Point(x, y + 2),
-            Size = new Size(12, 12),
-            BackColor = Color.Gray
-        };
-        panel.Paint += (_, e) =>
-        {
-            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            using var brush = new SolidBrush(panel.BackColor);
-            e.Graphics.FillEllipse(brush, 0, 0, 11, 11);
-        };
-        Controls.Add(panel);
-        return panel;
-    }
-
-    private Label AddLabel(string text, int x, int y, int width, bool bold = false)
-    {
-        var label = new Label
-        {
-            Text = text,
-            Location = new Point(x, y),
-            Size = new Size(width, 20),
-            Font = bold ? new Font(Font.FontFamily, Font.Size, FontStyle.Bold) : Font
-        };
-        Controls.Add(label);
-        return label;
-    }
-
     private void StartAutoRefresh()
     {
-        _refreshTimer = new System.Windows.Forms.Timer { Interval = 2000 }; // Every 2 sec
+        _refreshTimer = new System.Windows.Forms.Timer { Interval = 2000 };
         _refreshTimer.Tick += async (_, _) => await RefreshStatusAsync();
         _refreshTimer.Start();
-        _ = RefreshStatusAsync(); // Initial refresh
+        _ = RefreshStatusAsync();
     }
 
     private async Task RefreshStatusAsync()
@@ -231,26 +221,14 @@ public class StatusWindow : Form
             if (!_pipeClient.IsConnected)
             {
                 var connected = await _pipeClient.ConnectAsync(1000);
-                if (!connected)
-                {
-                    SetDisconnectedState();
-                    return;
-                }
+                if (!connected) { SetDisconnectedState(); return; }
             }
 
             var status = await _pipeClient.GetStatusAsync();
-            if (status == null)
-            {
-                SetDisconnectedState();
-                return;
-            }
-
+            if (status == null) { SetDisconnectedState(); return; }
             UpdateUI(status);
         }
-        catch
-        {
-            SetDisconnectedState();
-        }
+        catch { SetDisconnectedState(); }
     }
 
     private void SetDisconnectedState()
@@ -258,10 +236,10 @@ public class StatusWindow : Form
         if (InvokeRequired) { Invoke(SetDisconnectedState); return; }
 
         _connectionStatusLabel.Text = "Нет связи с сервисом";
-        _connectionIndicator.BackColor = Color.Gray;
+        _connectionIndicator.BackColor = GlassHelper.StatusGray;
         _connectionIndicator.Invalidate();
         _recordingStatusLabel.Text = "Неизвестно";
-        _recordingIndicator.BackColor = Color.Gray;
+        _recordingIndicator.BackColor = GlassHelper.StatusGray;
         _recordingIndicator.Invalidate();
     }
 
@@ -269,50 +247,47 @@ public class StatusWindow : Form
     {
         if (InvokeRequired) { Invoke(() => UpdateUI(status)); return; }
 
-        // Connection status
+        // Connection
         switch (status.ConnectionStatus)
         {
             case "connected":
                 _connectionStatusLabel.Text = "Подключен";
-                _connectionIndicator.BackColor = Color.FromArgb(76, 175, 80);
+                _connectionIndicator.BackColor = GlassHelper.StatusGreen;
                 break;
             case "reconnecting":
                 _connectionStatusLabel.Text = "Переподключение...";
-                _connectionIndicator.BackColor = Color.FromArgb(255, 152, 0);
+                _connectionIndicator.BackColor = GlassHelper.StatusOrange;
                 break;
             case "error":
                 _connectionStatusLabel.Text = $"Ошибка: {status.LastError ?? "неизвестная"}";
-                _connectionIndicator.BackColor = Color.FromArgb(244, 67, 54);
+                _connectionIndicator.BackColor = GlassHelper.StatusRed;
                 break;
             default:
                 _connectionStatusLabel.Text = "Отключен";
-                _connectionIndicator.BackColor = Color.FromArgb(158, 158, 158);
+                _connectionIndicator.BackColor = GlassHelper.StatusGray;
                 break;
         }
         _connectionIndicator.Invalidate();
 
-        // Recording status
+        // Recording
         switch (status.RecordingStatus)
         {
             case "recording":
                 _recordingStatusLabel.Text = "Запись идёт";
-                _recordingIndicator.BackColor = Color.FromArgb(76, 175, 80);
+                _recordingIndicator.BackColor = GlassHelper.StatusGreen;
                 break;
             case "starting":
                 _recordingStatusLabel.Text = "Запуск записи...";
-                _recordingIndicator.BackColor = Color.FromArgb(255, 193, 7);
+                _recordingIndicator.BackColor = GlassHelper.StatusYellow;
                 break;
             default:
                 _recordingStatusLabel.Text = "Остановлена";
-                _recordingIndicator.BackColor = Color.FromArgb(158, 158, 158);
+                _recordingIndicator.BackColor = GlassHelper.StatusGray;
                 break;
         }
         _recordingIndicator.Invalidate();
 
-        // Device ID
         _deviceIdValue.Text = status.DeviceId ?? "—";
-
-        // Parameters
         _fpsValue.Text = status.CaptureFps > 0 ? $"{status.CaptureFps} кадров/сек" : "—";
         _qualityValue.Text = status.Quality switch
         {
@@ -324,25 +299,21 @@ public class StatusWindow : Form
         _segmentValue.Text = status.SegmentDurationSec > 0 ? $"{status.SegmentDurationSec} сек" : "—";
         _heartbeatValue.Text = status.HeartbeatIntervalSec > 0 ? $"{status.HeartbeatIntervalSec} сек" : "—";
 
-        // Metrics
         _cpuValue.Text = $"{status.CpuPercent:F1}%";
         _memoryValue.Text = $"{status.MemoryMb:F0} МБ";
         _diskValue.Text = $"{status.DiskFreeGb:F1} ГБ";
         _queueValue.Text = $"{status.SegmentsQueued}";
         _lastHeartbeatValue.Text = status.LastHeartbeatTs?.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") ?? "—";
 
-        // Fill server URL if empty
         if (string.IsNullOrEmpty(_serverUrlBox.Text) && !string.IsNullOrEmpty(status.ServerUrl))
-        {
             _serverUrlBox.Text = status.ServerUrl;
-        }
     }
 
     private async void OnReconnect(object? sender, EventArgs e)
     {
         _reconnectBtn.Enabled = false;
         _statusMessage.Text = "Переподключение...";
-        _statusMessage.ForeColor = Color.Gray;
+        _statusMessage.ForeColor = GlassHelper.TextSecondary;
 
         try
         {
@@ -359,20 +330,20 @@ public class StatusWindow : Form
             if (response?.Success == true)
             {
                 _statusMessage.Text = "Подключено!";
-                _statusMessage.ForeColor = Color.Green;
-                _tokenBox.Text = ""; // Clear token after successful reconnect
+                _statusMessage.ForeColor = GlassHelper.StatusGreen;
+                _tokenBox.Text = "";
                 _onReconnect?.Invoke();
             }
             else
             {
                 _statusMessage.Text = response?.Error ?? "Ошибка подключения";
-                _statusMessage.ForeColor = Color.Red;
+                _statusMessage.ForeColor = GlassHelper.StatusRed;
             }
         }
         catch (Exception ex)
         {
             _statusMessage.Text = $"Ошибка: {ex.Message}";
-            _statusMessage.ForeColor = Color.Red;
+            _statusMessage.ForeColor = GlassHelper.StatusRed;
         }
         finally
         {
@@ -382,7 +353,6 @@ public class StatusWindow : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        // Hide instead of closing (tray keeps running)
         if (e.CloseReason == CloseReason.UserClosing)
         {
             e.Cancel = true;
