@@ -125,9 +125,13 @@ public class EmailOtpService {
         // 11. Record IP attempt
         recordIpAttempt(ipAddress);
 
-        // 12. Audit (no tenant_id for OTP initiation)
-        auditService.logAction(null, null, "OTP_SENT", "AUTH", null,
-                Map.of("email", maskEmail(email)), ipAddress, userAgent, getCorrelationId());
+        // 12. Audit (use system tenant for pre-auth events since audit_log.tenant_id is NOT NULL)
+        try {
+            auditService.logAction(TEMPLATE_TENANT_ID, null, "OTP_SENT", "AUTH", null,
+                    Map.of("email", maskEmail(email)), ipAddress, userAgent, getCorrelationId());
+        } catch (Exception e) {
+            log.warn("Failed to audit OTP_SENT: {}", e.getMessage());
+        }
 
         log.info("OTP initiated for email: {}", maskEmail(email));
 
@@ -202,10 +206,14 @@ public class EmailOtpService {
                 verificationCode.setBlockedUntil(Instant.now().plusSeconds(otpConfig.getBlockDuration()));
                 codeRepository.save(verificationCode);
 
-                auditService.logAction(null, null, "OTP_VERIFY_BLOCKED", "AUTH", null,
-                        Map.of("email", maskEmail(verificationCode.getEmail()),
-                                "attempts", verificationCode.getAttempts()),
-                        ipAddress, userAgent, getCorrelationId());
+                try {
+                    auditService.logAction(TEMPLATE_TENANT_ID, null, "OTP_VERIFY_BLOCKED", "AUTH", null,
+                            Map.of("email", maskEmail(verificationCode.getEmail()),
+                                    "attempts", verificationCode.getAttempts()),
+                            ipAddress, userAgent, getCorrelationId());
+                } catch (Exception e) {
+                    log.warn("Failed to audit OTP_VERIFY_BLOCKED: {}", e.getMessage());
+                }
 
                 throw new RateLimitExceededException(
                         "Too many attempts. Try again in 30 minutes.", "OTP_VERIFY_BLOCKED");
