@@ -39,6 +39,6 @@ public interface RoleRepository extends JpaRepository<Role, UUID> {
     @Query("SELECT r FROM Role r LEFT JOIN FETCH r.permissions WHERE r.id = :id AND r.tenant.id = :tenantId")
     Optional<Role> findByIdAndTenantIdWithPermissions(@Param("id") UUID id, @Param("tenantId") UUID tenantId);
 
-    @Query("SELECT COUNT(u) FROM User u JOIN u.roles r WHERE r.id = :roleId")
-    long countUsersByRoleId(@Param("roleId") UUID roleId);
+    @Query("SELECT COUNT(u) FROM User u JOIN u.roles r WHERE r.id = :roleId AND u.tenant.id = :tenantId")
+    long countUsersByRoleId(@Param("roleId") UUID roleId, @Param("tenantId") UUID tenantId);
 }

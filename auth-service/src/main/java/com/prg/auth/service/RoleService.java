@@ -141,7 +141,7 @@ public class RoleService {
             throw new IllegalArgumentException("System roles cannot be deleted");
         }
 
-        long usersCount = roleRepository.countUsersByRoleId(roleId);
+        long usersCount = roleRepository.countUsersByRoleId(roleId, tenantId);
         if (usersCount > 0) {
             throw new DuplicateResourceException(
                     "Cannot delete role with assigned users. Remove users first.", "ROLE_HAS_USERS");
@@ -213,7 +213,7 @@ public class RoleService {
                 .description(role.getDescription())
                 .isSystem(role.getIsSystem())
                 .permissionsCount(role.getPermissions() != null ? role.getPermissions().size() : 0)
-                .usersCount(roleRepository.countUsersByRoleId(role.getId()))
+                .usersCount(roleRepository.countUsersByRoleId(role.getId(), role.getTenant().getId()))
                 .createdTs(role.getCreatedTs())
                 .updatedTs(role.getUpdatedTs())
                 .build();
@@ -240,7 +240,7 @@ public class RoleService {
                 .isSystem(role.getIsSystem())
                 .permissions(permissionResponses)
                 .permissionsCount(permissionResponses.size())
-                .usersCount(roleRepository.countUsersByRoleId(role.getId()))
+                .usersCount(roleRepository.countUsersByRoleId(role.getId(), role.getTenant().getId()))
                 .createdTs(role.getCreatedTs())
                 .updatedTs(role.getUpdatedTs())
                 .build();

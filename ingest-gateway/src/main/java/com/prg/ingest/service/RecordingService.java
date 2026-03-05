@@ -220,7 +220,13 @@ public class RecordingService {
             ts = ts.substring(0, 19);
         }
         String shortId = session.getId().toString().substring(0, 8);
-        return "recording_" + shortId + "_" + hostname + "_" + ts;
+        String safeHostname = sanitizeForFilename(hostname);
+        return "recording_" + shortId + "_" + safeHostname + "_" + ts;
+    }
+
+    private String sanitizeForFilename(String input) {
+        if (input == null || input.isBlank()) return "unknown";
+        return input.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
     private Map<UUID, String> resolveDeviceHostnames(Set<UUID> deviceIds, UUID tenantId) {
