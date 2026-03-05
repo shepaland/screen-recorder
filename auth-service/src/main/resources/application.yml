@@ -95,7 +95,7 @@ prg:
     send-window-duration: 1800
     ip-burst-max: 20
     ip-burst-window: 300
-    hmac-secret: ${OTP_HMAC_SECRET:default-dev-hmac-secret-change-in-production-min-32-chars}
+    hmac-secret: ${OTP_HMAC_SECRET:dev-only-hmac-secret-not-for-production}
     max-tenants-per-email: 10
   email:
     from: ${EMAIL_FROM:otp@shepaland.ru}

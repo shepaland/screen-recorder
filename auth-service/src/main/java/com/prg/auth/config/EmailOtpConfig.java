@@ -1,11 +1,24 @@
 package com.prg.auth.config;
 
+import jakarta.annotation.PostConstruct;
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @Data
+@Slf4j
 @ConfigurationProperties(prefix = "prg.email-otp")
 public class EmailOtpConfig {
+
+    @PostConstruct
+    public void validate() {
+        if (hmacSecret == null || hmacSecret.isBlank()) {
+            throw new IllegalStateException("OTP HMAC secret must be configured (prg.email-otp.hmac-secret)");
+        }
+        if (hmacSecret.length() < 32) {
+            log.warn("OTP HMAC secret is shorter than recommended 32 characters");
+        }
+    }
 
     /** OTP code TTL in seconds (default 600 = 10 minutes) */
     private int codeTtl = 600;

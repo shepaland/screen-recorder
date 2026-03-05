@@ -120,7 +120,15 @@ public class EmailOtpService {
         verificationCode = codeRepository.save(verificationCode);
 
         // 10. Send email
-        emailService.sendVerificationCode(email, code);
+        try {
+            emailService.sendVerificationCode(email, code);
+        } catch (Exception e) {
+            log.error("Email delivery failed for {}: {}", maskEmail(email), e.getMessage());
+            // Code already saved in DB — invalidate it
+            verificationCode.setIsUsed(true);
+            codeRepository.save(verificationCode);
+            throw new BadRequestException("Failed to send verification email. Please try again later.", "EMAIL_DELIVERY_FAILED");
+        }
 
         // 11. Record IP attempt
         recordIpAttempt(ipAddress);
@@ -458,7 +466,15 @@ public class EmailOtpService {
         newCode = codeRepository.save(newCode);
 
         // 8. Send email
-        emailService.sendVerificationCode(email, code);
+        try {
+            emailService.sendVerificationCode(email, code);
+        } catch (Exception e) {
+            log.error("Email delivery failed for {}: {}", maskEmail(email), e.getMessage());
+            // Code already saved in DB — invalidate it
+            newCode.setIsUsed(true);
+            codeRepository.save(newCode);
+            throw new BadRequestException("Failed to send verification email. Please try again later.", "EMAIL_DELIVERY_FAILED");
+        }
 
         // 9. Record IP attempt
         recordIpAttempt(ipAddress);
@@ -551,6 +567,19 @@ public class EmailOtpService {
         if (deleted > 0) {
             log.info("Cleaned up {} expired verification codes", deleted);
         }
+    }
+
+    /**
+     * Scheduled cleanup of in-memory IP rate limit entries (runs every 5 minutes).
+     * Prevents memory leak from accumulating stale IP entries.
+     */
+    @Scheduled(fixedRate = 300000)
+    public void cleanupIpRateLimit() {
+        long cutoff = System.currentTimeMillis() - (otpConfig.getIpBurstWindow() * 1000L);
+        ipAttempts.forEach((ip, attempts) -> {
+            attempts.removeIf(ts -> ts < cutoff);
+            if (attempts.isEmpty()) ipAttempts.remove(ip);
+        });
     }
 
     // --- Helper methods ---

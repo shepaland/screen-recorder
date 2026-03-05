@@ -20,6 +20,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   OTP_NOT_FOUND: 'Код не найден. Запросите новый',
   OTP_LOGIN_NOT_ALLOWED: 'Для этого аккаунта используйте вход по паролю',
   TENANT_LIMIT_REACHED: 'Достигнут лимит аккаунтов для этого email',
+  EMAIL_DELIVERY_FAILED: 'Не удалось отправить email. Попробуйте позже',
   VALIDATION_ERROR: 'Проверьте введённые данные',
   TOO_MANY_REQUESTS: 'Слишком много запросов. Попробуйте позже',
 };
@@ -93,7 +94,8 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       await login({ username: username.trim(), password });
-      const redirectTo = searchParams.get('redirect') || '/';
+      const rawRedirect = searchParams.get('redirect') || '/';
+      const redirectTo = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/';
       navigate(redirectTo, { replace: true });
     } catch (err) {
       setError(getErrorMessage(err));
@@ -137,7 +139,8 @@ export default function LoginPage() {
     try {
       const response = await verifyEmailOtp({ code_id: codeId, code });
       await loginWithEmail(response);
-      const redirectTo = searchParams.get('redirect') || '/';
+      const rawRedirect = searchParams.get('redirect') || '/';
+      const redirectTo = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/';
       navigate(redirectTo, { replace: true });
     } catch (err) {
       setError(getErrorMessage(err));
