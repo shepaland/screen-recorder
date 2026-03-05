@@ -43,7 +43,7 @@ builder.Services.AddSingleton<CommandHandler>();
 builder.Services.AddSingleton<AgentStatusProvider>();
 builder.Services.AddSingleton<IStatusProvider>(sp => sp.GetRequiredService<AgentStatusProvider>());
 builder.Services.AddSingleton<AgentCommandExecutor>();
-builder.Services.AddSingleton<ICommandExecutor>(sp => sp.GetRequiredService<AgentCommandExecutor>());
+builder.Services.AddSingleton<KaderoAgent.Ipc.ICommandExecutor>(sp => sp.GetRequiredService<AgentCommandExecutor>());
 
 // Background services
 builder.Services.AddHostedService<HeartbeatService>();

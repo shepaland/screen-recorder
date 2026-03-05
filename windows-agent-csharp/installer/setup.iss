@@ -340,10 +340,8 @@ begin
   if CurUninstallStep = usPostUninstall then
   begin
     if MsgBox(
-      'Удалить данные записей и конфигурацию?' + #13#10 +
-      #13#10 +
-      'Директория: ' + ExpandConstant('{commonappdata}\Kadero') + #13#10 +
-      #13#10 +
+      'Удалить данные записей и конфигурацию?' + #13#10 + #13#10 +
+      'Директория: ' + ExpandConstant('{commonappdata}\Kadero') + #13#10 + #13#10 +
       'Если вы выберете "Нет", данные сохранятся и могут быть ' +
       'использованы при повторной установке.',
       mbConfirmation,
