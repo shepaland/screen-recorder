@@ -21,6 +21,7 @@ public class DeviceTokenResponse {
     private String name;
     private Integer maxUses;
     private Integer currentUses;
+    private Integer deviceCount;
     private Instant expiresAt;
     private Boolean isActive;
     private String createdByUsername;

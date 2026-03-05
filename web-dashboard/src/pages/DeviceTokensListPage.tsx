@@ -176,7 +176,7 @@ export default function DeviceTokensListPage() {
             }}
             className="text-sm text-blue-600 hover:text-blue-800"
           >
-            Устройства ({token.current_uses})
+            Устройства ({token.device_count})
           </button>
           <PermissionGate permission="DEVICE_TOKENS:DELETE">
             {token.is_active && (
@@ -313,7 +313,7 @@ export default function DeviceTokensListPage() {
                 leaveFrom="opacity-100 translate-y-0 sm:scale-100"
                 leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
               >
-                <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-3xl sm:p-6">
+                <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-5xl sm:p-6">
                   <div className="flex items-center justify-between mb-4">
                     <Dialog.Title as="h3" className="text-base font-semibold leading-6 text-gray-900">
                       Устройства токена {selectedTokenForDevices ? `\u00AB${selectedTokenForDevices.name}\u00BB` : ''}
@@ -330,7 +330,7 @@ export default function DeviceTokensListPage() {
                   {loadingDevices ? (
                     <LoadingSpinner size="md" className="py-12" />
                   ) : tokenDevicesData && tokenDevicesData.devices.length > 0 ? (
-                    <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+                    <div className="overflow-x-auto shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
                       <table className="min-w-full divide-y divide-gray-300">
                         <thead className="bg-gray-50">
                           <tr>
@@ -347,7 +347,7 @@ export default function DeviceTokensListPage() {
                               <td className="whitespace-nowrap px-3 py-4 text-sm font-medium text-gray-900">
                                 {device.hostname}
                               </td>
-                              <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                              <td className="px-3 py-4 text-sm text-gray-500 max-w-[200px]">
                                 {device.os_info || '--'}
                               </td>
                               <td className="whitespace-nowrap px-3 py-4 text-sm">

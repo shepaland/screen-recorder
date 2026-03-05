@@ -5,6 +5,7 @@ export interface DeviceTokenResponse {
   name: string;
   max_uses: number | null;
   current_uses: number;
+  device_count: number;
   expires_at: string | null;
   is_active: boolean;
   created_by_username?: string;

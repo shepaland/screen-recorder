@@ -71,7 +71,7 @@ public class DeviceTokenService {
         log.info("Device registration token created: id={}, name={}, tenant_id={}",
                 token.getId(), request.getName(), principal.getTenantId());
 
-        return toResponse(token, rawToken);
+        return toResponse(token, rawToken, 0);
     }
 
     @Transactional(readOnly = true)
@@ -82,9 +82,15 @@ public class DeviceTokenService {
         Page<DeviceRegistrationToken> tokenPage = tokenRepository.findByTenantIdFiltered(
                 principal.getTenantId(), search, isActive, pageRequest);
 
+        // Batch count active (non-deleted) devices per token
+        List<UUID> tokenIds = tokenPage.getContent().stream()
+                .map(DeviceRegistrationToken::getId).toList();
+        Map<UUID, Long> deviceCounts = getActiveDeviceCounts(tokenIds, principal.getTenantId());
+
         return PageResponse.<DeviceTokenResponse>builder()
                 .content(tokenPage.getContent().stream()
-                        .map(t -> toResponse(t, null))
+                        .map(t -> toResponse(t, null,
+                                deviceCounts.getOrDefault(t.getId(), 0L).intValue()))
                         .toList())
                 .page(tokenPage.getNumber())
                 .size(tokenPage.getSize())
@@ -104,7 +110,8 @@ public class DeviceTokenService {
                     "Device registration token not found", "TOKEN_NOT_FOUND");
         }
 
-        return toResponse(token, null);
+        Map<UUID, Long> counts = getActiveDeviceCounts(List.of(tokenId), principal.getTenantId());
+        return toResponse(token, null, counts.getOrDefault(tokenId, 0L).intValue());
     }
 
     @Transactional
@@ -156,7 +163,17 @@ public class DeviceTokenService {
                 .build();
     }
 
-    private DeviceTokenResponse toResponse(DeviceRegistrationToken token, String rawToken) {
+    private Map<UUID, Long> getActiveDeviceCounts(List<UUID> tokenIds, UUID tenantId) {
+        if (tokenIds.isEmpty()) return Map.of();
+        List<Object[]> rows = deviceRepository.countActiveDevicesByTokenIds(tokenIds, tenantId);
+        Map<UUID, Long> result = new java.util.HashMap<>();
+        for (Object[] row : rows) {
+            result.put((UUID) row[0], (Long) row[1]);
+        }
+        return result;
+    }
+
+    private DeviceTokenResponse toResponse(DeviceRegistrationToken token, String rawToken, int deviceCount) {
         return DeviceTokenResponse.builder()
                 .id(token.getId())
                 .token(rawToken)
@@ -164,6 +181,7 @@ public class DeviceTokenService {
                 .name(token.getName())
                 .maxUses(token.getMaxUses())
                 .currentUses(token.getCurrentUses())
+                .deviceCount(deviceCount)
                 .expiresAt(token.getExpiresAt())
                 .isActive(token.getIsActive())
                 .createdByUsername(token.getCreatedBy().getUsername())
