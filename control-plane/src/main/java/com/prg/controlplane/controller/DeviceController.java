@@ -30,12 +30,13 @@ public class DeviceController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String search) {
+            @RequestParam(required = false) String search,
+            @RequestParam(name = "include_deleted", defaultValue = "false") boolean includeDeleted) {
         DevicePrincipal principal = getPrincipal(httpRequest);
         requirePermission(principal, "DEVICES:READ");
 
         PageResponse<DeviceResponse> response = deviceService.getDevices(
-                principal.getTenantId(), status, search, page, size);
+                principal.getTenantId(), status, search, includeDeleted, page, size);
         return ResponseEntity.ok(response);
     }
 
@@ -63,16 +64,27 @@ public class DeviceController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deactivateDevice(
+    public ResponseEntity<Void> softDeleteDevice(
             @PathVariable UUID id,
             HttpServletRequest httpRequest) {
         DevicePrincipal principal = getPrincipal(httpRequest);
         requirePermission(principal, "DEVICES:DELETE");
 
-        deviceService.deactivateDevice(id, principal.getTenantId(),
+        deviceService.softDeleteDevice(id, principal.getTenantId(),
                 principal.getUserId(), getClientIp(httpRequest),
                 httpRequest.getHeader("User-Agent"));
         return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{id}/restore")
+    public ResponseEntity<DeviceResponse> restoreDevice(
+            @PathVariable UUID id,
+            HttpServletRequest httpRequest) {
+        DevicePrincipal principal = getPrincipal(httpRequest);
+        requirePermission(principal, "DEVICES:UPDATE");
+
+        DeviceResponse response = deviceService.restoreDevice(id, principal.getTenantId());
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}/heartbeat")

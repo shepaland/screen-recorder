@@ -36,10 +36,12 @@ public class DeviceService {
     private int defaultHeartbeatIntervalSec;
 
     @Transactional(readOnly = true)
-    public PageResponse<DeviceResponse> getDevices(UUID tenantId, String status, String search, int page, int size) {
+    public PageResponse<DeviceResponse> getDevices(UUID tenantId, String status, String search,
+                                                     boolean includeDeleted, int page, int size) {
         PageRequest pageRequest = PageRequest.of(page, Math.min(size, 100));
 
-        Page<Device> devicePage = deviceRepository.findByTenantIdWithFilters(tenantId, status, search, pageRequest);
+        Page<Device> devicePage = deviceRepository.findByTenantIdWithFilters(
+                tenantId, status, search, includeDeleted, pageRequest);
 
         return PageResponse.<DeviceResponse>builder()
                 .content(devicePage.getContent().stream().map(this::toResponse).toList())
@@ -80,9 +82,15 @@ public class DeviceService {
     }
 
     @Transactional
-    public void deactivateDevice(UUID deviceId, UUID tenantId, UUID userId,
+    public void softDeleteDevice(UUID deviceId, UUID tenantId, UUID userId,
                                   String ipAddress, String userAgent) {
         Device device = findDeviceByIdAndTenant(deviceId, tenantId);
+
+        // Idempotent: if already deleted, do nothing
+        if (Boolean.TRUE.equals(device.getIsDeleted())) {
+            log.info("Device already soft-deleted: id={}, tenant_id={}", deviceId, tenantId);
+            return;
+        }
 
         Instant now = Instant.now();
 
@@ -90,7 +98,7 @@ public class DeviceService {
         int interruptedSessions = recordingSessionRepository
                 .interruptActiveSessionsByDeviceId(deviceId, tenantId, now);
         if (interruptedSessions > 0) {
-            log.info("Interrupted {} active recording sessions for device being deactivated: device_id={}, tenant_id={}",
+            log.info("Interrupted {} active recording sessions for device being soft-deleted: device_id={}, tenant_id={}",
                     interruptedSessions, deviceId, tenantId);
         }
 
@@ -98,18 +106,39 @@ public class DeviceService {
         int expiredCommands = deviceCommandRepository
                 .expirePendingCommandsByDeviceId(deviceId, tenantId);
         if (expiredCommands > 0) {
-            log.info("Expired {} pending commands for device being deactivated: device_id={}, tenant_id={}",
+            log.info("Expired {} pending commands for device being soft-deleted: device_id={}, tenant_id={}",
                     expiredCommands, deviceId, tenantId);
         }
 
-        // 3. Deactivate the device itself
+        // 3. Soft delete the device
+        device.setIsDeleted(true);
+        device.setDeletedTs(now);
         device.setIsActive(false);
         device.setStatus("offline");
         deviceRepository.save(device);
 
-        log.info("Device deactivated: id={}, hostname={}, tenant_id={}, user_id={}, ip={}, interrupted_sessions={}, expired_commands={}",
+        log.info("DEVICE_SOFT_DELETED: id={}, hostname={}, tenant_id={}, user_id={}, ip={}, interrupted_sessions={}, expired_commands={}",
                 device.getId(), device.getHostname(), tenantId, userId, ipAddress,
                 interruptedSessions, expiredCommands);
+    }
+
+    @Transactional
+    public DeviceResponse restoreDevice(UUID deviceId, UUID tenantId) {
+        Device device = findDeviceByIdAndTenant(deviceId, tenantId);
+
+        // Idempotent: if not deleted, return current state
+        if (!Boolean.TRUE.equals(device.getIsDeleted())) {
+            log.info("Device is not soft-deleted, returning current state: id={}, tenant_id={}", deviceId, tenantId);
+            return toResponse(device);
+        }
+
+        device.setIsDeleted(false);
+        device.setDeletedTs(null);
+        device.setIsActive(true);
+        device = deviceRepository.save(device);
+
+        log.info("DEVICE_RESTORED: id={}, hostname={}, tenant_id={}", device.getId(), device.getHostname(), tenantId);
+        return toResponse(device);
     }
 
     @Transactional
@@ -124,6 +153,15 @@ public class DeviceService {
                         principal.getDeviceId(), deviceId, principal.getUserId());
                 throw new AccessDeniedException("Device ID mismatch - cannot send heartbeat for another device");
             }
+        }
+
+        // Auto-restore soft-deleted device on heartbeat
+        if (Boolean.TRUE.equals(device.getIsDeleted())) {
+            device.setIsDeleted(false);
+            device.setDeletedTs(null);
+            device.setIsActive(true);
+            log.info("DEVICE_AUTO_RESTORED: device_id={}, tenant_id={}, trigger=heartbeat",
+                    deviceId, principal.getTenantId());
         }
 
         // Update device fields
@@ -184,6 +222,8 @@ public class DeviceService {
                 .ipAddress(device.getIpAddress())
                 .settings(device.getSettings())
                 .isActive(device.getIsActive())
+                .isDeleted(device.getIsDeleted())
+                .deletedTs(device.getDeletedTs())
                 .createdTs(device.getCreatedTs())
                 .updatedTs(device.getUpdatedTs())
                 .build();
@@ -205,6 +245,8 @@ public class DeviceService {
                 .ipAddress(device.getIpAddress())
                 .settings(device.getSettings())
                 .isActive(device.getIsActive())
+                .isDeleted(device.getIsDeleted())
+                .deletedTs(device.getDeletedTs())
                 .createdTs(device.getCreatedTs())
                 .updatedTs(device.getUpdatedTs())
                 .recentCommands(recentCommands.stream().map(this::toCommandResponse).toList())

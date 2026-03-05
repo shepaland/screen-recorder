@@ -101,15 +101,15 @@ class DeviceServiceTest {
                 .build();
 
         Page<Device> page = new PageImpl<>(List.of(device, device2), PageRequest.of(0, 20), 2);
-        when(deviceRepository.findByTenantIdWithFilters(eq(tenantId), eq("online"), isNull(), any(PageRequest.class)))
+        when(deviceRepository.findByTenantIdWithFilters(eq(tenantId), eq("online"), isNull(), eq(false), any(PageRequest.class)))
                 .thenReturn(page);
 
-        PageResponse<DeviceResponse> result = deviceService.getDevices(tenantId, "online", null, 0, 20);
+        PageResponse<DeviceResponse> result = deviceService.getDevices(tenantId, "online", null, false, 0, 20);
 
         assertThat(result.getContent()).hasSize(2);
         assertThat(result.getTotalElements()).isEqualTo(2);
         assertThat(result.getContent().get(0).getStatus()).isEqualTo("online");
-        verify(deviceRepository).findByTenantIdWithFilters(eq(tenantId), eq("online"), isNull(), any(PageRequest.class));
+        verify(deviceRepository).findByTenantIdWithFilters(eq(tenantId), eq("online"), isNull(), eq(false), any(PageRequest.class));
     }
 
     @Test
@@ -214,21 +214,23 @@ class DeviceServiceTest {
     }
 
     @Test
-    @DisplayName("Deactivate device - sets offline and inactive, interrupts sessions, expires commands")
-    void testDeactivateDevice_setsOffline() {
+    @DisplayName("Soft delete device - sets offline, inactive, and is_deleted=true, interrupts sessions, expires commands")
+    void testSoftDeleteDevice_setsDeletedOfflineInactive() {
         UUID userId = UUID.randomUUID();
         when(deviceRepository.findByIdAndTenantId(deviceId, tenantId)).thenReturn(Optional.of(device));
         when(deviceRepository.save(any(Device.class))).thenAnswer(i -> i.getArgument(0));
         when(recordingSessionRepository.interruptActiveSessionsByDeviceId(eq(deviceId), eq(tenantId), any(Instant.class))).thenReturn(0);
         when(deviceCommandRepository.expirePendingCommandsByDeviceId(eq(deviceId), eq(tenantId))).thenReturn(0);
 
-        deviceService.deactivateDevice(deviceId, tenantId, userId, "10.0.0.1", "TestAgent");
+        deviceService.softDeleteDevice(deviceId, tenantId, userId, "10.0.0.1", "TestAgent");
 
         verify(recordingSessionRepository).interruptActiveSessionsByDeviceId(eq(deviceId), eq(tenantId), any(Instant.class));
         verify(deviceCommandRepository).expirePendingCommandsByDeviceId(deviceId, tenantId);
         verify(deviceRepository).save(argThat(d -> {
             assertThat(d.getIsActive()).isFalse();
             assertThat(d.getStatus()).isEqualTo("offline");
+            assertThat(d.getIsDeleted()).isTrue();
+            assertThat(d.getDeletedTs()).isNotNull();
             return true;
         }));
     }

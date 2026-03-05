@@ -12,6 +12,7 @@ export interface DevicesListParams {
   size?: number;
   status?: string;
   search?: string;
+  include_deleted?: boolean;
 }
 
 export async function getDevices(params?: DevicesListParams): Promise<PageResponse<DeviceResponse>> {
@@ -26,6 +27,10 @@ export async function getDevice(id: string): Promise<DeviceDetailResponse> {
 
 export async function deleteDevice(id: string): Promise<void> {
   await cpApiClient.delete(`/devices/${id}`);
+}
+
+export async function restoreDevice(id: string): Promise<void> {
+  await cpApiClient.put(`/devices/${id}/restore`);
 }
 
 export async function sendCommand(deviceId: string, data: CreateCommandRequest): Promise<DeviceCommandResponse> {

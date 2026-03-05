@@ -63,6 +63,12 @@ public class Device {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
 
+    @Column(name = "is_deleted", nullable = false)
+    private Boolean isDeleted;
+
+    @Column(name = "deleted_ts")
+    private Instant deletedTs;
+
     @Column(name = "created_ts", nullable = false, updatable = false)
     private Instant createdTs;
 
@@ -74,6 +80,7 @@ public class Device {
         if (createdTs == null) createdTs = Instant.now();
         if (updatedTs == null) updatedTs = Instant.now();
         if (isActive == null) isActive = true;
+        if (isDeleted == null) isDeleted = false;
         if (status == null) status = "offline";
     }
 

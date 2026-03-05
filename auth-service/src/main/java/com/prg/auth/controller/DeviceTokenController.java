@@ -3,6 +3,7 @@ package com.prg.auth.controller;
 import com.prg.auth.dto.request.CreateDeviceTokenRequest;
 import com.prg.auth.dto.response.DeviceTokenResponse;
 import com.prg.auth.dto.response.PageResponse;
+import com.prg.auth.dto.response.TokenDeviceResponse;
 import com.prg.auth.exception.AccessDeniedException;
 import com.prg.auth.security.UserPrincipal;
 import com.prg.auth.service.DeviceTokenService;
@@ -70,6 +71,14 @@ public class DeviceTokenController {
         deviceTokenService.deactivateToken(id, principal,
                 getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/devices")
+    public ResponseEntity<TokenDeviceResponse> getDevicesByToken(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        requirePermission(principal, "DEVICE_TOKENS:READ");
+        return ResponseEntity.ok(deviceTokenService.getDevicesByToken(id, principal.getTenantId()));
     }
 
     private void requirePermission(UserPrincipal principal, String permission) {

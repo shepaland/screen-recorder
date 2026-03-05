@@ -29,6 +29,8 @@ public class DeviceDetailResponse {
     private String ipAddress;
     private Map<String, Object> settings;
     private Boolean isActive;
+    private Boolean isDeleted;
+    private Instant deletedTs;
     private Instant createdTs;
     private Instant updatedTs;
     private List<CommandResponse> recentCommands;

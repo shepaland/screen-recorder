@@ -3,11 +3,14 @@ package com.prg.auth.service;
 import com.prg.auth.dto.request.CreateDeviceTokenRequest;
 import com.prg.auth.dto.response.DeviceTokenResponse;
 import com.prg.auth.dto.response.PageResponse;
+import com.prg.auth.dto.response.TokenDeviceResponse;
+import com.prg.auth.entity.Device;
 import com.prg.auth.entity.DeviceRegistrationToken;
 import com.prg.auth.entity.Tenant;
 import com.prg.auth.entity.User;
 import com.prg.auth.exception.ResourceNotFoundException;
 import com.prg.auth.repository.DeviceRegistrationTokenRepository;
+import com.prg.auth.repository.DeviceRepository;
 import com.prg.auth.repository.TenantRepository;
 import com.prg.auth.repository.UserRepository;
 import com.prg.auth.security.UserPrincipal;
@@ -20,6 +23,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -29,6 +33,7 @@ import java.util.UUID;
 public class DeviceTokenService {
 
     private final DeviceRegistrationTokenRepository tokenRepository;
+    private final DeviceRepository deviceRepository;
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
@@ -120,6 +125,35 @@ public class DeviceTokenService {
                 ipAddress, userAgent, getCorrelationId());
 
         log.info("Device registration token deactivated: id={}, tenant_id={}", tokenId, principal.getTenantId());
+    }
+
+    @Transactional(readOnly = true)
+    public TokenDeviceResponse getDevicesByToken(UUID tokenId, UUID tenantId) {
+        DeviceRegistrationToken token = tokenRepository.findByIdAndTenantId(tokenId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Device registration token not found", "DEVICE_TOKEN_NOT_FOUND"));
+
+        List<Device> devices = deviceRepository.findByRegistrationTokenIdAndTenantId(tokenId, tenantId);
+
+        List<TokenDeviceResponse.TokenDeviceItem> items = devices.stream()
+                .map(d -> TokenDeviceResponse.TokenDeviceItem.builder()
+                        .id(d.getId())
+                        .hostname(d.getHostname())
+                        .osInfo(d.getOsVersion())
+                        .status(d.getStatus())
+                        .isActive(d.getIsActive())
+                        .isDeleted(d.getIsDeleted())
+                        .lastHeartbeatTs(d.getLastHeartbeatTs())
+                        .createdTs(d.getCreatedTs())
+                        .build())
+                .toList();
+
+        return TokenDeviceResponse.builder()
+                .tokenId(token.getId())
+                .tokenName(token.getName())
+                .devices(items)
+                .totalCount(items.size())
+                .build();
     }
 
     private DeviceTokenResponse toResponse(DeviceRegistrationToken token, String rawToken) {

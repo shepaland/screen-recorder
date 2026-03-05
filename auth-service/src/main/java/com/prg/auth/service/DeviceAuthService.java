@@ -145,9 +145,18 @@ public class DeviceAuthService {
                 .orElse(null);
 
         if (device != null) {
-            // 7. Check is_active
-            if (!device.getIsActive()) {
+            // 7. Auto-restore soft-deleted device on re-login
+            if (Boolean.TRUE.equals(device.getIsDeleted())) {
+                device.setIsDeleted(false);
+                device.setDeletedTs(null);
+                device.setIsActive(true);
+                log.info("DEVICE_AUTO_RESTORED: device_id={}, tenant_id={}, trigger=device-login",
+                        device.getId(), tenantId);
+                auditAction = "DEVICE_RESTORED";
+            } else if (!device.getIsActive()) {
                 throw new DeviceDeactivatedException("Device has been deactivated. Contact your administrator.");
+            } else {
+                auditAction = "DEVICE_RELOGIN";
             }
 
             // 6. Update existing device
@@ -158,7 +167,6 @@ public class DeviceAuthService {
             device.setUser(user);
             device.setStatus("online");
             device = deviceRepository.save(device);
-            auditAction = "DEVICE_RELOGIN";
         } else {
             // Create new device
             device = Device.builder()
@@ -271,6 +279,16 @@ public class DeviceAuthService {
         // Validate device exists, is active, and belongs to the same tenant
         Device device = deviceRepository.findByIdAndTenantId(request.getDeviceId(), storedToken.getTenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Device not found", "DEVICE_NOT_FOUND"));
+
+        // Auto-restore soft-deleted device on token refresh
+        if (Boolean.TRUE.equals(device.getIsDeleted())) {
+            device.setIsDeleted(false);
+            device.setDeletedTs(null);
+            device.setIsActive(true);
+            deviceRepository.save(device);
+            log.info("DEVICE_AUTO_RESTORED: device_id={}, tenant_id={}, trigger=device-refresh",
+                    device.getId(), storedToken.getTenantId());
+        }
 
         if (!device.getIsActive()) {
             throw new DeviceDeactivatedException("Device has been deactivated. Contact your administrator.");

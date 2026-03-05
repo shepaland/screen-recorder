@@ -50,10 +50,10 @@ public class RecordingService {
                 .map(RecordingSession::getDeviceId)
                 .collect(Collectors.toSet());
 
-        Map<UUID, String> deviceHostnames = resolveDeviceHostnames(deviceIds, principal.getTenantId());
+        Map<UUID, DeviceInfo> deviceInfoMap = resolveDeviceInfo(deviceIds, principal.getTenantId());
 
         List<RecordingListItemResponse> content = sessionPage.getContent().stream()
-                .map(session -> toListItemResponse(session, deviceHostnames))
+                .map(session -> toListItemResponse(session, deviceInfoMap))
                 .toList();
 
         return PageResponse.<RecordingListItemResponse>builder()
@@ -71,10 +71,10 @@ public class RecordingService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Recording not found: " + recordingId, "RECORDING_NOT_FOUND"));
 
-        Map<UUID, String> deviceHostnames = resolveDeviceHostnames(
+        Map<UUID, DeviceInfo> deviceInfoMap = resolveDeviceInfo(
                 Set.of(session.getDeviceId()), principal.getTenantId());
 
-        return toDetailResponse(session, deviceHostnames);
+        return toDetailResponse(session, deviceInfoMap);
     }
 
     @Transactional(readOnly = true)
@@ -229,20 +229,27 @@ public class RecordingService {
         return input.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
-    private Map<UUID, String> resolveDeviceHostnames(Set<UUID> deviceIds, UUID tenantId) {
+    private record DeviceInfo(String hostname, boolean deleted) {}
+
+    private Map<UUID, DeviceInfo> resolveDeviceInfo(Set<UUID> deviceIds, UUID tenantId) {
         if (deviceIds.isEmpty()) {
             return Map.of();
         }
         List<Device> devices = deviceRepository.findByIdInAndTenantId(deviceIds, tenantId);
         return devices.stream()
-                .collect(Collectors.toMap(Device::getId, Device::getHostname, (a, b) -> a));
+                .collect(Collectors.toMap(
+                        Device::getId,
+                        d -> new DeviceInfo(d.getHostname(), Boolean.TRUE.equals(d.getIsDeleted())),
+                        (a, b) -> a));
     }
 
-    private RecordingListItemResponse toListItemResponse(RecordingSession session, Map<UUID, String> hostnames) {
+    private RecordingListItemResponse toListItemResponse(RecordingSession session, Map<UUID, DeviceInfo> deviceInfoMap) {
+        DeviceInfo info = deviceInfoMap.get(session.getDeviceId());
         return RecordingListItemResponse.builder()
                 .id(session.getId())
                 .deviceId(session.getDeviceId())
-                .deviceHostname(hostnames.getOrDefault(session.getDeviceId(), null))
+                .deviceHostname(info != null ? info.hostname() : null)
+                .deviceDeleted(info != null && info.deleted())
                 .status(session.getStatus())
                 .startedTs(session.getStartedTs())
                 .endedTs(session.getEndedTs())
@@ -253,12 +260,14 @@ public class RecordingService {
                 .build();
     }
 
-    private RecordingDetailResponse toDetailResponse(RecordingSession session, Map<UUID, String> hostnames) {
+    private RecordingDetailResponse toDetailResponse(RecordingSession session, Map<UUID, DeviceInfo> deviceInfoMap) {
+        DeviceInfo info = deviceInfoMap.get(session.getDeviceId());
         return RecordingDetailResponse.builder()
                 .id(session.getId())
                 .tenantId(session.getTenantId())
                 .deviceId(session.getDeviceId())
-                .deviceHostname(hostnames.getOrDefault(session.getDeviceId(), null))
+                .deviceHostname(info != null ? info.hostname() : null)
+                .deviceDeleted(info != null && info.deleted())
                 .userId(session.getUserId())
                 .status(session.getStatus())
                 .startedTs(session.getStartedTs())

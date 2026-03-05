@@ -19,6 +19,7 @@ public class RecordingDetailResponse {
     private UUID tenantId;
     private UUID deviceId;
     private String deviceHostname;
+    private Boolean deviceDeleted;
     private UUID userId;
     private String status;
     private Instant startedTs;

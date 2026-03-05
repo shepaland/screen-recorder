@@ -27,6 +27,8 @@ export interface DeviceResponse {
   last_recording_ts: string | null;
   ip_address: string | null;
   is_active: boolean;
+  is_deleted: boolean;
+  deleted_ts: string | null;
   settings: Record<string, unknown>;
   user?: {
     id: string;

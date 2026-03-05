@@ -33,6 +33,9 @@ public class Device {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
 
+    @Column(name = "is_deleted", nullable = false)
+    private Boolean isDeleted;
+
     @Column(name = "created_ts", nullable = false, updatable = false)
     private Instant createdTs;
 }

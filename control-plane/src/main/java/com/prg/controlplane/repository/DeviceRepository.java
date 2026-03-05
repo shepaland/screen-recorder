@@ -19,7 +19,12 @@ public interface DeviceRepository extends JpaRepository<Device, UUID> {
     @Query("""
             SELECT d FROM Device d
             WHERE d.tenantId = :tenantId
-              AND (:status IS NULL OR d.status = :status)
+              AND (:status IS NULL OR (
+                  CASE WHEN :status = 'deleted' THEN d.isDeleted = TRUE
+                       ELSE (d.status = :status AND d.isDeleted = FALSE)
+                  END
+              ))
+              AND (:includeDeleted = TRUE OR d.isDeleted = FALSE)
               AND (:search IS NULL OR LOWER(d.hostname) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))
             ORDER BY d.createdTs DESC
             """)
@@ -27,5 +32,6 @@ public interface DeviceRepository extends JpaRepository<Device, UUID> {
             @Param("tenantId") UUID tenantId,
             @Param("status") String status,
             @Param("search") String search,
+            @Param("includeDeleted") boolean includeDeleted,
             Pageable pageable);
 }

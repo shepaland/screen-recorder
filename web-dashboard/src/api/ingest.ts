@@ -26,6 +26,7 @@ export interface Recording {
   id: string;
   device_id: string;
   device_hostname: string;
+  device_deleted?: boolean;
   status: string;
   started_ts: string;
   ended_ts: string | null;

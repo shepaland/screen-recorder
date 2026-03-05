@@ -18,6 +18,8 @@ public interface DeviceRegistrationTokenRepository extends JpaRepository<DeviceR
 
     Optional<DeviceRegistrationToken> findByTokenHash(String tokenHash);
 
+    Optional<DeviceRegistrationToken> findByIdAndTenantId(UUID id, UUID tenantId);
+
     List<DeviceRegistrationToken> findByTenantIdAndIsActiveTrue(UUID tenantId);
 
     Page<DeviceRegistrationToken> findByTenantId(UUID tenantId, Pageable pageable);

@@ -182,7 +182,14 @@ export default function RecordingsPage() {
               }`}
             >
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-gray-900 truncate">{recording.device_hostname}</p>
+                <div className="flex items-center min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{recording.device_hostname}</p>
+                  {recording.device_deleted && (
+                    <span className="ml-1 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-red-100 text-red-700 flex-shrink-0">
+                      Комп. удалён
+                    </span>
+                  )}
+                </div>
                 <StatusBadge status={recording.status} />
               </div>
               <div className="flex items-center justify-between mt-1">
@@ -230,7 +237,12 @@ export default function RecordingsPage() {
         <div className="flex-1 flex flex-col bg-gray-50 overflow-hidden">
           <div className="px-6 py-3 border-b border-gray-200 bg-white flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">{selectedRecording.device_hostname}</h2>
+              <h2 className="text-lg font-semibold text-gray-900">
+                {selectedRecording.device_hostname}
+                {selectedRecording.device_deleted && (
+                  <span className="ml-2 text-sm font-normal text-red-600">(удалено)</span>
+                )}
+              </h2>
               <p className="text-sm text-gray-500">{formatTime(selectedRecording.started_ts)}</p>
             </div>
             <div className="flex items-center gap-2">
@@ -323,7 +335,12 @@ export default function RecordingsPage() {
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 p-4">
                 <div>
                   <dt className="text-xs font-medium text-gray-500">Устройство</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{selectedRecording.device_hostname}</dd>
+                  <dd className="mt-1 text-sm text-gray-900">
+                    {selectedRecording.device_hostname}
+                    {selectedRecording.device_deleted && (
+                      <span className="ml-1 text-red-600">(удалено)</span>
+                    )}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium text-gray-500">Начало</dt>

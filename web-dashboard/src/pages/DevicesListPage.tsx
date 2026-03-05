@@ -5,7 +5,7 @@ import DataTable, { type Column } from '../components/DataTable';
 import DeviceStatusBadge from '../components/DeviceStatusBadge';
 import PermissionGate from '../components/PermissionGate';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { getDevices, deleteDevice, type DevicesListParams } from '../api/devices';
+import { getDevices, deleteDevice, restoreDevice, type DevicesListParams } from '../api/devices';
 import type { DeviceResponse } from '../types';
 import { useToast } from '../contexts/ToastContext';
 import { timeAgo } from '../utils/timeAgo';
@@ -51,7 +51,12 @@ export default function DevicesListPage() {
     try {
       const params: DevicesListParams = { page, size };
       if (search) params.search = search;
-      if (statusFilter) params.status = statusFilter;
+      if (statusFilter === 'deleted') {
+        params.status = 'deleted';
+        params.include_deleted = true;
+      } else if (statusFilter) {
+        params.status = statusFilter;
+      }
 
       const data = await getDevices(params);
       setDevices(data.content);
@@ -107,7 +112,14 @@ export default function DevicesListPage() {
     {
       key: 'status',
       title: 'Статус',
-      render: (device) => <DeviceStatusBadge status={device.status} />,
+      render: (device) =>
+        device.is_deleted ? (
+          <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-red-100 text-red-800 ring-1 ring-inset ring-red-600/20">
+            Удалено
+          </span>
+        ) : (
+          <DeviceStatusBadge status={device.status} />
+        ),
     },
     {
       key: 'ip_address',
@@ -150,8 +162,21 @@ export default function DevicesListPage() {
           >
             Детали
           </button>
-          <PermissionGate permission="DEVICES:DELETE">
-            {device.status === 'offline' && (
+          {device.is_deleted ? (
+            <PermissionGate permission="DEVICES:UPDATE">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRestore(device);
+                }}
+                className="text-sm text-green-600 hover:text-green-800"
+              >
+                Восстановить
+              </button>
+            </PermissionGate>
+          ) : (
+            <PermissionGate permission="DEVICES:DELETE">
               <button
                 type="button"
                 onClick={(e) => {
@@ -162,8 +187,8 @@ export default function DevicesListPage() {
               >
                 Удалить
               </button>
-            )}
-          </PermissionGate>
+            </PermissionGate>
+          )}
         </div>
       ),
     },
@@ -173,12 +198,22 @@ export default function DevicesListPage() {
     if (!deleteTarget) return;
     try {
       await deleteDevice(deleteTarget.id);
-      addToast('success', `Устройство "${deleteTarget.hostname}" деактивировано`);
+      addToast('success', `Устройство "${deleteTarget.hostname}" удалено`);
       fetchDevices();
     } catch {
       addToast('error', 'Не удалось удалить устройство');
     }
     setDeleteTarget(null);
+  };
+
+  const handleRestore = async (device: DeviceResponse) => {
+    try {
+      await restoreDevice(device.id);
+      addToast('success', 'Устройство восстановлено');
+      fetchDevices();
+    } catch {
+      addToast('error', 'Не удалось восстановить устройство');
+    }
   };
 
   return (
@@ -234,6 +269,7 @@ export default function DevicesListPage() {
             <option value="recording">Запись</option>
             <option value="offline">Офлайн</option>
             <option value="error">Ошибка</option>
+            <option value="deleted">Удалённые</option>
           </select>
         </div>
       </div>
@@ -259,7 +295,7 @@ export default function DevicesListPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         title="Удалить устройство"
-        message={`Вы уверены, что хотите удалить устройство "${deleteTarget?.hostname}"? Активные сессии записи будут прерваны, ожидающие команды отменены. Устройство будет деактивировано.`}
+        message={`Вы уверены, что хотите удалить устройство "${deleteTarget?.hostname}"?\n\nУстройство будет скрыто из списка. Активные сессии записи будут прерваны.\n\nЕсли агент продолжает работу, устройство восстановится автоматически.`}
         confirmText="Удалить"
         cancelText="Отмена"
         onConfirm={handleDelete}

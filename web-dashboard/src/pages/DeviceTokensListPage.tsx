@@ -1,11 +1,21 @@
-import { useState, useEffect, useCallback } from 'react';
+import { Fragment, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Dialog, Transition } from '@headlessui/react';
 import { PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/20/solid';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import DataTable, { type Column } from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
 import PermissionGate from '../components/PermissionGate';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { getDeviceTokens, deleteDeviceToken, type DeviceTokensListParams } from '../api/deviceTokens';
+import LoadingSpinner from '../components/LoadingSpinner';
+import {
+  getDeviceTokens,
+  deleteDeviceToken,
+  getTokenDevices,
+  type DeviceTokensListParams,
+  type TokenDeviceItem,
+  type TokenDevicesResponse,
+} from '../api/deviceTokens';
 import type { DeviceTokenResponse } from '../types';
 import { useToast } from '../contexts/ToastContext';
 import { formatDateTime } from '../utils/format';
@@ -28,6 +38,12 @@ export default function DeviceTokensListPage() {
 
   // Deactivate dialog
   const [deactivateTarget, setDeactivateTarget] = useState<DeviceTokenResponse | null>(null);
+
+  // Devices modal
+  const [showDevicesModal, setShowDevicesModal] = useState(false);
+  const [selectedTokenForDevices, setSelectedTokenForDevices] = useState<DeviceTokenResponse | null>(null);
+  const [tokenDevicesData, setTokenDevicesData] = useState<TokenDevicesResponse | null>(null);
+  const [loadingDevices, setLoadingDevices] = useState(false);
 
   // Debounce search input
   useEffect(() => {
@@ -70,6 +86,22 @@ export default function DeviceTokensListPage() {
       addToast('error', 'Не удалось деактивировать токен');
     }
     setDeactivateTarget(null);
+  };
+
+  const handleShowDevices = async (token: DeviceTokenResponse) => {
+    setSelectedTokenForDevices(token);
+    setShowDevicesModal(true);
+    setLoadingDevices(true);
+    setTokenDevicesData(null);
+    try {
+      const data = await getTokenDevices(token.id);
+      setTokenDevicesData(data);
+    } catch {
+      addToast('error', 'Не удалось загрузить устройства токена');
+      setShowDevicesModal(false);
+    } finally {
+      setLoadingDevices(false);
+    }
   };
 
   const columns: Column<DeviceTokenResponse>[] = [
@@ -135,20 +167,32 @@ export default function DeviceTokensListPage() {
       key: 'actions',
       title: 'Действия',
       render: (token) => (
-        <PermissionGate permission="DEVICE_TOKENS:DELETE">
-          {token.is_active && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setDeactivateTarget(token);
-              }}
-              className="text-sm text-red-600 hover:text-red-800"
-            >
-              Деактивировать
-            </button>
-          )}
-        </PermissionGate>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleShowDevices(token);
+            }}
+            className="text-sm text-blue-600 hover:text-blue-800"
+          >
+            Устройства ({token.current_uses})
+          </button>
+          <PermissionGate permission="DEVICE_TOKENS:DELETE">
+            {token.is_active && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeactivateTarget(token);
+                }}
+                className="text-sm text-red-600 hover:text-red-800"
+              >
+                Деактивировать
+              </button>
+            )}
+          </PermissionGate>
+        </div>
       ),
     },
   ];
@@ -242,6 +286,134 @@ export default function DeviceTokensListPage() {
         onConfirm={handleDeactivate}
         onCancel={() => setDeactivateTarget(null)}
       />
+
+      {/* Token devices modal */}
+      <Transition.Root show={showDevicesModal} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={() => setShowDevicesModal(false)}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 z-10 w-screen overflow-y-auto">
+            <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                enterTo="opacity-100 translate-y-0 sm:scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 translate-y-0 sm:scale-100"
+                leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+              >
+                <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-3xl sm:p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <Dialog.Title as="h3" className="text-base font-semibold leading-6 text-gray-900">
+                      Устройства токена {selectedTokenForDevices ? `\u00AB${selectedTokenForDevices.name}\u00BB` : ''}
+                    </Dialog.Title>
+                    <button
+                      type="button"
+                      onClick={() => setShowDevicesModal(false)}
+                      className="rounded-md text-gray-400 hover:text-gray-500"
+                    >
+                      <XMarkIcon className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  {loadingDevices ? (
+                    <LoadingSpinner size="md" className="py-12" />
+                  ) : tokenDevicesData && tokenDevicesData.devices.length > 0 ? (
+                    <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+                      <table className="min-w-full divide-y divide-gray-300">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Hostname</th>
+                            <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">ОС</th>
+                            <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Статус</th>
+                            <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Последний heartbeat</th>
+                            <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Зарегистрирован</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 bg-white">
+                          {tokenDevicesData.devices.map((device: TokenDeviceItem) => (
+                            <tr key={device.id}>
+                              <td className="whitespace-nowrap px-3 py-4 text-sm font-medium text-gray-900">
+                                {device.hostname}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                {device.os_info || '--'}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-4 text-sm">
+                                {device.is_deleted ? (
+                                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-red-100 text-red-800 ring-1 ring-inset ring-red-600/20">
+                                    Удалено
+                                  </span>
+                                ) : !device.is_active ? (
+                                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 ring-1 ring-inset ring-gray-500/20">
+                                    Неактивно
+                                  </span>
+                                ) : (
+                                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
+                                    device.status === 'online'
+                                      ? 'bg-yellow-100 text-yellow-800 ring-yellow-600/20'
+                                      : device.status === 'recording'
+                                        ? 'bg-green-100 text-green-800 ring-green-600/20'
+                                        : device.status === 'error'
+                                          ? 'bg-red-100 text-red-800 ring-red-600/20'
+                                          : 'bg-gray-100 text-gray-600 ring-gray-500/20'
+                                  }`}>
+                                    {device.status === 'online' ? 'Онлайн'
+                                      : device.status === 'recording' ? 'Запись'
+                                      : device.status === 'offline' ? 'Офлайн'
+                                      : device.status === 'error' ? 'Ошибка'
+                                      : device.status}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                {device.last_heartbeat_ts
+                                  ? new Date(device.last_heartbeat_ts).toLocaleString('ru-RU', {
+                                      day: '2-digit', month: '2-digit', year: 'numeric',
+                                      hour: '2-digit', minute: '2-digit',
+                                    })
+                                  : '--'}
+                              </td>
+                              <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                {formatDateTime(device.created_ts)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <p className="text-sm text-gray-500">Нет подключённых устройств</p>
+                    </div>
+                  )}
+
+                  <div className="mt-5 sm:mt-4 flex justify-end">
+                    <button
+                      type="button"
+                      className="inline-flex justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                      onClick={() => setShowDevicesModal(false)}
+                    >
+                      Закрыть
+                    </button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition.Root>
     </div>
   );
 }

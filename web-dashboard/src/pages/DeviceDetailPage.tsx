@@ -6,8 +6,9 @@ import {
   StopIcon,
   ArrowPathIcon,
   Cog6ToothIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
-import { getDevice, deleteDevice, sendCommand } from '../api/devices';
+import { getDevice, deleteDevice, restoreDevice, sendCommand } from '../api/devices';
 import type { DeviceDetailResponse, CreateCommandRequest } from '../types';
 import DeviceStatusBadge from '../components/DeviceStatusBadge';
 import StatusBadge from '../components/StatusBadge';
@@ -43,8 +44,8 @@ export default function DeviceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [sendingCommand, setSendingCommand] = useState<string | null>(null);
 
-  // Deactivate dialog
-  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
+  // Delete dialog
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const fetchDevice = useCallback(async () => {
     if (!id) return;
@@ -80,16 +81,28 @@ export default function DeviceDetailPage() {
     }
   };
 
-  const handleDeactivate = async () => {
+  const handleDelete = async () => {
     if (!id) return;
     try {
       await deleteDevice(id);
-      addToast('success', 'Устройство деактивировано');
+      addToast('success', 'Устройство удалено');
       navigate('/devices');
     } catch {
-      addToast('error', 'Не удалось деактивировать устройство');
+      addToast('error', 'Не удалось удалить устройство');
     }
-    setShowDeactivateDialog(false);
+    setShowDeleteDialog(false);
+  };
+
+  const handleRestore = async () => {
+    if (!id) return;
+    try {
+      await restoreDevice(id);
+      addToast('success', 'Устройство восстановлено');
+      const updated = await getDevice(id);
+      setDevice(updated);
+    } catch {
+      addToast('error', 'Не удалось восстановить устройство');
+    }
   };
 
   if (loading) {
@@ -118,25 +131,58 @@ export default function DeviceDetailPage() {
               <h1 className="text-2xl font-bold tracking-tight text-gray-900">
                 {device.hostname}
               </h1>
-              <DeviceStatusBadge status={device.status} />
+              {device.is_deleted ? (
+                <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-red-100 text-red-800 ring-1 ring-inset ring-red-600/20">
+                  Удалено
+                </span>
+              ) : (
+                <DeviceStatusBadge status={device.status} />
+              )}
             </div>
             <p className="mt-1 text-sm text-gray-500">
               ID: {device.id}
             </p>
           </div>
-          <PermissionGate permission="DEVICES:DELETE">
-            {device.is_active && (
-              <button
-                type="button"
-                onClick={() => setShowDeactivateDialog(true)}
-                className="btn-danger"
-              >
-                Деактивировать
-              </button>
+          <div className="flex items-center gap-3">
+            {device.is_deleted ? (
+              <PermissionGate permission="DEVICES:UPDATE">
+                <button
+                  type="button"
+                  onClick={handleRestore}
+                  className="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
+                >
+                  Восстановить
+                </button>
+              </PermissionGate>
+            ) : (
+              <PermissionGate permission="DEVICES:DELETE">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="btn-danger"
+                >
+                  Удалить
+                </button>
+              </PermissionGate>
             )}
-          </PermissionGate>
+          </div>
         </div>
       </div>
+
+      {/* Deleted device banner */}
+      {device.is_deleted && (
+        <div className="mb-4 rounded-md bg-red-50 p-4 border border-red-200">
+          <div className="flex">
+            <TrashIcon className="h-5 w-5 text-red-400 flex-shrink-0" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Устройство удалено</h3>
+              <p className="mt-1 text-sm text-red-700">
+                Удалено {device.deleted_ts ? new Date(device.deleted_ts).toLocaleDateString('ru-RU') : ''}. Если агент продолжает работу, устройство восстановится автоматически.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Device info card */}
       <div className="card">
@@ -358,15 +404,15 @@ export default function DeviceDetailPage() {
         </div>
       )}
 
-      {/* Deactivate confirmation dialog */}
+      {/* Delete confirmation dialog */}
       <ConfirmDialog
-        open={showDeactivateDialog}
-        title="Деактивировать устройство"
-        message={`Вы уверены, что хотите деактивировать устройство "${device.hostname}"? Устройство будет отключено и не сможет отправлять записи.`}
-        confirmText="Деактивировать"
+        open={showDeleteDialog}
+        title="Удалить устройство"
+        message={`Вы уверены, что хотите удалить устройство "${device.hostname}"?\n\nУстройство будет скрыто из списка. Активные сессии записи будут прерваны.\n\nЕсли агент продолжает работу, устройство восстановится автоматически.`}
+        confirmText="Удалить"
         cancelText="Отмена"
-        onConfirm={handleDeactivate}
-        onCancel={() => setShowDeactivateDialog(false)}
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteDialog(false)}
       />
     </div>
   );
