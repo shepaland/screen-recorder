@@ -287,7 +287,7 @@ export default function RecordingsPage() {
           {/* Video player */}
           <div className="px-6 pt-4">
             <div className="bg-gray-900 rounded-lg aspect-video flex items-center justify-center relative overflow-hidden">
-              {selectedRecording.status === 'completed' && segments.length > 0 ? (
+              {segments.length > 0 ? (
                 <video
                   key={segments[currentSegmentIndex]?.id}
                   className="w-full h-full"
@@ -307,23 +307,37 @@ export default function RecordingsPage() {
                     <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
                     <span className="text-sm font-medium">Идёт запись</span>
                   </div>
-                  <p className="text-xs text-gray-400">Воспроизведение доступно после завершения</p>
-                </div>
-              ) : segments.length === 0 && selectedRecording.status === 'completed' ? (
-                <div className="text-center">
-                  <p className="text-gray-400 text-sm">Загрузка сегментов...</p>
+                  <p className="text-xs text-gray-400">Нет загруженных сегментов</p>
                 </div>
               ) : (
                 <div className="text-center">
-                  <p className="text-red-400 text-sm font-medium">Запись недоступна</p>
+                  <p className="text-gray-400 text-sm">Нет сегментов</p>
                 </div>
               )}
             </div>
-            {segments.length > 1 && (
+            {(segments.length > 0 || selectedRecording.status === 'active') && (
               <div className="flex items-center justify-center mt-2 gap-2">
-                <span className="text-xs text-gray-500">
-                  Сегмент {currentSegmentIndex + 1} из {segments.length}
-                </span>
+                {selectedRecording.status === 'active' && (
+                  <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
+                    <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                    Live
+                  </span>
+                )}
+                {segments.length > 0 && (
+                  <span className="text-xs text-gray-500">
+                    Сегмент {currentSegmentIndex + 1} из {segments.length}
+                  </span>
+                )}
+                {selectedRecording.status === 'active' && (
+                  <button
+                    type="button"
+                    onClick={() => handleSelect(selectedRecording)}
+                    className="text-xs text-blue-500 hover:text-blue-700"
+                    title="Обновить сегменты"
+                  >
+                    <ArrowPathIcon className="h-3.5 w-3.5 inline" /> Обновить
+                  </button>
+                )}
               </div>
             )}
           </div>

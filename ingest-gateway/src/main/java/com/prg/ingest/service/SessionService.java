@@ -34,13 +34,16 @@ public class SessionService {
                     "DEVICE_MISMATCH");
         }
 
-        boolean hasActive = sessionRepository.existsByDeviceIdAndTenantIdAndStatus(
-                principal.getDeviceId(), principal.getTenantId(), "active");
-
-        if (hasActive) {
-            throw new IllegalStateException(
-                    "Device already has an active recording session. End it before creating a new one.");
-        }
+        // Auto-close stale active session if exists (agent restart recovery)
+        sessionRepository.findByDeviceIdAndTenantIdAndStatus(
+                principal.getDeviceId(), principal.getTenantId(), "active")
+                .ifPresent(staleSession -> {
+                    log.warn("Auto-closing stale active session id={} for device={} (started at {})",
+                            staleSession.getId(), staleSession.getDeviceId(), staleSession.getStartedTs());
+                    staleSession.setStatus("interrupted");
+                    staleSession.setEndedTs(Instant.now());
+                    sessionRepository.save(staleSession);
+                });
 
         RecordingSession session = RecordingSession.builder()
                 .tenantId(principal.getTenantId())

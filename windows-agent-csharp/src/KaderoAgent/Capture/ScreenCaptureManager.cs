@@ -28,10 +28,11 @@ public class ScreenCaptureManager
         _logger = logger;
     }
 
-    public void Start(string sessionId, int fps = 1, int segmentDuration = 10,
+    /// <summary>Start screen capture. Returns true if FFmpeg was launched successfully.</summary>
+    public bool Start(string sessionId, int fps = 1, int segmentDuration = 10,
         string quality = "medium", string resolution = "1280x720")
     {
-        if (_isRecording) return;
+        if (_isRecording) return true; // Already recording
 
         _outputDir = Path.Combine(_config.Value.DataPath, "segments", sessionId);
         Directory.CreateDirectory(_outputDir);
@@ -70,12 +71,20 @@ public class ScreenCaptureManager
             $"-y \"{outputPattern}\"";
 
         _ffmpeg = new FfmpegProcess(_config.Value.FfmpegPath, _logger);
-        _ffmpeg.Start(ffmpegArgs);
-        _isRecording = true;
+        var started = _ffmpeg.Start(ffmpegArgs);
 
+        if (!started)
+        {
+            _logger.LogError("FFmpeg failed to start, not marking as recording");
+            _ffmpeg = null;
+            return false;
+        }
+
+        _isRecording = true;
         _logger.LogInformation(
             "Screen capture started: fps={Fps}, segment={Seg}s, quality={Q}, resolution={Res}",
             fps, segmentDuration, quality, resolution);
+        return true;
     }
 
     public void Stop()

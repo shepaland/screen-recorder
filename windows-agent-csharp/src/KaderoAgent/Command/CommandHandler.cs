@@ -21,6 +21,10 @@ public class CommandHandler
     private DateTime? _sessionStartTime;
     private string _currentBaseUrl = "";
 
+    // Crash recovery backoff
+    private int _consecutiveFailures;
+    private const int MaxConsecutiveFailures = 5;
+
     public CommandHandler(ScreenCaptureManager captureManager, SessionManager sessionManager,
         UploadQueue uploadQueue, AuthManager authManager, ApiClient apiClient,
         IOptions<AgentConfig> config, ILogger<CommandHandler> logger)
@@ -43,6 +47,7 @@ public class CommandHandler
             switch (cmd.CommandType?.ToUpper())
             {
                 case "START_RECORDING":
+                    _consecutiveFailures = 0; // Reset on explicit command
                     await StartRecording(baseUrl, ct);
                     break;
                 case "STOP_RECORDING":
@@ -90,16 +95,27 @@ public class CommandHandler
         await StartRecording(baseUrl, ct);
     }
 
-    /// <summary>Check if FFmpeg crashed and restart recording.</summary>
+    /// <summary>Check if FFmpeg crashed and restart recording with exponential backoff.</summary>
     public async Task CheckAndRecoverAsync(string baseUrl, CancellationToken ct)
     {
         if (!_captureManager.IsRecording) return;
 
         if (_captureManager.HasCrashed)
         {
-            _logger.LogWarning("FFmpeg crash detected, restarting recording...");
+            _consecutiveFailures++;
+            _logger.LogWarning("FFmpeg crash detected (attempt {Attempt}/{Max})",
+                _consecutiveFailures, MaxConsecutiveFailures);
+
             _captureManager.ResetAfterCrash();
-    
+
+            if (_consecutiveFailures >= MaxConsecutiveFailures)
+            {
+                _logger.LogError("Max consecutive FFmpeg failures ({Max}) reached, stopping recovery. " +
+                    "Will retry on next server START_RECORDING command or agent restart.",
+                    MaxConsecutiveFailures);
+                try { await _sessionManager.EndSessionAsync(ct); } catch { }
+                return;
+            }
 
             // End old session, start new one
             try { await _sessionManager.EndSessionAsync(ct); } catch { }
@@ -136,7 +152,7 @@ public class CommandHandler
         var quality = !string.IsNullOrEmpty(serverCfg?.Quality) ? serverCfg.Quality : _config.Value.Quality;
         var resolution = !string.IsNullOrEmpty(serverCfg?.Resolution) ? serverCfg.Resolution : _config.Value.Resolution;
 
-        // Create session on server (offline-tolerant)
+        // Create session on server (handles 409 by closing stale session)
         string sessionId;
         try
         {
@@ -148,7 +164,18 @@ public class CommandHandler
             sessionId = Guid.NewGuid().ToString();
         }
 
-        _captureManager.Start(sessionId, fps, segDuration, quality, resolution);
+        var started = _captureManager.Start(sessionId, fps, segDuration, quality, resolution);
+        if (!started)
+        {
+            _logger.LogError("FFmpeg failed to start, aborting recording");
+            _consecutiveFailures++;
+            // End the session we just created since FFmpeg didn't start
+            try { await _sessionManager.EndSessionAsync(ct); } catch { }
+            return;
+        }
+
+        // FFmpeg started successfully — reset failure counter
+        _consecutiveFailures = 0;
         _uploadQueue.StartProcessing(baseUrl, ct);
         _sessionStartTime = DateTime.UtcNow;
 

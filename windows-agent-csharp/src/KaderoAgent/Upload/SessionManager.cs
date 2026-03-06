@@ -1,3 +1,4 @@
+using System.Net;
 using KaderoAgent.Auth;
 using KaderoAgent.Util;
 using Microsoft.Extensions.Logging;
@@ -42,10 +43,26 @@ public class SessionManager
             }
         };
 
-        var response = await _apiClient.PostAsync<SessionResponse>(url, body, ct);
-        _currentSessionId = response?.Id;
-        _logger.LogInformation("Recording session started: {SessionId}", _currentSessionId);
-        return _currentSessionId ?? throw new Exception("Failed to create session");
+        try
+        {
+            var response = await _apiClient.PostAsync<SessionResponse>(url, body, ct);
+            _currentSessionId = response?.Id;
+            _logger.LogInformation("Recording session started: {SessionId}", _currentSessionId);
+            return _currentSessionId ?? throw new Exception("Failed to create session");
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
+        {
+            _logger.LogWarning("Server returned 409 Conflict (active session exists), closing stale session...");
+
+            // Try to find and close the active session, then retry
+            await CloseActiveSessionForDeviceAsync(baseUrl, ct);
+
+            // Retry session creation
+            var response = await _apiClient.PostAsync<SessionResponse>(url, body, ct);
+            _currentSessionId = response?.Id;
+            _logger.LogInformation("Recording session started after closing stale: {SessionId}", _currentSessionId);
+            return _currentSessionId ?? throw new Exception("Failed to create session after closing stale");
+        }
     }
 
     public async Task EndSessionAsync(CancellationToken ct = default)
@@ -71,6 +88,45 @@ public class SessionManager
             _currentSessionId = null;
         }
     }
+
+    /// <summary>
+    /// Close any active recording session for this device on the server.
+    /// Used to recover from 409 Conflict when stale sessions exist.
+    /// </summary>
+    private async Task CloseActiveSessionForDeviceAsync(string baseUrl, CancellationToken ct)
+    {
+        try
+        {
+            // Get recordings for this device to find active sessions
+            var deviceId = _authManager.DeviceId;
+            var listUrl = $"{baseUrl}/api/ingest/v1/ingest/recordings?device_id={deviceId}&status=active&size=10";
+
+            var listResponse = await _apiClient.GetAsync<RecordingsListResponse>(listUrl, ct);
+            if (listResponse?.Content == null || listResponse.Content.Count == 0)
+            {
+                _logger.LogWarning("No active sessions found for device, but server returned 409");
+                return;
+            }
+
+            foreach (var session in listResponse.Content)
+            {
+                try
+                {
+                    var endUrl = $"{baseUrl}/api/ingest/v1/ingest/sessions/{session.Id}/end";
+                    await _apiClient.PutAsync<object>(endUrl, null, ct);
+                    _logger.LogInformation("Closed stale session: {SessionId}", session.Id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to close stale session {SessionId}", session.Id);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to list/close active sessions for device");
+        }
+    }
 }
 
 public class SessionResponse
@@ -78,4 +134,15 @@ public class SessionResponse
     public string? Id { get; set; }
     public string? Status { get; set; }
     public string? StartedTs { get; set; }
+}
+
+public class RecordingsListResponse
+{
+    public List<RecordingItem>? Content { get; set; }
+}
+
+public class RecordingItem
+{
+    public string? Id { get; set; }
+    public string? Status { get; set; }
 }
