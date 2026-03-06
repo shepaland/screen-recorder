@@ -81,7 +81,14 @@ if (args.Contains("--tray"))
     return;
 }
 
-var builder = Host.CreateApplicationBuilder(args);
+// Use exe directory as content root (not the working directory),
+// so appsettings.json is always found regardless of how the process was launched
+// (e.g. from HKCU\Run, schtasks, or Windows Service).
+var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+{
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory
+});
 
 // Configuration
 builder.Services.Configure<AgentConfig>(builder.Configuration.GetSection("Agent"));
