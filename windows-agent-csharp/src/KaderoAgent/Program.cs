@@ -202,7 +202,7 @@ if (!args.Contains("--service") &&
         {
             FileName = exePath,
             Arguments = "--tray",
-            UseShellExecute = false
+            UseShellExecute = true // Must use shell to properly register NotifyIcon with explorer
         });
     }
 }
@@ -225,7 +225,7 @@ if (!args.Contains("--service"))
                 {
                     FileName = trayExePath,
                     Arguments = "--tray",
-                    UseShellExecute = false
+                    UseShellExecute = true // Must use shell to properly register NotifyIcon with explorer
                 });
             }
             catch { /* non-fatal: tray is optional */ }
