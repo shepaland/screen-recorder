@@ -3,8 +3,7 @@ namespace KaderoAgent.Configuration;
 public class AgentConfig
 {
     public string ServerUrl { get; set; } = "";
-    public string DataPath { get; set; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Kadero");
+    public string DataPath { get; set; } = @"C:\screen-recorder-agent";
     public int HeartbeatIntervalSec { get; set; } = 30;
     public int SegmentDurationSec { get; set; } = 10;
     public int CaptureFps { get; set; } = 5;

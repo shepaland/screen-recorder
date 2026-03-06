@@ -69,3 +69,12 @@ export interface CreateCommandRequest {
   command_type: 'START_RECORDING' | 'STOP_RECORDING' | 'UPDATE_SETTINGS' | 'RESTART_AGENT' | 'UNREGISTER';
   payload?: Record<string, unknown>;
 }
+
+export interface DeviceSettings {
+  capture_fps: number;
+  resolution: string;
+  quality: string;
+  segment_duration_sec: number;
+  session_max_duration_hours: number;
+  auto_start: boolean;
+}

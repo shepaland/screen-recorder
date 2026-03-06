@@ -2,6 +2,7 @@ using System.Windows.Forms;
 using System.Drawing;
 using KaderoAgent.Auth;
 using KaderoAgent.Configuration;
+using KaderoAgent.Resources;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KaderoAgent.Tray;
@@ -32,7 +33,7 @@ public class SetupForm : Form
         Size = new Size(420, 320);
         MaximizeBox = false;
         ShowInTaskbar = true;
-        Icon = SystemIcons.Application;
+        Icon = LogoHelper.CreateAppIcon(32);
 
         // Glass effect
         GlassHelper.ApplyGlassEffect(this);

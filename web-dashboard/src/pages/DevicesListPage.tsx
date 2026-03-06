@@ -162,6 +162,20 @@ export default function DevicesListPage() {
           >
             Детали
           </button>
+          {!device.is_deleted && (
+            <PermissionGate permission="DEVICES:UPDATE">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/devices/${device.id}#settings`);
+                }}
+                className="text-sm text-gray-600 hover:text-gray-800"
+              >
+                Настройки
+              </button>
+            </PermissionGate>
+          )}
           {device.is_deleted ? (
             <PermissionGate permission="DEVICES:UPDATE">
               <button

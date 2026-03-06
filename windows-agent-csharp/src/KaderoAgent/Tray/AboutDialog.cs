@@ -2,9 +2,11 @@ namespace KaderoAgent.Tray;
 
 using System.Windows.Forms;
 using System.Drawing;
+using KaderoAgent.Resources;
 
 /// <summary>
 /// About dialog with glass/acrylic UI style.
+/// Shows logo, version and description.
 /// </summary>
 public class AboutDialog : Form
 {
@@ -17,6 +19,7 @@ public class AboutDialog : Form
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
+        Icon = LogoHelper.CreateAppIcon(32);
 
         // Glass effect
         GlassHelper.ApplyGlassEffect(this);
@@ -30,11 +33,22 @@ public class AboutDialog : Form
         Controls.Add(titleBar);
         GlassHelper.EnableDrag(this);
 
-        // Content
+        // Logo
+        var logoPicture = new PictureBox
+        {
+            Image = LogoHelper.CreateLogoBitmap(48),
+            Size = new Size(48, 48),
+            Location = new Point(24, 50),
+            SizeMode = PictureBoxSizeMode.Zoom,
+            BackColor = Color.Transparent
+        };
+        Controls.Add(logoPicture);
+
+        // Title next to logo
         var titleLabel = new Label
         {
             Text = "Кадеро Agent",
-            Location = new Point(24, 52),
+            Location = new Point(80, 54),
             AutoSize = true,
             Font = new Font("Segoe UI", 16, FontStyle.Bold),
             ForeColor = GlassHelper.AccentColor,
@@ -45,7 +59,7 @@ public class AboutDialog : Form
         var versionLabel = new Label
         {
             Text = $"Версия {GetType().Assembly.GetName().Version?.ToString() ?? "1.0.0"}",
-            Location = new Point(24, 85),
+            Location = new Point(80, 85),
             AutoSize = true,
             Font = new Font("Segoe UI", 9.5f),
             ForeColor = GlassHelper.TextSecondary,

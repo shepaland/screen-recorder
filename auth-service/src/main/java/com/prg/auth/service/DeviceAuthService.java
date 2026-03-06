@@ -59,6 +59,15 @@ public class DeviceAuthService {
     @Value("${prg.device.control-plane-base-url:}")
     private String controlPlaneBaseUrl;
 
+    @Value("${prg.device.default-resolution:720p}")
+    private String defaultResolution;
+
+    @Value("${prg.device.default-session-max-hours:24}")
+    private int defaultSessionMaxHours;
+
+    @Value("${prg.device.default-auto-start:true}")
+    private boolean defaultAutoStart;
+
     private final ConcurrentHashMap<String, List<Long>> loginAttempts = new ConcurrentHashMap<>();
 
     @Transactional
@@ -123,17 +132,17 @@ public class DeviceAuthService {
             throw new InvalidCredentialsException("Invalid username or password");
         }
 
-        // 4. Check role: TENANT_ADMIN or MANAGER
+        // 4. Check role: OWNER, TENANT_ADMIN, MANAGER, or SUPER_ADMIN
         List<String> userRoles = user.getRoles().stream().map(Role::getCode).toList();
-        boolean hasRequiredRole = userRoles.contains("TENANT_ADMIN") || userRoles.contains("MANAGER")
-                || userRoles.contains("SUPER_ADMIN");
+        boolean hasRequiredRole = userRoles.contains("OWNER") || userRoles.contains("TENANT_ADMIN")
+                || userRoles.contains("MANAGER") || userRoles.contains("SUPER_ADMIN");
         if (!hasRequiredRole) {
             recordLoginAttempt(rateLimitKey);
             auditService.logAction(tenantId, user.getId(), "DEVICE_LOGIN_FAILED", "AUTH", null,
                     Map.of("reason", "insufficient_role", "roles", userRoles.toString(),
                             "hardware_id", request.getDeviceInfo().getHardwareId()),
                     ipAddress, userAgent, getCorrelationId());
-            throw new AccessDeniedException("Insufficient role for device registration. Required: TENANT_ADMIN or MANAGER");
+            throw new AccessDeniedException("Insufficient role for device registration. Required: OWNER, TENANT_ADMIN or MANAGER");
         }
 
         loginAttempts.remove(rateLimitKey);
@@ -248,7 +257,16 @@ public class DeviceAuthService {
                 .settings(user.getSettings())
                 .build();
 
-        // Build server config
+        // Build server config with device-specific overrides from settings JSONB
+        Map<String, Object> deviceSettings = device.getSettings() != null ? device.getSettings() : Map.of();
+
+        String resolution = deviceSettings.containsKey("resolution")
+                ? String.valueOf(deviceSettings.get("resolution")) : defaultResolution;
+        Integer sessionMaxDurationHours = deviceSettings.containsKey("session_max_duration_hours")
+                ? toInteger(deviceSettings.get("session_max_duration_hours")) : defaultSessionMaxHours;
+        Boolean autoStart = deviceSettings.containsKey("auto_start")
+                ? toBoolean(deviceSettings.get("auto_start")) : defaultAutoStart;
+
         DeviceLoginResponse.ServerConfig serverConfig = DeviceLoginResponse.ServerConfig.builder()
                 .heartbeatIntervalSec(heartbeatIntervalSec)
                 .segmentDurationSec(segmentDurationSec)
@@ -256,6 +274,9 @@ public class DeviceAuthService {
                 .quality(quality)
                 .ingestBaseUrl(ingestBaseUrl)
                 .controlPlaneBaseUrl(controlPlaneBaseUrl)
+                .resolution(resolution)
+                .sessionMaxDurationHours(sessionMaxDurationHours)
+                .autoStart(autoStart)
                 .build();
 
         // 11. Return refresh_token in body
@@ -390,6 +411,20 @@ public class DeviceAuthService {
         if (cid != null) {
             try { return UUID.fromString(cid); } catch (IllegalArgumentException e) { return null; }
         }
+        return null;
+    }
+
+    private Integer toInteger(Object value) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value instanceof String) {
+            try { return Integer.parseInt((String) value); } catch (NumberFormatException e) { return null; }
+        }
+        return null;
+    }
+
+    private Boolean toBoolean(Object value) {
+        if (value instanceof Boolean) return (Boolean) value;
+        if (value instanceof String) return Boolean.parseBoolean((String) value);
         return null;
     }
 }

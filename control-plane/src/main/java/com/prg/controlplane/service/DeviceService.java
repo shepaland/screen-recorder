@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -195,10 +196,15 @@ public class DeviceService {
         log.debug("Heartbeat processed: device_id={}, status={}, commands_delivered={}",
                 deviceId, request.getStatus(), pendingCommands.size());
 
+        // Include device settings in response if present
+        Map<String, Object> deviceSettings = device.getSettings() != null && !device.getSettings().isEmpty()
+                ? device.getSettings() : null;
+
         return HeartbeatResponse.builder()
                 .serverTs(now)
                 .pendingCommands(pendingCommands.stream().map(this::toCommandResponse).toList())
                 .nextHeartbeatSec(defaultHeartbeatIntervalSec)
+                .deviceSettings(deviceSettings)
                 .build();
     }
 

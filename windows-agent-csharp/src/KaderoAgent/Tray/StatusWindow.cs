@@ -3,6 +3,7 @@ namespace KaderoAgent.Tray;
 using System.Windows.Forms;
 using System.Drawing;
 using KaderoAgent.Ipc;
+using KaderoAgent.Resources;
 
 /// <summary>
 /// Status window with glass/acrylic UI style.
@@ -60,7 +61,7 @@ public class StatusWindow : Form
         ShowInTaskbar = true;
         MaximizeBox = false;
         MinimizeBox = false;
-        Icon = SystemIcons.Application;
+        Icon = LogoHelper.CreateAppIcon(32);
 
         // Glass effect
         GlassHelper.ApplyGlassEffect(this);

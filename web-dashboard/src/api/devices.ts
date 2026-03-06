@@ -4,6 +4,7 @@ import type {
   DeviceDetailResponse,
   DeviceCommandResponse,
   CreateCommandRequest,
+  DeviceSettings,
 } from '../types/device';
 import type { PageResponse } from '../types/common';
 
@@ -45,6 +46,17 @@ export async function getDeviceCommands(
   const response = await cpApiClient.get<PageResponse<DeviceCommandResponse>>(
     `/devices/${deviceId}/commands`,
     { params },
+  );
+  return response.data;
+}
+
+export async function updateDeviceSettings(
+  deviceId: string,
+  settings: DeviceSettings,
+): Promise<DeviceDetailResponse> {
+  const response = await cpApiClient.put<DeviceDetailResponse>(
+    `/devices/${deviceId}`,
+    { settings },
   );
   return response.data;
 }

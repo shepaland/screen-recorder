@@ -3,6 +3,8 @@ namespace KaderoAgent.Tray;
 using System.Diagnostics;
 using System.Windows.Forms;
 using KaderoAgent.Ipc;
+using KaderoAgent.Resources;
+using KaderoAgent.Util;
 
 /// <summary>
 /// Tray application — UI shell for monitoring and configuring KaderoAgent Windows Service.
@@ -60,6 +62,20 @@ public class TrayApplication : ApplicationContext
         menu.Items.Add(restartItem);
 
         menu.Items.Add(new ToolStripSeparator());
+
+        var autoStartItem = new ToolStripMenuItem("Запускать при входе в систему")
+        {
+            Checked = AutoStartHelper.IsAutoStartEnabled(),
+            CheckOnClick = true
+        };
+        autoStartItem.CheckedChanged += (_, _) =>
+        {
+            if (autoStartItem.Checked)
+                AutoStartHelper.EnableAutoStart();
+            else
+                AutoStartHelper.DisableAutoStart();
+        };
+        menu.Items.Add(autoStartItem);
 
         var aboutItem = new ToolStripMenuItem("О программе");
         aboutItem.Click += OnAbout;

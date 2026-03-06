@@ -11,21 +11,22 @@ using System.Windows.Forms;
 /// </summary>
 public static class GlassHelper
 {
-    // ── Colors (dark glass theme with Alfa-Bank accent) ──
+    // ── Colors (dark glass theme, Tailwind CSS palette) ──
     public static readonly Color BackgroundColor = Color.FromArgb(200, 28, 28, 32);
-    public static readonly Color AccentColor = Color.FromArgb(229, 57, 53);       // #E53935
-    public static readonly Color AccentDark = Color.FromArgb(183, 28, 28);         // #B71C1C
+    public static readonly Color AccentColor = Color.FromArgb(220, 38, 38);        // Tailwind red-600 #dc2626
+    public static readonly Color AccentDark = Color.FromArgb(185, 28, 28);          // Tailwind red-700 #b91c1c
+    public static readonly Color AccentHover = Color.FromArgb(239, 68, 68);         // Tailwind red-500 #ef4444
     public static readonly Color TextPrimary = Color.White;
     public static readonly Color TextSecondary = Color.FromArgb(180, 255, 255, 255);
     public static readonly Color InputBackground = Color.FromArgb(60, 255, 255, 255);
     public static readonly Color InputBorder = Color.FromArgb(80, 255, 255, 255);
     public static readonly Color BorderColor = Color.FromArgb(60, 255, 255, 255);
     public static readonly Color SeparatorColor = Color.FromArgb(40, 255, 255, 255);
-    public static readonly Color StatusGreen = Color.FromArgb(76, 175, 80);
-    public static readonly Color StatusOrange = Color.FromArgb(255, 152, 0);
-    public static readonly Color StatusRed = Color.FromArgb(244, 67, 54);
-    public static readonly Color StatusYellow = Color.FromArgb(255, 193, 7);
-    public static readonly Color StatusGray = Color.FromArgb(158, 158, 158);
+    public static readonly Color StatusGreen = Color.FromArgb(22, 163, 74);         // Tailwind green-600 #16a34a
+    public static readonly Color StatusOrange = Color.FromArgb(234, 88, 12);        // Tailwind orange-600 #ea580c
+    public static readonly Color StatusRed = Color.FromArgb(220, 38, 38);           // Tailwind red-600 #dc2626
+    public static readonly Color StatusYellow = Color.FromArgb(202, 138, 4);        // Tailwind yellow-600 #ca8a04
+    public static readonly Color StatusGray = Color.FromArgb(156, 163, 175);        // Tailwind gray-400 #9ca3af
 
     // ── DWM APIs ──
 
@@ -136,7 +137,7 @@ public static class GlassHelper
     /// </summary>
     public static void PositionBottomRight(Form form, int margin = 12)
     {
-        var workArea = Screen.PrimaryScreen!.WorkingArea;
+        var workArea = Screen.FromPoint(Cursor.Position).WorkingArea;
         form.StartPosition = FormStartPosition.Manual;
         form.Location = new Point(
             workArea.Right - form.Width - margin,
@@ -145,11 +146,11 @@ public static class GlassHelper
     }
 
     /// <summary>
-    /// Position form at center of working area.
+    /// Position form at center of working area (uses monitor where cursor is located).
     /// </summary>
     public static void PositionCenter(Form form)
     {
-        var workArea = Screen.PrimaryScreen!.WorkingArea;
+        var workArea = Screen.FromPoint(Cursor.Position).WorkingArea;
         form.StartPosition = FormStartPosition.Manual;
         form.Location = new Point(
             workArea.Left + (workArea.Width - form.Width) / 2,
@@ -339,7 +340,7 @@ public static class GlassHelper
             Font = new Font("Segoe UI", 9.5f, FontStyle.Bold)
         };
         btn.FlatAppearance.BorderSize = 0;
-        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(239, 83, 80);  // lighter red
+        btn.FlatAppearance.MouseOverBackColor = AccentHover;
         btn.FlatAppearance.MouseDownBackColor = AccentDark;
         return btn;
     }

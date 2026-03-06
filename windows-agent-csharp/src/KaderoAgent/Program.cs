@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using KaderoAgent.Auth;
 using KaderoAgent.Capture;
 using KaderoAgent.Command;
@@ -10,9 +11,17 @@ using KaderoAgent.Util;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
+// P/Invoke for attaching to parent console (WinExe has no console by default)
+[DllImport("kernel32.dll")]
+static extern bool AttachConsole(int dwProcessId);
+const int ATTACH_PARENT_PROCESS = -1;
+
 // Glass UI test mode: create all windows, verify properties, exit.
 if (args.Contains("--test-ui"))
 {
+    AttachConsole(ATTACH_PARENT_PROCESS);
+
+    Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
     Application.EnableVisualStyles();
     Application.SetCompatibleTextRenderingDefault(false);
 
@@ -24,7 +33,7 @@ if (args.Contains("--test-ui"))
     }
 
     Console.WriteLine("=== GlassHelper ===");
-    Assert("AccentColor is #E53935", KaderoAgent.Tray.GlassHelper.AccentColor.R == 229 && KaderoAgent.Tray.GlassHelper.AccentColor.G == 57);
+    Assert("AccentColor is #dc2626", KaderoAgent.Tray.GlassHelper.AccentColor.R == 220 && KaderoAgent.Tray.GlassHelper.AccentColor.G == 38);
     Assert("TextPrimary is White", KaderoAgent.Tray.GlassHelper.TextPrimary == System.Drawing.Color.White);
     Assert("BackgroundColor alpha=200", KaderoAgent.Tray.GlassHelper.BackgroundColor.A == 200);
 
@@ -43,7 +52,7 @@ if (args.Contains("--test-ui"))
     Assert("Borderless", status.FormBorderStyle == System.Windows.Forms.FormBorderStyle.None);
     Assert("Size 480x720", status.Width == 480 && status.Height == 720);
     Assert("Manual position", status.StartPosition == System.Windows.Forms.FormStartPosition.Manual);
-    var wa = System.Windows.Forms.Screen.PrimaryScreen!.WorkingArea;
+    var wa = System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position).WorkingArea;
     var expectedX = wa.Right - status.Width - 12;
     var expectedY = wa.Bottom - status.Height - 12;
     Assert($"Bottom-right position ({status.Location.X},{status.Location.Y} vs {expectedX},{expectedY})",
@@ -61,8 +70,13 @@ if (args.Contains("--test-ui"))
 // No DI container needed -- TrayApplication creates PipeClient internally.
 if (args.Contains("--tray"))
 {
+    Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
     Application.EnableVisualStyles();
     Application.SetCompatibleTextRenderingDefault(false);
+
+    // Enable auto-start on first manual launch
+    KaderoAgent.Util.AutoStartHelper.EnableAutoStart();
+
     Application.Run(new KaderoAgent.Tray.TrayApplication());
     return;
 }
@@ -113,6 +127,8 @@ var host = builder.Build();
 // Saves server URL and token for later setup completion via SetupForm or Tray app.
 if (args.Contains("--register"))
 {
+    AttachConsole(ATTACH_PARENT_PROCESS);
+
     var serverUrl = args.FirstOrDefault(a => a.StartsWith("--server-url="))?.Split('=', 2)[1];
     var token = args.FirstOrDefault(a => a.StartsWith("--token="))?.Split('=', 2)[1];
 
@@ -133,6 +149,7 @@ if (args.Contains("--register"))
 if (!args.Contains("--service") &&
     (args.Contains("--setup") || !host.Services.GetRequiredService<CredentialStore>().HasCredentials()))
 {
+    Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
     Application.EnableVisualStyles();
     Application.SetCompatibleTextRenderingDefault(false);
     var form = new KaderoAgent.Tray.SetupForm(host.Services);

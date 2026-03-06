@@ -32,5 +32,8 @@ public class DeviceLoginResponse {
         private String quality;
         private String ingestBaseUrl;
         private String controlPlaneBaseUrl;
+        private String resolution;
+        private Integer sessionMaxDurationHours;
+        private Boolean autoStart;
     }
 }

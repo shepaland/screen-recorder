@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeftIcon } from '@heroicons/react/20/solid';
 import {
   PlayIcon,
@@ -7,13 +7,16 @@ import {
   ArrowPathIcon,
   Cog6ToothIcon,
   TrashIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
 } from '@heroicons/react/24/outline';
-import { getDevice, deleteDevice, restoreDevice, sendCommand } from '../api/devices';
-import type { DeviceDetailResponse, CreateCommandRequest } from '../types';
+import { getDevice, deleteDevice, restoreDevice, sendCommand, updateDeviceSettings } from '../api/devices';
+import type { DeviceDetailResponse, DeviceSettings, CreateCommandRequest } from '../types';
 import DeviceStatusBadge from '../components/DeviceStatusBadge';
 import StatusBadge from '../components/StatusBadge';
 import PermissionGate from '../components/PermissionGate';
 import ConfirmDialog from '../components/ConfirmDialog';
+import DeviceSettingsForm from '../components/DeviceSettingsForm';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useToast } from '../contexts/ToastContext';
 import { formatDateTime } from '../utils/format';
@@ -38,6 +41,7 @@ const commandTypeLabels: Record<string, string> = {
 export default function DeviceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { addToast } = useToast();
 
   const [device, setDevice] = useState<DeviceDetailResponse | null>(null);
@@ -46,6 +50,9 @@ export default function DeviceDetailPage() {
 
   // Delete dialog
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  // Recording settings section -- auto-expand if URL hash is #settings
+  const [showSettings, setShowSettings] = useState(location.hash === '#settings');
 
   const fetchDevice = useCallback(async () => {
     if (!id) return;
@@ -102,6 +109,17 @@ export default function DeviceDetailPage() {
       setDevice(updated);
     } catch {
       addToast('error', 'Не удалось восстановить устройство');
+    }
+  };
+
+  const handleSaveSettings = async (settings: DeviceSettings) => {
+    if (!id) return;
+    try {
+      const updated = await updateDeviceSettings(id, settings);
+      setDevice(updated);
+      addToast('success', 'Настройки записи сохранены');
+    } catch {
+      addToast('error', 'Не удалось сохранить настройки записи');
     }
   };
 
@@ -240,6 +258,68 @@ export default function DeviceDetailPage() {
           </div>
         </dl>
       </div>
+
+      {/* Recording settings section */}
+      <PermissionGate permission="DEVICES:UPDATE">
+        <div className="card mt-6">
+          <button
+            type="button"
+            onClick={() => setShowSettings(!showSettings)}
+            className="flex w-full items-center justify-between text-left"
+          >
+            <div className="flex items-center gap-2">
+              <Cog6ToothIcon className="h-5 w-5 text-gray-500" />
+              <h2 className="text-lg font-semibold text-gray-900">Настройки записи</h2>
+            </div>
+            {showSettings ? (
+              <ChevronDownIcon className="h-5 w-5 text-gray-400" />
+            ) : (
+              <ChevronRightIcon className="h-5 w-5 text-gray-400" />
+            )}
+          </button>
+          {!showSettings && device.settings && Object.keys(device.settings).length > 0 && (() => {
+            const s = device.settings as unknown as Partial<DeviceSettings>;
+            return (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {s.capture_fps != null && (
+                  <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
+                    {s.capture_fps} FPS
+                  </span>
+                )}
+                {s.resolution ? (
+                  <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
+                    {s.resolution}
+                  </span>
+                ) : null}
+                {s.quality ? (
+                  <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
+                    {s.quality}
+                  </span>
+                ) : null}
+                {s.auto_start != null && (
+                  <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
+                    Автостарт: {s.auto_start ? 'Да' : 'Нет'}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
+          {showSettings && (
+            <div className="mt-4 border-t border-gray-200 pt-4">
+              <DeviceSettingsForm
+                deviceId={device.id}
+                currentSettings={
+                  device.settings && Object.keys(device.settings).length > 0
+                    ? (device.settings as unknown as DeviceSettings)
+                    : null
+                }
+                onSave={handleSaveSettings}
+                onCancel={() => setShowSettings(false)}
+              />
+            </div>
+          )}
+        </div>
+      </PermissionGate>
 
       {/* Commands section */}
       <PermissionGate permission="DEVICES:COMMAND">

@@ -23,6 +23,7 @@ import TenantsPage from './pages/TenantsPage';
 import TenantCreatePage from './pages/TenantCreatePage';
 import RecordingsPage from './pages/RecordingsPage';
 import DownloadPage from './pages/DownloadPage';
+import RecordingSettingsPage from './pages/RecordingSettingsPage';
 
 function App() {
   return (
@@ -125,6 +126,16 @@ function App() {
           element={
             <ProtectedRoute permission="DEVICES:READ">
               <DeviceDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Recording Settings */}
+        <Route
+          path="/recording-settings"
+          element={
+            <ProtectedRoute permission="DEVICES:READ">
+              <RecordingSettingsPage />
             </ProtectedRoute>
           }
         />

@@ -75,6 +75,9 @@ prg:
     quality: ${DEVICE_QUALITY:medium}
     ingest-base-url: ${INGEST_BASE_URL:}
     control-plane-base-url: ${CONTROL_PLANE_BASE_URL:}
+    default-resolution: ${DEVICE_DEFAULT_RESOLUTION:720p}
+    default-session-max-hours: ${DEVICE_SESSION_MAX_HOURS:24}
+    default-auto-start: ${DEVICE_AUTO_START:true}
   oauth:
     yandex:
       client-id: ${YANDEX_OAUTH_CLIENT_ID:}

@@ -49,4 +49,5 @@ export type {
   DeviceCommandResponse,
   RecordingSessionResponse,
   CreateCommandRequest,
+  DeviceSettings,
 } from './device';
