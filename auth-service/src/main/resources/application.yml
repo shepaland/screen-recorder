@@ -103,6 +103,14 @@ prg:
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:80}
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+
 management:
   endpoints:
     web:

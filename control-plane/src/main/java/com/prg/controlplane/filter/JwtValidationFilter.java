@@ -35,7 +35,10 @@ public class JwtValidationFilter extends OncePerRequestFilter {
 
     private static final Set<String> PUBLIC_PATHS = Set.of(
             "/actuator/health",
-            "/actuator/info"
+            "/actuator/info",
+            "/v3/api-docs",
+            "/swagger-ui",
+            "/swagger-ui.html"
     );
 
     @Override

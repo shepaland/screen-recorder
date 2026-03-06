@@ -43,6 +43,14 @@ prg:
     bucket: ${S3_BUCKET:prg-segments}
     presign-expiry-sec: ${S3_PRESIGN_EXPIRY:300}
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+
 management:
   endpoints:
     web:

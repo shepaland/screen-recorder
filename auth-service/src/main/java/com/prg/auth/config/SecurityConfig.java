@@ -61,7 +61,10 @@ public class SecurityConfig {
                                 "/api/v1/auth/register/verify",
                                 "/api/v1/auth/register/resend",
                                 "/actuator/health",
-                                "/actuator/info"
+                                "/actuator/info",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
                         ).permitAll()
                         .requestMatchers("/api/v1/internal/**").hasRole("INTERNAL")
                         .anyRequest().authenticated()
