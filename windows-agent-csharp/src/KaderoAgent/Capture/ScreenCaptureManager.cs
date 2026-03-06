@@ -1,3 +1,5 @@
+using System.Security.AccessControl;
+using System.Security.Principal;
 using KaderoAgent.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -37,6 +39,24 @@ public class ScreenCaptureManager
         _outputDir = Path.Combine(_config.Value.DataPath, "segments", sessionId);
         Directory.CreateDirectory(_outputDir);
 
+        // Grant Users group write access so FFmpeg (running in user session) can write segments
+        try
+        {
+            var dirInfo = new DirectoryInfo(_outputDir);
+            var acl = dirInfo.GetAccessControl();
+            acl.AddAccessRule(new FileSystemAccessRule(
+                new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null),
+                FileSystemRights.FullControl,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None,
+                AccessControlType.Allow));
+            dirInfo.SetAccessControl(acl);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to set ACL on segments directory {Dir}", _outputDir);
+        }
+
         _currentFps = fps;
         _currentResolution = resolution;
 
@@ -51,10 +71,21 @@ public class ScreenCaptureManager
         var outputPattern = Path.Combine(_outputDir, "segment_%05d.mp4");
 
         // Build FFmpeg args with resolution scaling
+        // Supports both "1280x720" and shorthand "720p", "1080p", "480p"
         var scaleFilter = "";
-        if (!string.IsNullOrEmpty(resolution) && resolution.Contains('x'))
+        var resolvedRes = resolution?.Trim().ToLowerInvariant() switch
         {
-            var parts = resolution.Split('x');
+            "2160p" => "3840x2160",
+            "1440p" => "2560x1440",
+            "1080p" => "1920x1080",
+            "720p" => "1280x720",
+            "480p" => "854x480",
+            "360p" => "640x360",
+            _ => resolution
+        };
+        if (!string.IsNullOrEmpty(resolvedRes) && resolvedRes.Contains('x'))
+        {
+            var parts = resolvedRes.Split('x');
             if (parts.Length == 2 && int.TryParse(parts[0], out var w) && int.TryParse(parts[1], out var h))
             {
                 scaleFilter = $"-vf scale={w}:{h} ";

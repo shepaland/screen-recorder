@@ -36,8 +36,13 @@ public class FfmpegProcess
     {
         _logger.LogInformation("Running as service, launching FFmpeg in user session");
 
+        // Redirect FFmpeg stderr to a log file for diagnostics
+        var stderrLogPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "Kadero", "logs", "ffmpeg-stderr.log");
+
         var pid = InteractiveProcessLauncher.LaunchInUserSession(
-            _ffmpegPath, arguments, null, _logger);
+            _ffmpegPath, arguments, null, _logger, stderrLogPath);
 
         if (pid <= 0)
         {
@@ -50,6 +55,18 @@ public class FfmpegProcess
         {
             _process = Process.GetProcessById(pid);
             _logger.LogInformation("FFmpeg started in user session, PID={Pid}", pid);
+
+            // Wait briefly and check if FFmpeg crashed immediately (e.g., GDI access denied)
+            Thread.Sleep(2000);
+            if (_process.HasExited)
+            {
+                _logger.LogError("FFmpeg PID={Pid} exited within 2s (exit code: {ExitCode}). Check {StderrLog}",
+                    pid, _process.ExitCode, stderrLogPath);
+                _interactivePid = -1;
+                _process = null;
+                return false;
+            }
+
             return true;
         }
         catch (Exception ex)
