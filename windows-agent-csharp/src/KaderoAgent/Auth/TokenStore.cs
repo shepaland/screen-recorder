@@ -25,5 +25,11 @@ public class TokenStore
         set { lock (_lock) _accessTokenExpiry = value; }
     }
 
-    public bool IsAccessTokenExpired() => DateTime.UtcNow >= AccessTokenExpiry.AddMinutes(-2);
+    public bool IsAccessTokenExpired()
+    {
+        var expiry = AccessTokenExpiry;
+        // DateTime.MinValue.AddMinutes(-2) throws ArgumentOutOfRangeException
+        if (expiry == DateTime.MinValue) return true;
+        return DateTime.UtcNow >= expiry.AddMinutes(-2);
+    }
 }
