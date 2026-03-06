@@ -96,6 +96,7 @@ public class PipeServer : BackgroundService
                 try
                 {
                     var request = JsonSerializer.Deserialize<PipeRequest>(line, _jsonOptions);
+                    _logger.LogDebug("Pipe ← {Command}", request?.Command);
                     response = await ProcessRequestAsync(request!, ct);
                 }
                 catch (Exception ex)
@@ -105,6 +106,7 @@ public class PipeServer : BackgroundService
                 }
 
                 var json = JsonSerializer.Serialize(response, _jsonOptions);
+                _logger.LogDebug("Pipe → success={Success}", response.Success);
                 await writer.WriteLineAsync(json);
             }
         }

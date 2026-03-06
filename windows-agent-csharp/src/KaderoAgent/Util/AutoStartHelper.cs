@@ -17,8 +17,9 @@ namespace KaderoAgent.Util
             var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
             if (exePath == null) return;
             using var key = Registry.CurrentUser.OpenSubKey(RunKey, true);
-            // Launch main agent (not --tray). Agent will spawn tray process itself.
-            key?.SetValue(AppName, $"\"{exePath}\"");
+            // Launch --tray only from HKCU\Run. The Windows Service (host) is managed by sc.exe.
+            // This prevents a second host from competing with the service for PipeServer.
+            key?.SetValue(AppName, $"\"{exePath}\" --tray");
         }
 
         public static void DisableAutoStart()

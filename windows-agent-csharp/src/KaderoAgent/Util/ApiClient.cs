@@ -105,7 +105,9 @@ public class ApiClient
             {
                 // Clone request for retry
                 var clone = await CloneRequest(request);
+                _logger.LogDebug("HTTP {Method} {Url}", clone.Method, clone.RequestUri);
                 var response = await _http.SendAsync(clone, ct);
+                _logger.LogDebug("HTTP {Method} {Url} → {StatusCode}", clone.Method, clone.RequestUri, (int)response.StatusCode);
 
                 if (response.StatusCode != HttpStatusCode.ServiceUnavailable &&
                     response.StatusCode != HttpStatusCode.GatewayTimeout)

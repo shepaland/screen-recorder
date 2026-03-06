@@ -11,6 +11,13 @@ using KaderoAgent.Util;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
+// Configure log4net — set log path before loading config
+var logPath = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+    "Kadero", "logs");
+Directory.CreateDirectory(logPath);
+log4net.GlobalContext.Properties["LogPath"] = logPath;
+
 // P/Invoke for attaching to parent console (WinExe has no console by default)
 [DllImport("kernel32.dll")]
 static extern bool AttachConsole(int dwProcessId);
@@ -108,6 +115,10 @@ var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
 
 // Configuration
 builder.Services.Configure<AgentConfig>(builder.Configuration.GetSection("Agent"));
+
+// Add log4net as logging provider
+var log4netConfigPath = Path.Combine(AppContext.BaseDirectory, "log4net.config");
+builder.Logging.AddLog4Net(log4netConfigPath);
 
 // Core services
 builder.Services.AddSingleton<CredentialStore>();
@@ -256,6 +267,15 @@ if (!args.Contains("--service"))
             catch { /* non-fatal: tray is optional */ }
         }
     }
+}
+
+// Ensure only one agent host runs at a time (Windows Service OR standalone).
+// If service is already running, this process should not start another host.
+using var hostMutex = new Mutex(false, @"Global\KaderoAgentHost", out var isFirstInstance);
+if (!isFirstInstance && !args.Contains("--service"))
+{
+    // Service already running. Tray was launched above. Exit gracefully.
+    return;
 }
 
 await host.RunAsync();
