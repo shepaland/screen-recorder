@@ -17,67 +17,83 @@ static extern bool AttachConsole(int dwProcessId);
 const int ATTACH_PARENT_PROCESS = -1;
 
 // Glass UI test mode: create all windows, verify properties, exit.
+// Must run on STA thread because top-level await (line 236) makes Main async → MTA.
 if (args.Contains("--test-ui"))
 {
     AttachConsole(ATTACH_PARENT_PROCESS);
 
-    Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
-    Application.EnableVisualStyles();
-    Application.SetCompatibleTextRenderingDefault(false);
+    var exitCode = 0;
+    var staThread = new Thread(() =>
+    {
+        Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
 
-    var passed = 0;
-    var failed = 0;
-    void Assert(string name, bool condition) {
-        if (condition) { Console.WriteLine($"  PASS: {name}"); passed++; }
-        else { Console.WriteLine($"  FAIL: {name}"); failed++; }
-    }
+        var passed = 0;
+        var failed = 0;
+        void Assert(string name, bool condition) {
+            if (condition) { Console.WriteLine($"  PASS: {name}"); passed++; }
+            else { Console.WriteLine($"  FAIL: {name}"); failed++; }
+        }
 
-    Console.WriteLine("=== GlassHelper ===");
-    Assert("AccentColor is #dc2626", KaderoAgent.Tray.GlassHelper.AccentColor.R == 220 && KaderoAgent.Tray.GlassHelper.AccentColor.G == 38);
-    Assert("TextPrimary is White", KaderoAgent.Tray.GlassHelper.TextPrimary == System.Drawing.Color.White);
-    Assert("BackgroundColor alpha=200", KaderoAgent.Tray.GlassHelper.BackgroundColor.A == 200);
+        Console.WriteLine("=== GlassHelper ===");
+        Assert("AccentColor is #dc2626", KaderoAgent.Tray.GlassHelper.AccentColor.R == 220 && KaderoAgent.Tray.GlassHelper.AccentColor.G == 38);
+        Assert("TextPrimary is White", KaderoAgent.Tray.GlassHelper.TextPrimary == System.Drawing.Color.White);
+        Assert("BackgroundColor alpha=200", KaderoAgent.Tray.GlassHelper.BackgroundColor.A == 200);
 
-    Console.WriteLine("=== AboutDialog ===");
-    var about = new KaderoAgent.Tray.AboutDialog();
-    Assert("Title is 'О программе'", about.Text == "О программе");
-    Assert("Borderless", about.FormBorderStyle == System.Windows.Forms.FormBorderStyle.None);
-    Assert("Size 350x220", about.Width == 350 && about.Height == 220);
-    Assert("Has controls", about.Controls.Count >= 4);
-    about.Dispose();
+        Console.WriteLine("=== AboutDialog ===");
+        var about = new KaderoAgent.Tray.AboutDialog();
+        Assert("Title is 'О программе'", about.Text == "О программе");
+        Assert("Borderless", about.FormBorderStyle == System.Windows.Forms.FormBorderStyle.None);
+        Assert("Size 350x220", about.Width == 350 && about.Height == 220);
+        Assert("Has controls", about.Controls.Count >= 4);
+        about.Dispose();
 
-    Console.WriteLine("=== StatusWindow ===");
-    var pipe = new KaderoAgent.Ipc.PipeClient();
-    var status = new KaderoAgent.Tray.StatusWindow(pipe, () => {});
-    Assert("Title contains 'Кадеро'", status.Text.Contains("Кадеро"));
-    Assert("Borderless", status.FormBorderStyle == System.Windows.Forms.FormBorderStyle.None);
-    Assert("Size 480x720", status.Width == 480 && status.Height == 720);
-    Assert("Manual position", status.StartPosition == System.Windows.Forms.FormStartPosition.Manual);
-    var wa = System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position).WorkingArea;
-    var expectedX = wa.Right - status.Width - 12;
-    var expectedY = wa.Bottom - status.Height - 12;
-    Assert($"Bottom-right position ({status.Location.X},{status.Location.Y} vs {expectedX},{expectedY})",
-        Math.Abs(status.Location.X - expectedX) < 5 && Math.Abs(status.Location.Y - expectedY) < 5);
-    Assert("Has many controls", status.Controls.Count >= 20);
-    status.Dispose();
-    pipe.Dispose();
+        Console.WriteLine("=== StatusWindow ===");
+        var pipe = new KaderoAgent.Ipc.PipeClient();
+        var status = new KaderoAgent.Tray.StatusWindow(pipe, () => {});
+        Assert("Title contains 'Кадеро'", status.Text.Contains("Кадеро"));
+        Assert("Borderless", status.FormBorderStyle == System.Windows.Forms.FormBorderStyle.None);
+        Assert("Size 480x720", status.Width == 480 && status.Height == 720);
+        Assert("Manual position", status.StartPosition == System.Windows.Forms.FormStartPosition.Manual);
+        var wa = System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position).WorkingArea;
+        var expectedX = wa.Right - status.Width - 12;
+        var expectedY = wa.Bottom - status.Height - 12;
+        Assert($"Bottom-right position ({status.Location.X},{status.Location.Y} vs {expectedX},{expectedY})",
+            Math.Abs(status.Location.X - expectedX) < 5 && Math.Abs(status.Location.Y - expectedY) < 5);
+        Assert("Has many controls", status.Controls.Count >= 20);
+        status.Dispose();
+        pipe.Dispose();
 
-    Console.WriteLine($"\n=== Results: {passed} PASSED, {failed} FAILED ===");
-    Environment.ExitCode = failed > 0 ? 1 : 0;
+        Console.WriteLine($"\n=== Results: {passed} PASSED, {failed} FAILED ===");
+        exitCode = failed > 0 ? 1 : 0;
+    });
+    staThread.SetApartmentState(ApartmentState.STA);
+    staThread.Start();
+    staThread.Join();
+    Environment.ExitCode = exitCode;
     return;
 }
 
 // Tray mode: separate process communicating with Service via Named Pipe.
 // No DI container needed -- TrayApplication creates PipeClient internally.
+// Must run on STA thread — ContextMenuStrip requires STA for COM message pump.
 if (args.Contains("--tray"))
 {
-    Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
-    Application.EnableVisualStyles();
-    Application.SetCompatibleTextRenderingDefault(false);
+    var staThread = new Thread(() =>
+    {
+        Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
 
-    // Enable auto-start on first manual launch
-    KaderoAgent.Util.AutoStartHelper.EnableAutoStart();
+        // Enable auto-start on first manual launch
+        KaderoAgent.Util.AutoStartHelper.EnableAutoStart();
 
-    Application.Run(new KaderoAgent.Tray.TrayApplication());
+        Application.Run(new KaderoAgent.Tray.TrayApplication());
+    });
+    staThread.SetApartmentState(ApartmentState.STA);
+    staThread.Start();
+    staThread.Join();
     return;
 }
 
@@ -178,17 +194,26 @@ if (args.Contains("--register"))
 }
 
 // If --setup flag or no credentials, show setup form (not in service mode)
+// Must run on STA thread — WinForms requires STA for proper COM interop.
 if (!args.Contains("--service") &&
     (args.Contains("--setup") || !host.Services.GetRequiredService<CredentialStore>().HasCredentials()))
 {
-    Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
-    Application.EnableVisualStyles();
-    Application.SetCompatibleTextRenderingDefault(false);
-    var form = new KaderoAgent.Tray.SetupForm(host.Services);
-    Application.Run(form);
+    var setupCompleted = false;
+    var staThread = new Thread(() =>
+    {
+        Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
+        var form = new KaderoAgent.Tray.SetupForm(host.Services);
+        Application.Run(form);
+        setupCompleted = host.Services.GetRequiredService<CredentialStore>().HasCredentials();
+    });
+    staThread.SetApartmentState(ApartmentState.STA);
+    staThread.Start();
+    staThread.Join();
 
     // After setup, if credentials saved, enable auto-start and continue
-    if (!host.Services.GetRequiredService<CredentialStore>().HasCredentials())
+    if (!setupCompleted)
         return;
 
     // Enable tray auto-start after successful setup
