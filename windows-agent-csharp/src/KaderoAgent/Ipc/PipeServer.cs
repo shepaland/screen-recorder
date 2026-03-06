@@ -65,8 +65,9 @@ public class PipeServer : BackgroundService
                     PipeOptions.Asynchronous,
                     0, 0, pipeSecurity);
 
+                _logger.LogInformation("PipeServer waiting for connection...");
                 await server.WaitForConnectionAsync(ct);
-                _logger.LogDebug("Pipe client connected");
+                _logger.LogInformation("Pipe client connected");
 
                 // Handle in background — HandleClientAsync owns disposal of server
                 _ = HandleClientAsync(server, ct);
@@ -82,21 +83,26 @@ public class PipeServer : BackgroundService
 
     private async Task HandleClientAsync(NamedPipeServerStream server, CancellationToken ct)
     {
+        _logger.LogInformation("HandleClient: start, IsConnected={Connected}", server.IsConnected);
         try
         {
-            using var reader = new StreamReader(server, Encoding.UTF8);
-            using var writer = new StreamWriter(server, Encoding.UTF8) { AutoFlush = true };
+            var noBomUtf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+            var reader = new StreamReader(server, noBomUtf8, leaveOpen: true);
+            var writer = new StreamWriter(server, noBomUtf8, leaveOpen: true) { AutoFlush = true };
+            _logger.LogInformation("HandleClient: reader/writer created (no BOM)");
 
             while (server.IsConnected && !ct.IsCancellationRequested)
             {
+                _logger.LogInformation("HandleClient: waiting for line...");
                 var line = await reader.ReadLineAsync(ct);
-                if (line == null) break; // client disconnected
+                _logger.LogInformation("HandleClient: got line={Line}", line?.Length > 100 ? line[..100] : line);
+                if (line == null) break;
 
                 PipeResponse response;
                 try
                 {
                     var request = JsonSerializer.Deserialize<PipeRequest>(line, _jsonOptions);
-                    _logger.LogDebug("Pipe ← {Command}", request?.Command);
+                    _logger.LogInformation("Pipe ← {Command}", request?.Command);
                     response = await ProcessRequestAsync(request!, ct);
                 }
                 catch (Exception ex)
@@ -106,18 +112,21 @@ public class PipeServer : BackgroundService
                 }
 
                 var json = JsonSerializer.Serialize(response, _jsonOptions);
-                _logger.LogDebug("Pipe → success={Success}", response.Success);
+                _logger.LogInformation("Pipe → {Len} bytes", json.Length);
                 await writer.WriteLineAsync(json);
+                _logger.LogInformation("HandleClient: response sent");
             }
+            _logger.LogInformation("HandleClient: loop ended");
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Pipe client disconnected");
+            _logger.LogError(ex, "HandleClient error");
         }
         finally
         {
             try { if (server.IsConnected) server.Disconnect(); } catch { }
             server.Dispose();
+            _logger.LogInformation("HandleClient: disposed");
         }
     }
 

@@ -19,6 +19,13 @@ var logPath = Path.Combine(
 try { Directory.CreateDirectory(logPath); } catch { /* ACL may not be set yet during install */ }
 log4net.GlobalContext.Properties["LogPath"] = logPath;
 
+// Initialize log4net directly (for --tray and --test-ui which exit before Host builder)
+var log4netCfg = Path.Combine(AppContext.BaseDirectory, "log4net.config");
+if (File.Exists(log4netCfg))
+{
+    log4net.Config.XmlConfigurator.Configure(new FileInfo(log4netCfg));
+}
+
 // P/Invoke for attaching to parent console (WinExe has no console by default)
 [DllImport("kernel32.dll")]
 static extern bool AttachConsole(int dwProcessId);

@@ -44,8 +44,9 @@ public class PipeClient : IDisposable
             _log.Info($"Pipe connecting to {PipeProtocol.PipeName}...");
             var pipe = new NamedPipeClientStream(".", PipeProtocol.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
             await pipe.ConnectAsync(timeoutMs).ConfigureAwait(false);
-            var reader = new StreamReader(pipe, Encoding.UTF8);
-            var writer = new StreamWriter(pipe, Encoding.UTF8) { AutoFlush = true };
+            var noBomUtf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+            var reader = new StreamReader(pipe, noBomUtf8);
+            var writer = new StreamWriter(pipe, noBomUtf8) { AutoFlush = true };
 
             lock (_pipeLock)
             {
