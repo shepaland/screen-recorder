@@ -1,6 +1,7 @@
 package com.prg.auth.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -13,5 +14,6 @@ import lombok.NoArgsConstructor;
 public class ValidateRegistrationTokenRequest {
 
     @NotBlank(message = "Registration token is required")
+    @Size(max = 255, message = "Registration token must not exceed 255 characters")
     private String registrationToken;
 }

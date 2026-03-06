@@ -46,9 +46,11 @@ public class DeviceAuthController {
 
     @PostMapping("/validate-registration-token")
     public ResponseEntity<ValidateRegistrationTokenResponse> validateRegistrationToken(
-            @Valid @RequestBody ValidateRegistrationTokenRequest request) {
+            @Valid @RequestBody ValidateRegistrationTokenRequest request,
+            HttpServletRequest httpRequest) {
+        String ipAddress = getClientIp(httpRequest);
         ValidateRegistrationTokenResponse response = deviceAuthService.validateRegistrationToken(
-                request.getRegistrationToken());
+                request.getRegistrationToken(), ipAddress);
         return ResponseEntity.ok(response);
     }
 

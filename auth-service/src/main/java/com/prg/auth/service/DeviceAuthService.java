@@ -107,6 +107,10 @@ public class DeviceAuthService {
         User user;
         if (hasCredentials) {
             // 3a. Validate username + password in tenant context (backward compatibility)
+            if (request.getUsername().length() < 3) {
+                recordLoginAttempt(rateLimitKey);
+                throw new InvalidCredentialsException("Invalid username or password");
+            }
             user = userRepository.findByTenantIdAndUsername(tenantId, request.getUsername())
                     .orElse(null);
 
@@ -409,11 +413,16 @@ public class DeviceAuthService {
      * Returns token validity status along with tenant and token metadata.
      */
     @Transactional(readOnly = true)
-    public ValidateRegistrationTokenResponse validateRegistrationToken(String rawToken) {
+    public ValidateRegistrationTokenResponse validateRegistrationToken(String rawToken, String ipAddress) {
+        // Rate limit by IP to prevent token enumeration
+        String rateLimitKey = ipAddress + ":validate-token";
+        checkRateLimit(rateLimitKey);
+
         String tokenHash = AuthService.sha256(rawToken);
         Optional<DeviceRegistrationToken> optToken = registrationTokenRepository.findByTokenHash(tokenHash);
 
         if (optToken.isEmpty()) {
+            recordLoginAttempt(rateLimitKey);
             return ValidateRegistrationTokenResponse.builder()
                     .valid(false)
                     .reason("INVALID_TOKEN")
@@ -422,33 +431,32 @@ public class DeviceAuthService {
 
         DeviceRegistrationToken regToken = optToken.get();
 
+        // For invalid states, do NOT expose tenant_name/token_name (security: information disclosure)
         if (!regToken.getIsActive()) {
+            recordLoginAttempt(rateLimitKey);
             return ValidateRegistrationTokenResponse.builder()
                     .valid(false)
-                    .tenantName(regToken.getTenant().getName())
-                    .tokenName(regToken.getName())
                     .reason("TOKEN_INACTIVE")
                     .build();
         }
 
         if (regToken.getExpiresAt() != null && regToken.getExpiresAt().isBefore(Instant.now())) {
+            recordLoginAttempt(rateLimitKey);
             return ValidateRegistrationTokenResponse.builder()
                     .valid(false)
-                    .tenantName(regToken.getTenant().getName())
-                    .tokenName(regToken.getName())
                     .reason("TOKEN_EXPIRED")
                     .build();
         }
 
         if (regToken.getMaxUses() != null && regToken.getCurrentUses() >= regToken.getMaxUses()) {
+            recordLoginAttempt(rateLimitKey);
             return ValidateRegistrationTokenResponse.builder()
                     .valid(false)
-                    .tenantName(regToken.getTenant().getName())
-                    .tokenName(regToken.getName())
                     .reason("TOKEN_EXHAUSTED")
                     .build();
         }
 
+        // Only expose tenant/token metadata for valid tokens
         return ValidateRegistrationTokenResponse.builder()
                 .valid(true)
                 .tenantName(regToken.getTenant().getName())

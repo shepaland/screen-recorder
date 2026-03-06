@@ -15,12 +15,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class DeviceLoginRequest {
 
-    @Size(min = 3, max = 255, message = "Username must be between 3 and 255 characters")
+    @Size(max = 255, message = "Username must not exceed 255 characters")
     private String username;
 
     private String password;
 
     @NotBlank(message = "Registration token is required")
+    @Size(max = 255, message = "Registration token must not exceed 255 characters")
     private String registrationToken;
 
     @NotNull(message = "Device info is required")
