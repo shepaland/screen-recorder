@@ -1,7 +1,9 @@
 namespace KaderoAgent.Tray;
 
-using System.Windows.Forms;
 using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Management;
+using System.Windows.Forms;
 using KaderoAgent.Ipc;
 using KaderoAgent.Resources;
 
@@ -17,6 +19,13 @@ public class StatusWindow : Form
     private readonly PipeClient _pipeClient;
     private readonly Action _onReconnect;
 
+    // Service status
+    private Label _serviceStatusLabel = null!;
+    private Panel _serviceIndicator = null!;
+    private Panel _progressPanel = null!;
+    private int _progressOffset;
+    private System.Windows.Forms.Timer? _progressAnimTimer;
+
     // Status indicators
     private Label _connectionStatusLabel = null!;
     private Panel _connectionIndicator = null!;
@@ -26,8 +35,11 @@ public class StatusWindow : Form
     // Read-only parameters
     private Label _fpsValue = null!;
     private Label _qualityValue = null!;
+    private Label _resolutionValue = null!;
     private Label _segmentValue = null!;
     private Label _heartbeatValue = null!;
+    private Label _autoStartValue = null!;
+    private Label _maxSessionValue = null!;
     private Label _deviceIdValue = null!;
 
     // Metrics
@@ -59,7 +71,7 @@ public class StatusWindow : Form
     private void InitializeComponent()
     {
         Text = "Кадеро — Статус агента";
-        Size = new Size(480, 650);
+        Size = new Size(480, 720);
         ShowInTaskbar = true;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -98,7 +110,26 @@ public class StatusWindow : Form
         Controls.Add(_recordingIndicator);
         _recordingStatusLabel = GlassHelper.CreateLabel("Неизвестно", left + 22, y, 300);
         Controls.Add(_recordingStatusLabel);
-        y += 30;
+        y += 24;
+
+        // Service status
+        _serviceIndicator = GlassHelper.CreateIndicator(left, y, GlassHelper.StatusGray);
+        Controls.Add(_serviceIndicator);
+        _serviceStatusLabel = GlassHelper.CreateLabel("Служба: неизвестно", left + 22, y, 300);
+        Controls.Add(_serviceStatusLabel);
+        y += 22;
+
+        // Progress bar (hidden by default, shown during service start/stop)
+        _progressPanel = new Panel
+        {
+            Location = new Point(left, y),
+            Size = new Size(fullWidth, 3),
+            BackColor = Color.Transparent,
+            Visible = false
+        };
+        _progressPanel.Paint += PaintProgressBar;
+        Controls.Add(_progressPanel);
+        y += 10;
 
         // Separator
         Controls.Add(GlassHelper.CreateSeparator(left, y, fullWidth));
@@ -124,6 +155,11 @@ public class StatusWindow : Form
         Controls.Add(_qualityValue);
         y += 22;
 
+        Controls.Add(GlassHelper.CreateLabel("Разрешение", left, y, 140, secondary: true));
+        _resolutionValue = GlassHelper.CreateLabel("—", valX, y, 200);
+        Controls.Add(_resolutionValue);
+        y += 22;
+
         Controls.Add(GlassHelper.CreateLabel("Сегмент", left, y, 140, secondary: true));
         _segmentValue = GlassHelper.CreateLabel("—", valX, y, 200);
         Controls.Add(_segmentValue);
@@ -132,6 +168,16 @@ public class StatusWindow : Form
         Controls.Add(GlassHelper.CreateLabel("Heartbeat", left, y, 140, secondary: true));
         _heartbeatValue = GlassHelper.CreateLabel("—", valX, y, 200);
         Controls.Add(_heartbeatValue);
+        y += 22;
+
+        Controls.Add(GlassHelper.CreateLabel("Автостарт", left, y, 140, secondary: true));
+        _autoStartValue = GlassHelper.CreateLabel("—", valX, y, 200);
+        Controls.Add(_autoStartValue);
+        y += 22;
+
+        Controls.Add(GlassHelper.CreateLabel("Макс. сессия", left, y, 140, secondary: true));
+        _maxSessionValue = GlassHelper.CreateLabel("—", valX, y, 200);
+        Controls.Add(_maxSessionValue);
         y += 28;
 
         // Separator
@@ -225,7 +271,9 @@ public class StatusWindow : Form
                 var connected = _pipeClient.ConnectAsync(1000).GetAwaiter().GetResult();
                 if (!connected)
                 {
-                    MarshalSetDisconnectedState();
+                    // Check actual Windows service state
+                    var svcState = QueryServiceState();
+                    MarshalSetDisconnectedState(svcState);
                     return;
                 }
             }
@@ -233,14 +281,15 @@ public class StatusWindow : Form
             var status = _pipeClient.GetStatusAsync().GetAwaiter().GetResult();
             if (status == null)
             {
-                MarshalSetDisconnectedState();
+                var svcState = QueryServiceState();
+                MarshalSetDisconnectedState(svcState);
                 return;
             }
             MarshalUpdateUI(status);
         }
         catch
         {
-            MarshalSetDisconnectedState();
+            MarshalSetDisconnectedState("unknown");
         }
         finally
         {
@@ -248,10 +297,34 @@ public class StatusWindow : Form
         }
     }
 
-    private void MarshalSetDisconnectedState()
+    /// <summary>
+    /// Query Windows service state via WMI. Runs on thread pool.
+    /// Returns: "Running", "Stopped", "Start Pending", "Stop Pending", "not_installed", "error"
+    /// </summary>
+    private static string QueryServiceState()
+    {
+        try
+        {
+            using var searcher = new ManagementObjectSearcher(
+                "SELECT State FROM Win32_Service WHERE Name = 'KaderoAgent'");
+            foreach (ManagementObject obj in searcher.Get())
+            {
+                var state = obj["State"]?.ToString() ?? "unknown";
+                obj.Dispose();
+                return state;
+            }
+            return "not_installed";
+        }
+        catch
+        {
+            return "error";
+        }
+    }
+
+    private void MarshalSetDisconnectedState(string serviceState)
     {
         if (IsDisposed) return;
-        try { BeginInvoke(SetDisconnectedState); }
+        try { BeginInvoke(() => SetDisconnectedState(serviceState)); }
         catch (ObjectDisposedException) { }
         catch (InvalidOperationException) { }
     }
@@ -264,7 +337,7 @@ public class StatusWindow : Form
         catch (InvalidOperationException) { }
     }
 
-    private void SetDisconnectedState()
+    private void SetDisconnectedState(string serviceState)
     {
         _connectionStatusLabel.Text = "Нет связи с сервисом";
         _connectionIndicator.BackColor = GlassHelper.StatusGray;
@@ -272,6 +345,93 @@ public class StatusWindow : Form
         _recordingStatusLabel.Text = "Неизвестно";
         _recordingIndicator.BackColor = GlassHelper.StatusGray;
         _recordingIndicator.Invalidate();
+
+        UpdateServiceStatus(serviceState);
+    }
+
+    private void UpdateServiceStatus(string serviceState)
+    {
+        switch (serviceState)
+        {
+            case "Running":
+                _serviceStatusLabel.Text = "Служба: запущена";
+                _serviceIndicator.BackColor = GlassHelper.StatusGreen;
+                ShowProgress(false);
+                break;
+            case "Start Pending":
+            case "Continue Pending":
+                _serviceStatusLabel.Text = "Служба: запускается...";
+                _serviceIndicator.BackColor = GlassHelper.StatusYellow;
+                ShowProgress(true);
+                break;
+            case "Stop Pending":
+            case "Pause Pending":
+                _serviceStatusLabel.Text = "Служба: останавливается...";
+                _serviceIndicator.BackColor = GlassHelper.StatusYellow;
+                ShowProgress(true);
+                break;
+            case "Stopped":
+            case "Paused":
+                _serviceStatusLabel.Text = "Служба: остановлена";
+                _serviceIndicator.BackColor = GlassHelper.TextPrimary; // White
+                ShowProgress(false);
+                break;
+            case "not_installed":
+                _serviceStatusLabel.Text = "Служба: не установлена";
+                _serviceIndicator.BackColor = GlassHelper.StatusGray;
+                ShowProgress(false);
+                break;
+            default: // "error", "unknown"
+                _serviceStatusLabel.Text = "Служба: ошибка";
+                _serviceIndicator.BackColor = GlassHelper.StatusRed;
+                ShowProgress(false);
+                break;
+        }
+        _serviceIndicator.Invalidate();
+    }
+
+    private void ShowProgress(bool show)
+    {
+        _progressPanel.Visible = show;
+        if (show)
+        {
+            if (_progressAnimTimer == null)
+            {
+                _progressAnimTimer = new System.Windows.Forms.Timer { Interval = 40 };
+                _progressAnimTimer.Tick += (_, _) =>
+                {
+                    _progressOffset = (_progressOffset + 4) % (_progressPanel.Width + 120);
+                    _progressPanel.Invalidate();
+                };
+            }
+            _progressAnimTimer.Start();
+        }
+        else
+        {
+            _progressAnimTimer?.Stop();
+        }
+    }
+
+    private void PaintProgressBar(object? sender, PaintEventArgs e)
+    {
+        var w = _progressPanel.Width;
+        var h = _progressPanel.Height;
+
+        // Background track
+        using var bgBrush = new SolidBrush(Color.FromArgb(30, 255, 255, 255));
+        e.Graphics.FillRectangle(bgBrush, 0, 0, w, h);
+
+        // Moving bar
+        var barWidth = w / 4;
+        var x = _progressOffset - barWidth;
+        if (x < w)
+        {
+            var drawX = Math.Max(0, x);
+            var drawW = Math.Min(barWidth, w - drawX);
+            if (x < 0) drawW = barWidth + x;
+            using var barBrush = new SolidBrush(GlassHelper.StatusYellow);
+            e.Graphics.FillRectangle(barBrush, drawX, 0, drawW, h);
+        }
     }
 
     private void UpdateUI(AgentStatus status)
@@ -316,6 +476,9 @@ public class StatusWindow : Form
         }
         _recordingIndicator.Invalidate();
 
+        // Service: pipe connected = service running
+        UpdateServiceStatus("Running");
+
         _deviceIdValue.Text = status.DeviceId ?? "—";
         _fpsValue.Text = status.CaptureFps > 0 ? $"{status.CaptureFps} кадров/сек" : "—";
         _qualityValue.Text = status.Quality switch
@@ -325,8 +488,11 @@ public class StatusWindow : Form
             "high" => "Высокое",
             _ => status.Quality ?? "—"
         };
+        _resolutionValue.Text = !string.IsNullOrEmpty(status.Resolution) ? status.Resolution : "—";
         _segmentValue.Text = status.SegmentDurationSec > 0 ? $"{status.SegmentDurationSec} сек" : "—";
         _heartbeatValue.Text = status.HeartbeatIntervalSec > 0 ? $"{status.HeartbeatIntervalSec} сек" : "—";
+        _autoStartValue.Text = status.AutoStart ? "Да" : "Нет";
+        _maxSessionValue.Text = status.SessionMaxDurationHours > 0 ? $"{status.SessionMaxDurationHours} ч" : "—";
 
         _cpuValue.Text = $"{status.CpuPercent:F1}%";
         _memoryValue.Text = $"{status.MemoryMb:F0} МБ";
@@ -398,11 +564,14 @@ public class StatusWindow : Form
         {
             e.Cancel = true;
             _refreshTimer?.Change(Timeout.Infinite, Timeout.Infinite); // Stop timer while hidden
+            _progressAnimTimer?.Stop();
             Hide();
             return;
         }
         _refreshTimer?.Dispose();
         _refreshTimer = null;
+        _progressAnimTimer?.Dispose();
+        _progressAnimTimer = null;
         base.OnFormClosing(e);
     }
 

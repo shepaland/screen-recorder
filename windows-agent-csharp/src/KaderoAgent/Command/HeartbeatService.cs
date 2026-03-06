@@ -1,3 +1,4 @@
+using System.Text.Json;
 using KaderoAgent.Auth;
 using KaderoAgent.Capture;
 using KaderoAgent.Configuration;
@@ -86,6 +87,12 @@ public class HeartbeatService : BackgroundService
                     asp.SetLastError(null);
                 }
 
+                // Apply device_settings from heartbeat response
+                if (response?.DeviceSettings is { Count: > 0 } ds)
+                {
+                    ApplyDeviceSettings(ds);
+                }
+
                 // Process pending commands
                 if (response?.PendingCommands != null)
                 {
@@ -112,6 +119,41 @@ public class HeartbeatService : BackgroundService
             await Task.Delay(TimeSpan.FromSeconds(interval), ct);
         }
     }
+
+    private void ApplyDeviceSettings(Dictionary<string, JsonElement> ds)
+    {
+        try
+        {
+            var cfg = _authManager.ServerConfig ?? new ServerConfig();
+            var changed = false;
+
+            if (ds.TryGetValue("capture_fps", out var fpsEl) && fpsEl.TryGetInt32(out var fps) && fps > 0)
+            { cfg.CaptureFps = fps; changed = true; }
+            if (ds.TryGetValue("resolution", out var resEl) && resEl.GetString() is string res && res.Length > 0)
+            { cfg.Resolution = res; changed = true; }
+            if (ds.TryGetValue("quality", out var qEl) && qEl.GetString() is string q && q.Length > 0)
+            { cfg.Quality = q; changed = true; }
+            if (ds.TryGetValue("segment_duration_sec", out var segEl) && segEl.TryGetInt32(out var seg) && seg > 0)
+            { cfg.SegmentDurationSec = seg; changed = true; }
+            if (ds.TryGetValue("auto_start", out var autoEl))
+            { cfg.AutoStart = autoEl.GetBoolean(); changed = true; }
+            if (ds.TryGetValue("session_max_duration_hours", out var maxEl) && maxEl.TryGetInt32(out var max) && max > 0)
+            { cfg.SessionMaxDurationHours = max; changed = true; }
+            if (ds.TryGetValue("heartbeat_interval_sec", out var hbEl) && hbEl.TryGetInt32(out var hb) && hb > 0)
+            { cfg.HeartbeatIntervalSec = hb; changed = true; }
+
+            if (changed)
+            {
+                _authManager.UpdateServerConfig(cfg);
+                _logger.LogInformation("Device settings updated from heartbeat: fps={Fps}, res={Res}, quality={Quality}",
+                    cfg.CaptureFps, cfg.Resolution, cfg.Quality);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to apply device settings from heartbeat");
+        }
+    }
 }
 
 public class HeartbeatResponse
@@ -119,6 +161,7 @@ public class HeartbeatResponse
     public string? ServerTs { get; set; }
     public List<PendingCommand>? PendingCommands { get; set; }
     public int NextHeartbeatSec { get; set; } = 30;
+    public Dictionary<string, JsonElement>? DeviceSettings { get; set; }
 }
 
 public class PendingCommand

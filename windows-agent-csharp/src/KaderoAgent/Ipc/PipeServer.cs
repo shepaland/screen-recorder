@@ -83,26 +83,23 @@ public class PipeServer : BackgroundService
 
     private async Task HandleClientAsync(NamedPipeServerStream server, CancellationToken ct)
     {
-        _logger.LogInformation("HandleClient: start, IsConnected={Connected}", server.IsConnected);
+        _logger.LogDebug("HandleClient: start, IsConnected={Connected}", server.IsConnected);
         try
         {
             var noBomUtf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
             var reader = new StreamReader(server, noBomUtf8, leaveOpen: true);
             var writer = new StreamWriter(server, noBomUtf8, leaveOpen: true) { AutoFlush = true };
-            _logger.LogInformation("HandleClient: reader/writer created (no BOM)");
 
             while (server.IsConnected && !ct.IsCancellationRequested)
             {
-                _logger.LogInformation("HandleClient: waiting for line...");
                 var line = await reader.ReadLineAsync(ct);
-                _logger.LogInformation("HandleClient: got line={Line}", line?.Length > 100 ? line[..100] : line);
                 if (line == null) break;
 
                 PipeResponse response;
                 try
                 {
                     var request = JsonSerializer.Deserialize<PipeRequest>(line, _jsonOptions);
-                    _logger.LogInformation("Pipe ← {Command}", request?.Command);
+                    _logger.LogDebug("Pipe ← {Command}", request?.Command);
                     response = await ProcessRequestAsync(request!, ct);
                 }
                 catch (Exception ex)
@@ -112,11 +109,9 @@ public class PipeServer : BackgroundService
                 }
 
                 var json = JsonSerializer.Serialize(response, _jsonOptions);
-                _logger.LogInformation("Pipe → {Len} bytes", json.Length);
+                _logger.LogDebug("Pipe → {Len} bytes", json.Length);
                 await writer.WriteLineAsync(json);
-                _logger.LogInformation("HandleClient: response sent");
             }
-            _logger.LogInformation("HandleClient: loop ended");
         }
         catch (Exception ex)
         {
@@ -126,7 +121,7 @@ public class PipeServer : BackgroundService
         {
             try { if (server.IsConnected) server.Disconnect(); } catch { }
             server.Dispose();
-            _logger.LogInformation("HandleClient: disposed");
+            _logger.LogDebug("HandleClient: disposed");
         }
     }
 

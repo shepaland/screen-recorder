@@ -33,6 +33,9 @@ public class AgentStatus
     public double MemoryMb { get; set; }
     public double DiskFreeGb { get; set; }
     public int SegmentsQueued { get; set; }
+    public string? Resolution { get; set; }
+    public int SessionMaxDurationHours { get; set; }
+    public bool AutoStart { get; set; }
     public string AgentVersion { get; set; } = "1.0.0";
     public DateTime? LastHeartbeatTs { get; set; }
     public string? LastError { get; set; }

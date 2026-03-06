@@ -26,6 +26,20 @@ public class AuthManager
     public string? DeviceId => _deviceId;
     public bool IsAuthenticated => !string.IsNullOrEmpty(_tokenStore.AccessToken);
 
+    /// <summary>
+    /// Update server config from heartbeat device_settings and persist to CredentialStore.
+    /// </summary>
+    public void UpdateServerConfig(ServerConfig config)
+    {
+        _serverConfig = config;
+        var creds = _credentialStore.Load();
+        if (creds != null)
+        {
+            creds.ServerConfig = config;
+            _credentialStore.Save(creds);
+        }
+    }
+
     public AuthManager(CredentialStore credentialStore, TokenStore tokenStore,
         ApiClient apiClient, IOptions<AgentConfig> config, ILogger<AuthManager> logger)
     {
