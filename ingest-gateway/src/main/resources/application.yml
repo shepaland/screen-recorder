@@ -1,5 +1,6 @@
 server:
   port: 8084
+  forward-headers-strategy: framework
   servlet:
     multipart:
       max-file-size: 50MB
