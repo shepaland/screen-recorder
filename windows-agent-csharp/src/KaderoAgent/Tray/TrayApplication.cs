@@ -22,6 +22,7 @@ public class TrayApplication : ApplicationContext
     private ToolStripMenuItem _statusItem = null!;
     private string _lastConnectionStatus = "";
     private string _lastRecordingStatus = "";
+    private bool _polling; // Re-entrance guard for timer-based polling
 
     public TrayApplication()
     {
@@ -100,6 +101,8 @@ public class TrayApplication : ApplicationContext
 
     private async Task PollStatusAsync()
     {
+        if (_polling) return; // Skip if previous poll still running
+        _polling = true;
         try
         {
             if (!_pipeClient.IsConnected)
@@ -125,6 +128,10 @@ public class TrayApplication : ApplicationContext
         catch
         {
             UpdateTrayIcon("disconnected", "stopped");
+        }
+        finally
+        {
+            _polling = false;
         }
     }
 

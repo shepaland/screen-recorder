@@ -42,6 +42,7 @@ public class StatusWindow : Form
 
     // Auto-refresh timer
     private System.Windows.Forms.Timer _refreshTimer = null!;
+    private bool _refreshing; // Re-entrance guard for timer-based refresh
 
     public StatusWindow(PipeClient pipeClient, Action onReconnect)
     {
@@ -205,6 +206,8 @@ public class StatusWindow : Form
 
     private async Task RefreshStatusAsync()
     {
+        if (_refreshing) return; // Skip if previous refresh still running
+        _refreshing = true;
         try
         {
             if (!_pipeClient.IsConnected)
@@ -218,6 +221,10 @@ public class StatusWindow : Form
             UpdateUI(status);
         }
         catch { SetDisconnectedState(); }
+        finally
+        {
+            _refreshing = false;
+        }
     }
 
     private void SetDisconnectedState()
