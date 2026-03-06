@@ -110,21 +110,24 @@ builder.Services.AddSingleton<KaderoAgent.Ipc.ICommandExecutor>(sp => sp.GetRequ
 builder.Services.AddHostedService<HeartbeatService>();
 builder.Services.AddHostedService<AgentService>();
 
-// Windows Service support + Named Pipe server
+// Named Pipe server — always start so --tray UI can connect
+builder.Services.AddHostedService<PipeServer>();
+
+// Windows Service support (when running as sc.exe registered service)
 if (args.Contains("--service"))
 {
     builder.Services.AddWindowsService(options =>
     {
         options.ServiceName = "KaderoAgent";
     });
-    builder.Services.AddHostedService<PipeServer>();
 }
 
 var host = builder.Build();
 
-// Headless config-only registration:
+// Headless registration:
 //   KaderoAgent --register --server-url=<url> --token=<token>
-// Saves server URL and token for later setup completion via SetupForm or Tray app.
+// Performs device registration via API and saves credentials.
+// With --save-only flag, just saves pending registration for SetupForm.
 if (args.Contains("--register"))
 {
     AttachConsole(ATTACH_PARENT_PROCESS);
@@ -134,16 +137,36 @@ if (args.Contains("--register"))
 
     if (string.IsNullOrEmpty(serverUrl) || string.IsNullOrEmpty(token))
     {
-        Console.WriteLine("Usage: KaderoAgent --register --server-url=<url> --token=<token>");
+        Console.WriteLine("Usage: KaderoAgent --register --server-url=<url> --token=<token> [--save-only]");
         return;
     }
 
-    Console.WriteLine($"Saving server configuration: {serverUrl}");
-    var credStore = host.Services.GetRequiredService<CredentialStore>();
-    credStore.SavePendingRegistration(serverUrl, token);
-    // Enable auto-start so tray app appears after reboot
-    KaderoAgent.Util.AutoStartHelper.EnableAutoStart();
-    Console.WriteLine("Configuration saved. Auto-start enabled. Complete registration via Setup Form or Tray application.");
+    if (args.Contains("--save-only"))
+    {
+        // Just save for later completion via SetupForm
+        Console.WriteLine($"Saving server configuration: {serverUrl}");
+        var credStore = host.Services.GetRequiredService<CredentialStore>();
+        credStore.SavePendingRegistration(serverUrl, token);
+        KaderoAgent.Util.AutoStartHelper.EnableAutoStart();
+        Console.WriteLine("Configuration saved. Complete registration via Setup Form or Tray application.");
+        return;
+    }
+
+    // Full headless registration via API
+    try
+    {
+        Console.WriteLine($"Registering device at {serverUrl} ...");
+        var authManager = host.Services.GetRequiredService<KaderoAgent.Auth.AuthManager>();
+        var response = await authManager.RegisterAsync(serverUrl, token);
+        KaderoAgent.Util.AutoStartHelper.EnableAutoStart();
+        Console.WriteLine($"Device registered successfully: {response.DeviceId}");
+        Console.WriteLine("Auto-start enabled. Run KaderoAgent.exe to start the agent service.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Registration failed: {ex.Message}");
+        Environment.ExitCode = 1;
+    }
     return;
 }
 
@@ -163,6 +186,44 @@ if (!args.Contains("--service") &&
 
     // Enable tray auto-start after successful setup
     KaderoAgent.Util.AutoStartHelper.EnableAutoStart();
+
+    // Launch tray UI process so user sees the tray icon immediately
+    var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+    if (exePath != null)
+    {
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = exePath,
+            Arguments = "--tray",
+            UseShellExecute = false
+        });
+    }
+}
+
+// Launch tray UI for interactive sessions (not when running as Windows Service)
+if (!args.Contains("--service"))
+{
+    var trayExePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+    if (trayExePath != null)
+    {
+        // Check if tray is already running
+        var trayAlreadyRunning = System.Diagnostics.Process.GetProcessesByName("KaderoAgent")
+            .Any(p => p.Id != Environment.ProcessId);
+
+        if (!trayAlreadyRunning)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = trayExePath,
+                    Arguments = "--tray",
+                    UseShellExecute = false
+                });
+            }
+            catch { /* non-fatal: tray is optional */ }
+        }
+    }
 }
 
 await host.RunAsync();
