@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FilmIcon, XMarkIcon, ArrowPathIcon, ArrowDownTrayIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { FilmIcon, XMarkIcon, ArrowPathIcon, ArrowDownTrayIcon, TrashIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { getRecordings, getRecordingSegments, deleteRecording, downloadRecording, type Recording, type Segment } from '../api/ingest';
 import ConfirmDialog from '../components/ConfirmDialog';
 import PermissionGate from '../components/PermissionGate';
@@ -142,6 +142,21 @@ export default function RecordingsPage() {
     return `${basePath}/prg-segments/${segment.s3_key}`;
   };
 
+  // Keyboard navigation for segments (left/right arrows)
+  useEffect(() => {
+    if (!selectedRecording || segments.length <= 1) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === 'ArrowLeft') {
+        setCurrentSegmentIndex(i => Math.max(0, i - 1));
+      } else if (e.key === 'ArrowRight') {
+        setCurrentSegmentIndex(i => Math.min(segments.length - 1, i + 1));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedRecording, segments.length]);
+
   return (
     <div className="flex h-[calc(100vh-7rem)] gap-0 -mx-4 sm:-mx-6 lg:-mx-8 -my-6">
       {/* Recordings list */}
@@ -235,7 +250,8 @@ export default function RecordingsPage() {
       {/* Recording detail + player */}
       {selectedRecording && (
         <div className="flex-1 flex flex-col bg-gray-50 overflow-hidden">
-          <div className="px-6 py-3 border-b border-gray-200 bg-white flex items-center justify-between">
+          {/* Header — fixed height */}
+          <div className="px-6 py-3 border-b border-gray-200 bg-white flex items-center justify-between shrink-0">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
                 {selectedRecording.device_hostname}
@@ -284,13 +300,13 @@ export default function RecordingsPage() {
             </div>
           </div>
 
-          {/* Video player */}
-          <div className="px-6 pt-4">
-            <div className="bg-gray-900 rounded-lg aspect-video flex items-center justify-center relative overflow-hidden">
+          {/* Video player — shrinkable, takes remaining space */}
+          <div className="px-6 pt-4 flex-1 min-h-0 flex flex-col">
+            <div className="bg-gray-900 rounded-lg flex-1 min-h-0 flex items-center justify-center relative overflow-hidden">
               {segments.length > 0 ? (
                 <video
                   key={segments[currentSegmentIndex]?.id}
-                  className="w-full h-full"
+                  className="max-w-full max-h-full object-contain"
                   controls
                   autoPlay
                   onEnded={() => {
@@ -315,41 +331,97 @@ export default function RecordingsPage() {
                 </div>
               )}
             </div>
+
+            {/* Segment navigation controls */}
             {(segments.length > 0 || selectedRecording.status === 'active') && (
-              <div className="flex items-center justify-center mt-2 gap-2">
-                {selectedRecording.status === 'active' && (
-                  <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
-                    <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                    Live
-                  </span>
-                )}
-                {segments.length > 0 && (
-                  <span className="text-xs text-gray-500">
-                    Сегмент {currentSegmentIndex + 1} из {segments.length}
-                  </span>
-                )}
-                {selectedRecording.status === 'active' && (
-                  <button
-                    type="button"
-                    onClick={() => handleSelect(selectedRecording)}
-                    className="text-xs text-blue-500 hover:text-blue-700"
-                    title="Обновить сегменты"
-                  >
-                    <ArrowPathIcon className="h-3.5 w-3.5 inline" /> Обновить
-                  </button>
+              <div className="shrink-0 mt-2 space-y-1.5">
+                <div className="flex items-center justify-center gap-3">
+                  {/* Previous segment */}
+                  {segments.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setCurrentSegmentIndex(i => Math.max(0, i - 1))}
+                      disabled={currentSegmentIndex === 0}
+                      className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      title="Предыдущий сегмент (←)"
+                    >
+                      <ChevronLeftIcon className="h-5 w-5" />
+                    </button>
+                  )}
+
+                  {/* Live indicator */}
+                  {selectedRecording.status === 'active' && (
+                    <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
+                      <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                      Live
+                    </span>
+                  )}
+
+                  {/* Segment counter */}
+                  {segments.length > 0 && (
+                    <span className="text-xs text-gray-500 tabular-nums min-w-[7rem] text-center">
+                      Сегмент {currentSegmentIndex + 1} из {segments.length}
+                    </span>
+                  )}
+
+                  {/* Next segment */}
+                  {segments.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setCurrentSegmentIndex(i => Math.min(segments.length - 1, i + 1))}
+                      disabled={currentSegmentIndex >= segments.length - 1}
+                      className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      title="Следующий сегмент (→)"
+                    >
+                      <ChevronRightIcon className="h-5 w-5" />
+                    </button>
+                  )}
+
+                  {/* Refresh button for active recordings */}
+                  {selectedRecording.status === 'active' && (
+                    <button
+                      type="button"
+                      onClick={() => handleSelect(selectedRecording)}
+                      className="text-xs text-blue-500 hover:text-blue-700"
+                      title="Обновить сегменты"
+                    >
+                      <ArrowPathIcon className="h-3.5 w-3.5 inline" /> Обновить
+                    </button>
+                  )}
+                </div>
+
+                {/* Segment timeline — clickable bar for quick navigation */}
+                {segments.length > 1 && (
+                  <div className="flex gap-0.5 px-1">
+                    {segments.map((seg, idx) => (
+                      <button
+                        key={seg.id}
+                        type="button"
+                        onClick={() => setCurrentSegmentIndex(idx)}
+                        className={`h-1.5 rounded-full flex-1 transition-colors ${
+                          idx === currentSegmentIndex
+                            ? 'bg-red-600'
+                            : idx < currentSegmentIndex
+                              ? 'bg-gray-400'
+                              : 'bg-gray-200'
+                        } hover:bg-red-400`}
+                        title={`Сегмент ${idx + 1} — ${formatDuration(seg.duration_ms)}`}
+                      />
+                    ))}
+                  </div>
                 )}
               </div>
             )}
           </div>
 
-          {/* Metadata */}
-          <div className="px-6 py-4 flex-1 overflow-y-auto">
+          {/* Metadata — always fully visible, never scrolls */}
+          <div className="px-6 py-4 shrink-0">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">Метаданные записи</h3>
             <div className="card">
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 p-4">
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-4">
                 <div>
                   <dt className="text-xs font-medium text-gray-500">Устройство</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
+                  <dd className="mt-0.5 text-sm text-gray-900">
                     {selectedRecording.device_hostname}
                     {selectedRecording.device_deleted && (
                       <span className="ml-1 text-red-600">(удалено)</span>
@@ -358,31 +430,31 @@ export default function RecordingsPage() {
                 </div>
                 <div>
                   <dt className="text-xs font-medium text-gray-500">Начало</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{formatTime(selectedRecording.started_ts)}</dd>
+                  <dd className="mt-0.5 text-sm text-gray-900">{formatTime(selectedRecording.started_ts)}</dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium text-gray-500">Окончание</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{formatTime(selectedRecording.ended_ts)}</dd>
+                  <dd className="mt-0.5 text-sm text-gray-900">{formatTime(selectedRecording.ended_ts)}</dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium text-gray-500">Длительность</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{formatDuration(selectedRecording.total_duration_ms)}</dd>
+                  <dd className="mt-0.5 text-sm text-gray-900">{formatDuration(selectedRecording.total_duration_ms)}</dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium text-gray-500">Размер</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{formatBytes(selectedRecording.total_bytes)}</dd>
+                  <dd className="mt-0.5 text-sm text-gray-900">{formatBytes(selectedRecording.total_bytes)}</dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium text-gray-500">Сегменты</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{selectedRecording.segment_count}</dd>
+                  <dd className="mt-0.5 text-sm text-gray-900">{selectedRecording.segment_count}</dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium text-gray-500">Статус</dt>
-                  <dd className="mt-1"><StatusBadge status={selectedRecording.status} /></dd>
+                  <dd className="mt-0.5"><StatusBadge status={selectedRecording.status} /></dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium text-gray-500">ID</dt>
-                  <dd className="mt-1 text-sm text-gray-900 font-mono text-xs">{selectedRecording.id}</dd>
+                  <dd className="mt-0.5 text-sm text-gray-900 font-mono text-xs">{selectedRecording.id}</dd>
                 </div>
               </dl>
             </div>
