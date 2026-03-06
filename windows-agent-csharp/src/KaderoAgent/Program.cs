@@ -16,7 +16,7 @@ using Microsoft.Extensions.Logging;
 var logPath = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
     "Kadero", "logs");
-Directory.CreateDirectory(logPath);
+try { Directory.CreateDirectory(logPath); } catch { /* ACL may not be set yet during install */ }
 log4net.GlobalContext.Properties["LogPath"] = logPath;
 
 // P/Invoke for attaching to parent console (WinExe has no console by default)
@@ -117,9 +117,12 @@ var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
 // Configuration
 builder.Services.Configure<AgentConfig>(builder.Configuration.GetSection("Agent"));
 
-// Add log4net as logging provider
+// Add log4net as logging provider (if config file exists)
 var log4netConfigPath = Path.Combine(AppContext.BaseDirectory, "log4net.config");
-builder.Logging.AddLog4Net(log4netConfigPath);
+if (File.Exists(log4netConfigPath))
+{
+    builder.Logging.AddLog4Net(log4netConfigPath);
+}
 
 // Core services
 builder.Services.AddSingleton<CredentialStore>();

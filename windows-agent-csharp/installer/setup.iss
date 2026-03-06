@@ -36,16 +36,17 @@ Source: "publish\*.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoes
 Source: "publish\*.json"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "ffmpeg\ffmpeg.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "appsettings.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "publish\log4net.config"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 ; ---------------------------------------------------------------------------
 ; Directories with explicit permissions
 ; ---------------------------------------------------------------------------
 [Dirs]
-Name: "{commonappdata}\Kadero"; Permissions: admins-full
-Name: "{commonappdata}\Kadero\logs"; Permissions: admins-full
-Name: "{commonappdata}\Kadero\segments"; Permissions: admins-full
-Name: "{commonappdata}\Kadero\db"; Permissions: admins-full
+Name: "{commonappdata}\Kadero"; Permissions: admins-full system-full
+Name: "{commonappdata}\Kadero\logs"; Permissions: admins-full system-full users-modify
+Name: "{commonappdata}\Kadero\segments"; Permissions: admins-full system-full
+Name: "{commonappdata}\Kadero\db"; Permissions: admins-full system-full
 
 ; ---------------------------------------------------------------------------
 ; Registry: tray auto-start + uninstall cleanup
@@ -106,11 +107,11 @@ Filename: "sc.exe"; \
   StatusMsg: "Запуск службы..."; \
   Flags: runhidden
 
-; Launch tray application (optional, user can uncheck on final page)
+; Launch tray application after install (checked by default, runs as the real user)
 Filename: "{app}\KaderoAgent.exe"; \
   Parameters: "--tray"; \
   Description: "Запустить Кадеро в области уведомлений"; \
-  Flags: postinstall nowait skipifsilent unchecked
+  Flags: postinstall nowait runasoriginaluser
 
 ; ---------------------------------------------------------------------------
 ; Uninstall actions (order: kill processes, stop service, delete service)
