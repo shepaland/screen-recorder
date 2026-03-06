@@ -141,7 +141,9 @@ if (args.Contains("--register"))
     Console.WriteLine($"Saving server configuration: {serverUrl}");
     var credStore = host.Services.GetRequiredService<CredentialStore>();
     credStore.SavePendingRegistration(serverUrl, token);
-    Console.WriteLine("Configuration saved. Complete registration via Setup Form or Tray application.");
+    // Enable auto-start so tray app appears after reboot
+    KaderoAgent.Util.AutoStartHelper.EnableAutoStart();
+    Console.WriteLine("Configuration saved. Auto-start enabled. Complete registration via Setup Form or Tray application.");
     return;
 }
 
@@ -155,9 +157,12 @@ if (!args.Contains("--service") &&
     var form = new KaderoAgent.Tray.SetupForm(host.Services);
     Application.Run(form);
 
-    // After setup, if credentials saved, continue
+    // After setup, if credentials saved, enable auto-start and continue
     if (!host.Services.GetRequiredService<CredentialStore>().HasCredentials())
         return;
+
+    // Enable tray auto-start after successful setup
+    KaderoAgent.Util.AutoStartHelper.EnableAutoStart();
 }
 
 await host.RunAsync();
