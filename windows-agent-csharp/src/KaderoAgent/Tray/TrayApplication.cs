@@ -20,6 +20,8 @@ public class TrayApplication : ApplicationContext
 
     // Menu items that need updating
     private ToolStripMenuItem _statusItem = null!;
+    private string _lastConnectionStatus = "";
+    private string _lastRecordingStatus = "";
 
     public TrayApplication()
     {
@@ -128,6 +130,11 @@ public class TrayApplication : ApplicationContext
 
     private void UpdateTrayIcon(string connectionStatus, string recordingStatus)
     {
+        if (connectionStatus == _lastConnectionStatus && recordingStatus == _lastRecordingStatus)
+            return;
+        _lastConnectionStatus = connectionStatus;
+        _lastRecordingStatus = recordingStatus;
+
         Icon newIcon;
         string tooltip;
         string statusText;

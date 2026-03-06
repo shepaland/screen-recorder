@@ -115,8 +115,9 @@ export default function DeviceDetailPage() {
   const handleSaveSettings = async (settings: DeviceSettings) => {
     if (!id) return;
     try {
-      const updated = await updateDeviceSettings(id, settings);
-      setDevice(updated);
+      await updateDeviceSettings(id, settings);
+      const refreshed = await getDevice(id);
+      setDevice(refreshed);
       addToast('success', 'Настройки записи сохранены');
     } catch {
       addToast('error', 'Не удалось сохранить настройки записи');
@@ -382,7 +383,7 @@ export default function DeviceDetailPage() {
 
           {/* Recent commands table */}
           <h3 className="text-sm font-semibold text-gray-700 mb-3">Последние команды</h3>
-          {device.recent_commands.length === 0 ? (
+          {(device.recent_commands?.length ?? 0) === 0 ? (
             <p className="text-sm text-gray-500">Команды не отправлялись</p>
           ) : (
             <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">

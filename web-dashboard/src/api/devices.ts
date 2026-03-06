@@ -53,8 +53,8 @@ export async function getDeviceCommands(
 export async function updateDeviceSettings(
   deviceId: string,
   settings: DeviceSettings,
-): Promise<DeviceDetailResponse> {
-  const response = await cpApiClient.put<DeviceDetailResponse>(
+): Promise<DeviceResponse> {
+  const response = await cpApiClient.put<DeviceResponse>(
     `/devices/${deviceId}`,
     { settings },
   );

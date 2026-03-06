@@ -1,14 +1,19 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Runtime.InteropServices;
 
 namespace KaderoAgent.Resources
 {
     /// <summary>
     /// Generates application icons programmatically: red "К" on dark background.
     /// No embedded .ico files needed.
+    /// Uses Icon.Clone() + DestroyIcon() to properly manage GDI HICON handles.
     /// </summary>
     public static class LogoHelper
     {
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern bool DestroyIcon(IntPtr handle);
+
         /// <summary>Creates application icon (red "К" on dark background).</summary>
         public static Icon CreateAppIcon(int size = 32)
         {
@@ -27,7 +32,16 @@ namespace KaderoAgent.Resources
             var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
             g.DrawString("\u041A", font, textBrush, new RectangleF(0, 0, size, size), sf);
 
-            return Icon.FromHandle(bmp.GetHicon());
+            IntPtr hIcon = bmp.GetHicon();
+            try
+            {
+                using var tempIcon = Icon.FromHandle(hIcon);
+                return (Icon)tempIcon.Clone();
+            }
+            finally
+            {
+                DestroyIcon(hIcon);
+            }
         }
 
         /// <summary>Creates tray icon with status indicator dot in bottom-right corner.</summary>
@@ -53,7 +67,16 @@ namespace KaderoAgent.Resources
             using var dotBrush = new SolidBrush(statusColor);
             g.FillEllipse(dotBrush, size - dotSize - 1, size - dotSize - 1, dotSize, dotSize);
 
-            return Icon.FromHandle(bmp.GetHicon());
+            IntPtr hIcon = bmp.GetHicon();
+            try
+            {
+                using var tempIcon = Icon.FromHandle(hIcon);
+                return (Icon)tempIcon.Clone();
+            }
+            finally
+            {
+                DestroyIcon(hIcon);
+            }
         }
 
         /// <summary>Creates a logo bitmap for display in About dialog.</summary>

@@ -19,6 +19,7 @@ model: opus
 - Настройка NATS JetStream: стримы, consumers, retention
 - Настройка OpenSearch: индексы, шаблоны, lifecycle
 - Troubleshooting: анализ логов, events, ресурсов, сетевых проблем в k8s
+- Обновить Memory после того как закончишь свою часть работы
 
 ## Инфраструктура — два сервера, два стейджинга
 
@@ -68,6 +69,81 @@ ssh SERVER "KUBECTL -n NAMESPACE rollout restart deployment/SERVICE"
 Где:
 - test: SERVER=shepaland-cloud, KUBECTL="sudo k3s kubectl", NAMESPACE=test-screen-record, ENV=test
 - prod: SERVER=shepaland-videcalls-test-srv, KUBECTL="sudo kubectl", NAMESPACE=prod-screen-record, ENV=prod
+
+## Windows Agent build & deploy workflow
+
+### Триггер
+
+Пересборка Windows Agent **обязательна** при любом изменении файлов:
+- `windows-agent-csharp/src/**` — исходный код агента
+- `windows-agent-csharp/installer/**` — скрипт установщика Inno Setup, LICENSE
+- `windows-agent-csharp/build.ps1` — скрипт сборки
+
+### Подключение к билд-машине (192.168.1.135)
+
+```bash
+WIN_SSH="sshpass -p '#6TY0N0d' ssh -o StrictHostKeyChecking=no -o PreferredAuthentications=password -o PubkeyAuthentication=no shepaland@192.168.1.135"
+WIN_SCP="sshpass -p '#6TY0N0d' scp -o StrictHostKeyChecking=no -o PreferredAuthentications=password -o PubkeyAuthentication=no"
+```
+
+Между SSH-вызовами вставлять `sleep 2` — соединение нестабильно. rsync недоступен, только scp.
+
+### Шаг 1: Очистка предыдущей версии
+
+```bash
+$WIN_SSH "taskkill /f /im KaderoAgent.exe 2>nul & exit 0"
+sleep 2
+$WIN_SSH "sc stop KaderoAgent 2>nul & timeout /t 3 /nobreak >nul & sc delete KaderoAgent 2>nul & exit 0"
+sleep 2
+$WIN_SSH "if exist C:\screen-recorder-agent rmdir /s /q C:\screen-recorder-agent"
+```
+
+### Шаг 2: Копирование исходников
+
+```bash
+$WIN_SSH "mkdir C:\screen-recorder-agent"
+sleep 2
+$WIN_SCP -r "windows-agent-csharp/src" "shepaland@192.168.1.135:C:/screen-recorder-agent/src"
+sleep 2
+$WIN_SCP -r "windows-agent-csharp/installer" "shepaland@192.168.1.135:C:/screen-recorder-agent/installer"
+sleep 2
+$WIN_SCP "windows-agent-csharp/build.ps1" "shepaland@192.168.1.135:C:/screen-recorder-agent/build.ps1"
+```
+
+### Шаг 3: Сборка установщика
+
+```bash
+# FFmpeg из постоянного хранилища
+$WIN_SSH "mkdir C:\screen-recorder-agent\installer\ffmpeg 2>nul & copy C:\ffmpeg\ffmpeg-8.0.1-essentials_build\bin\ffmpeg.exe C:\screen-recorder-agent\installer\ffmpeg\ffmpeg.exe"
+sleep 2
+# .NET publish (dotnet не в PATH)
+$WIN_SSH "C:\Users\shepaland\.dotnet\dotnet.exe publish C:\screen-recorder-agent\src\KaderoAgent\KaderoAgent.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o C:\screen-recorder-agent\installer\publish"
+sleep 2
+# appsettings.json
+$WIN_SSH "copy C:\screen-recorder-agent\src\KaderoAgent\appsettings.json C:\screen-recorder-agent\installer\appsettings.json"
+sleep 2
+# Inno Setup
+$WIN_SSH "\"C:\Program Files (x86)\Inno Setup 6\ISCC.exe\" C:\screen-recorder-agent\installer\setup.iss"
+```
+
+### Шаг 4: Размещение установщика
+
+```bash
+$WIN_SSH "mkdir C:\kadero_install 2>nul & copy /Y C:\screen-recorder-agent\installer\Output\KaderoAgentSetup.exe C:\kadero_install\KaderoAgentSetup.exe"
+```
+
+### Шаг 5: Предложить ручную установку
+
+После успешной сборки **НЕ устанавливать автоматически**. Вывести пользователю:
+
+```
+Windows Agent успешно собран.
+Установщик: C:\kadero_install\KaderoAgentSetup.exe (на машине 192.168.1.135)
+
+Для установки подключитесь к Windows-машине через RDP и запустите установщик.
+- Интерактивная: двойной клик на KaderoAgentSetup.exe
+- Silent: KaderoAgentSetup.exe /VERYSILENT /SERVERURL=<url> /REGTOKEN=drt_<токен>
+```
 
 ## Принципы работы
 
