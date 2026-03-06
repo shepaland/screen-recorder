@@ -37,8 +37,6 @@ public class StatusWindow : Form
     // Editable fields
     private TextBox _serverUrlBox = null!;
     private TextBox _tokenBox = null!;
-    private TextBox _usernameBox = null!;
-    private TextBox _passwordBox = null!;
     private Button _reconnectBtn = null!;
     private Label _statusMessage = null!;
 
@@ -57,7 +55,7 @@ public class StatusWindow : Form
     private void InitializeComponent()
     {
         Text = "Кадеро — Статус агента";
-        Size = new Size(480, 720);
+        Size = new Size(480, 650);
         ShowInTaskbar = true;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -179,16 +177,6 @@ public class StatusWindow : Form
         y += 20;
         _tokenBox = GlassHelper.CreateTextBox(left, y, fullWidth, placeholder: "drt_... (оставьте пустым для текущего)");
         Controls.Add(_tokenBox);
-        y += 36;
-
-        Controls.Add(GlassHelper.CreateLabel("Имя пользователя", left, y, 160, secondary: true));
-        _usernameBox = GlassHelper.CreateTextBox(valX, y - 2, fullWidth - valX + left);
-        Controls.Add(_usernameBox);
-        y += 30;
-
-        Controls.Add(GlassHelper.CreateLabel("Пароль", left, y, 160, secondary: true));
-        _passwordBox = GlassHelper.CreateTextBox(valX, y - 2, fullWidth - valX + left, password: true);
-        Controls.Add(_passwordBox);
         y += 38;
 
         _reconnectBtn = GlassHelper.CreateAccentButton("Переподключиться", left, y);
@@ -323,9 +311,7 @@ public class StatusWindow : Form
 
             var response = await _pipeClient.ReconnectAsync(
                 _serverUrlBox.Text.Trim(),
-                string.IsNullOrWhiteSpace(_tokenBox.Text) ? null : _tokenBox.Text.Trim(),
-                string.IsNullOrWhiteSpace(_usernameBox.Text) ? null : _usernameBox.Text.Trim(),
-                string.IsNullOrWhiteSpace(_passwordBox.Text) ? null : _passwordBox.Text
+                string.IsNullOrWhiteSpace(_tokenBox.Text) ? null : _tokenBox.Text.Trim()
             );
 
             if (response?.Success == true)

@@ -2,8 +2,10 @@ package com.prg.auth.controller;
 
 import com.prg.auth.dto.request.DeviceLoginRequest;
 import com.prg.auth.dto.request.DeviceRefreshRequest;
+import com.prg.auth.dto.request.ValidateRegistrationTokenRequest;
 import com.prg.auth.dto.response.DeviceLoginResponse;
 import com.prg.auth.dto.response.DeviceRefreshResponse;
+import com.prg.auth.dto.response.ValidateRegistrationTokenResponse;
 import com.prg.auth.service.DeviceAuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -39,6 +41,14 @@ public class DeviceAuthController {
         String userAgent = httpRequest.getHeader("User-Agent");
 
         DeviceRefreshResponse response = deviceAuthService.deviceRefresh(request, ipAddress, userAgent);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/validate-registration-token")
+    public ResponseEntity<ValidateRegistrationTokenResponse> validateRegistrationToken(
+            @Valid @RequestBody ValidateRegistrationTokenRequest request) {
+        ValidateRegistrationTokenResponse response = deviceAuthService.validateRegistrationToken(
+                request.getRegistrationToken());
         return ResponseEntity.ok(response);
     }
 

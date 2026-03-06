@@ -69,8 +69,7 @@ public class PipeClient : IDisposable
         return response?.Status;
     }
 
-    public async Task<PipeResponse?> ReconnectAsync(string? serverUrl, string? token,
-        string? username = null, string? password = null)
+    public async Task<PipeResponse?> ReconnectAsync(string? serverUrl, string? token)
     {
         var request = new PipeRequest
         {
@@ -79,8 +78,6 @@ public class PipeClient : IDisposable
         };
         if (!string.IsNullOrEmpty(serverUrl)) request.Params["server_url"] = serverUrl;
         if (!string.IsNullOrEmpty(token)) request.Params["token"] = token;
-        if (!string.IsNullOrEmpty(username)) request.Params["username"] = username;
-        if (!string.IsNullOrEmpty(password)) request.Params["password"] = password;
         return await SendAsync(request);
     }
 

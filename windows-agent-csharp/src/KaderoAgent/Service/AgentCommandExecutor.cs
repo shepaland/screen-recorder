@@ -20,8 +20,7 @@ public class AgentCommandExecutor : ICommandExecutor
         _logger = logger;
     }
 
-    public async Task<bool> ReconnectAsync(string? newServerUrl, string? newToken,
-        string? username, string? password, CancellationToken ct)
+    public async Task<bool> ReconnectAsync(string? newServerUrl, string? newToken, CancellationToken ct)
     {
         try
         {
@@ -32,7 +31,7 @@ public class AgentCommandExecutor : ICommandExecutor
             {
                 // New registration with new server URL and token
                 _credentialStore.Clear();
-                var response = await _authManager.RegisterAsync(newServerUrl, newToken, username, password);
+                var response = await _authManager.RegisterAsync(newServerUrl, newToken);
                 _credentialStore.ClearPendingRegistration();
                 _statusProvider.SetConnectionStatus("connected");
                 _statusProvider.SetLastError(null);

@@ -72,7 +72,10 @@ public class DeviceAuthService {
 
     @Transactional
     public DeviceLoginResponse deviceLogin(DeviceLoginRequest request, String ipAddress, String userAgent) {
-        String rateLimitKey = ipAddress + ":device:" + request.getUsername();
+        boolean hasCredentials = request.getUsername() != null && !request.getUsername().isBlank()
+                && request.getPassword() != null && !request.getPassword().isBlank();
+
+        String rateLimitKey = ipAddress + ":device:" + (hasCredentials ? request.getUsername() : "token-only");
         checkRateLimit(rateLimitKey);
 
         // 1. Validate registration token
@@ -101,35 +104,58 @@ public class DeviceAuthService {
         // 2. Extract tenant_id from token
         UUID tenantId = regToken.getTenant().getId();
 
-        // 3. Validate username + password in tenant context
-        User user = userRepository.findByTenantIdAndUsername(tenantId, request.getUsername())
-                .orElse(null);
+        User user;
+        if (hasCredentials) {
+            // 3a. Validate username + password in tenant context (backward compatibility)
+            user = userRepository.findByTenantIdAndUsername(tenantId, request.getUsername())
+                    .orElse(null);
 
-        if (user == null) {
-            recordLoginAttempt(rateLimitKey);
-            auditService.logAction(tenantId, null, "DEVICE_LOGIN_FAILED", "AUTH", null,
-                    Map.of("username", request.getUsername(), "reason", "user_not_found",
-                            "hardware_id", request.getDeviceInfo().getHardwareId()),
-                    ipAddress, userAgent, getCorrelationId());
-            throw new InvalidCredentialsException("Invalid username or password");
-        }
+            if (user == null) {
+                recordLoginAttempt(rateLimitKey);
+                auditService.logAction(tenantId, null, "DEVICE_LOGIN_FAILED", "AUTH", null,
+                        Map.of("username", request.getUsername(), "reason", "user_not_found",
+                                "hardware_id", request.getDeviceInfo().getHardwareId()),
+                        ipAddress, userAgent, getCorrelationId());
+                throw new InvalidCredentialsException("Invalid username or password");
+            }
 
-        if (!user.getIsActive()) {
-            recordLoginAttempt(rateLimitKey);
-            auditService.logAction(tenantId, user.getId(), "DEVICE_LOGIN_FAILED", "AUTH", null,
-                    Map.of("reason", "account_disabled",
-                            "hardware_id", request.getDeviceInfo().getHardwareId()),
-                    ipAddress, userAgent, getCorrelationId());
-            throw new InvalidCredentialsException("Invalid username or password");
-        }
+            if (!user.getIsActive()) {
+                recordLoginAttempt(rateLimitKey);
+                auditService.logAction(tenantId, user.getId(), "DEVICE_LOGIN_FAILED", "AUTH", null,
+                        Map.of("reason", "account_disabled",
+                                "hardware_id", request.getDeviceInfo().getHardwareId()),
+                        ipAddress, userAgent, getCorrelationId());
+                throw new InvalidCredentialsException("Invalid username or password");
+            }
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            recordLoginAttempt(rateLimitKey);
-            auditService.logAction(tenantId, user.getId(), "DEVICE_LOGIN_FAILED", "AUTH", null,
-                    Map.of("reason", "invalid_password",
-                            "hardware_id", request.getDeviceInfo().getHardwareId()),
-                    ipAddress, userAgent, getCorrelationId());
-            throw new InvalidCredentialsException("Invalid username or password");
+            if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+                recordLoginAttempt(rateLimitKey);
+                auditService.logAction(tenantId, user.getId(), "DEVICE_LOGIN_FAILED", "AUTH", null,
+                        Map.of("reason", "invalid_password",
+                                "hardware_id", request.getDeviceInfo().getHardwareId()),
+                        ipAddress, userAgent, getCorrelationId());
+                throw new InvalidCredentialsException("Invalid username or password");
+            }
+        } else {
+            // 3b. Token-only mode: use the user who created the registration token
+            user = regToken.getCreatedBy();
+
+            if (user == null) {
+                recordLoginAttempt(rateLimitKey);
+                throw new InvalidCredentialsException("Registration token creator not found", "TOKEN_CREATOR_NOT_FOUND");
+            }
+
+            if (!user.getIsActive()) {
+                recordLoginAttempt(rateLimitKey);
+                auditService.logAction(tenantId, user.getId(), "DEVICE_LOGIN_FAILED", "AUTH", null,
+                        Map.of("reason", "token_creator_disabled",
+                                "hardware_id", request.getDeviceInfo().getHardwareId()),
+                        ipAddress, userAgent, getCorrelationId());
+                throw new InvalidCredentialsException("Token creator account is disabled");
+            }
+
+            log.info("Device login token-only mode: using token creator user_id={}, tenant_id={}",
+                    user.getId(), tenantId);
         }
 
         // 4. Check role: OWNER, TENANT_ADMIN, MANAGER, or SUPER_ADMIN
@@ -375,6 +401,58 @@ public class DeviceAuthService {
                 .refreshToken(newRawRefreshToken)
                 .tokenType("Bearer")
                 .expiresIn(jwtTokenProvider.getAccessTokenTtl())
+                .build();
+    }
+
+    /**
+     * Validates a registration token without performing device login.
+     * Returns token validity status along with tenant and token metadata.
+     */
+    @Transactional(readOnly = true)
+    public ValidateRegistrationTokenResponse validateRegistrationToken(String rawToken) {
+        String tokenHash = AuthService.sha256(rawToken);
+        Optional<DeviceRegistrationToken> optToken = registrationTokenRepository.findByTokenHash(tokenHash);
+
+        if (optToken.isEmpty()) {
+            return ValidateRegistrationTokenResponse.builder()
+                    .valid(false)
+                    .reason("INVALID_TOKEN")
+                    .build();
+        }
+
+        DeviceRegistrationToken regToken = optToken.get();
+
+        if (!regToken.getIsActive()) {
+            return ValidateRegistrationTokenResponse.builder()
+                    .valid(false)
+                    .tenantName(regToken.getTenant().getName())
+                    .tokenName(regToken.getName())
+                    .reason("TOKEN_INACTIVE")
+                    .build();
+        }
+
+        if (regToken.getExpiresAt() != null && regToken.getExpiresAt().isBefore(Instant.now())) {
+            return ValidateRegistrationTokenResponse.builder()
+                    .valid(false)
+                    .tenantName(regToken.getTenant().getName())
+                    .tokenName(regToken.getName())
+                    .reason("TOKEN_EXPIRED")
+                    .build();
+        }
+
+        if (regToken.getMaxUses() != null && regToken.getCurrentUses() >= regToken.getMaxUses()) {
+            return ValidateRegistrationTokenResponse.builder()
+                    .valid(false)
+                    .tenantName(regToken.getTenant().getName())
+                    .tokenName(regToken.getName())
+                    .reason("TOKEN_EXHAUSTED")
+                    .build();
+        }
+
+        return ValidateRegistrationTokenResponse.builder()
+                .valid(true)
+                .tenantName(regToken.getTenant().getName())
+                .tokenName(regToken.getName())
                 .build();
     }
 

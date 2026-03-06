@@ -50,7 +50,7 @@ public class CredentialStore
 
     /// <summary>
     /// Saves server URL and registration token for later completion via SetupForm/Tray.
-    /// Used by installer when username/password are not yet known.
+    /// Used by installer to pre-fill SetupForm with server URL and token.
     /// </summary>
     public void SavePendingRegistration(string serverUrl, string registrationToken)
     {

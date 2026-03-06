@@ -53,6 +53,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/refresh",
                                 "/api/v1/auth/device-login",
                                 "/api/v1/auth/device-refresh",
+                                "/api/v1/auth/validate-registration-token",
                                 "/api/v1/auth/oauth/yandex",
                                 "/api/v1/auth/oauth/yandex/callback",
                                 "/api/v1/auth/oauth/select-tenant",

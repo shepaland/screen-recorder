@@ -51,8 +51,7 @@ public class AuthManager
         return await RefreshTokenAsync();
     }
 
-    public async Task<DeviceLoginResponse> RegisterAsync(string serverUrl, string registrationToken,
-        string? username = null, string? password = null)
+    public async Task<DeviceLoginResponse> RegisterAsync(string serverUrl, string registrationToken)
     {
         var hwId = HardwareId.Generate();
         var hostname = Environment.MachineName;
@@ -60,8 +59,6 @@ public class AuthManager
 
         var body = new
         {
-            username = username ?? "",
-            password = password ?? "",
             registration_token = registrationToken,
             device_info = new
             {
@@ -97,6 +94,32 @@ public class AuthManager
 
         _logger.LogInformation("Device registered: {DeviceId}", _deviceId);
         return response;
+    }
+
+    /// <summary>
+    /// Validates a registration token against the server without performing device login.
+    /// Returns token validity status, tenant name, and token name.
+    /// </summary>
+    public async Task<ValidateTokenResponse> ValidateTokenAsync(string serverUrl, string registrationToken)
+    {
+        var url = $"{serverUrl.TrimEnd('/')}/api/v1/auth/validate-registration-token";
+        var body = new { registration_token = registrationToken };
+
+        try
+        {
+            var response = await _apiClient.PostAsync<ValidateTokenResponse>(url, body);
+            return response ?? new ValidateTokenResponse { Valid = false, Reason = "Empty response from server" };
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Token validation request failed");
+            return new ValidateTokenResponse { Valid = false, Reason = $"Connection error: {ex.Message}" };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Token validation failed");
+            return new ValidateTokenResponse { Valid = false, Reason = ex.Message };
+        }
     }
 
     public async Task<bool> RefreshTokenAsync()
@@ -161,4 +184,12 @@ public class DeviceRefreshResponse
     public string? RefreshToken { get; set; }
     public string? TokenType { get; set; }
     public long ExpiresIn { get; set; }
+}
+
+public class ValidateTokenResponse
+{
+    public bool Valid { get; set; }
+    public string? TenantName { get; set; }
+    public string? TokenName { get; set; }
+    public string? Reason { get; set; }
 }

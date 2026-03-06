@@ -128,9 +128,7 @@ public class PipeServer : BackgroundService
             case "reconnect":
                 var serverUrl = request.Params?.GetValueOrDefault("server_url");
                 var token = request.Params?.GetValueOrDefault("token");
-                var username = request.Params?.GetValueOrDefault("username");
-                var password = request.Params?.GetValueOrDefault("password");
-                var result = await _commandExecutor.ReconnectAsync(serverUrl, token, username, password, ct);
+                var result = await _commandExecutor.ReconnectAsync(serverUrl, token, ct);
                 return new PipeResponse { Success = result, Status = _statusProvider.GetCurrentStatus() };
 
             case "restart_service":
