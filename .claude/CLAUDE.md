@@ -23,6 +23,13 @@ H.264 fMP4 запись → сегментация → S3 хранение → H
 | search-service | 8083 | NATS consumer → OpenSearch индексация, полнотекстовый поиск |
 | web-dashboard | 80 | React SPA, nginx |
 
+## Git
+
+- **Remote:** `git@github.com:shepaland/screen-recorder.git`
+- После завершения разработки фичи/фикса — **всегда коммитить и пушить** изменения в remote.
+- Ветки: `feature/*`, `fix/*`, `hotfix/*`. Мержить в `main` через Pull Request.
+- При работе скиллов `/pipeline`, `/implement`, `/deploy` — коммит и push обязателен в конце.
+
 ## Команды
 
 ```bash
