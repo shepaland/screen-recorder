@@ -57,7 +57,7 @@ public class PipeServer : BackgroundService
                     PipeAccessRights.ReadWrite,
                     System.Security.AccessControl.AccessControlType.Allow));
 
-                using var server = NamedPipeServerStreamAcl.Create(
+                var server = NamedPipeServerStreamAcl.Create(
                     PipeProtocol.PipeName,
                     PipeDirection.InOut,
                     5, // maxNumberOfServerInstances (multiple RDP users)
@@ -68,7 +68,7 @@ public class PipeServer : BackgroundService
                 await server.WaitForConnectionAsync(ct);
                 _logger.LogDebug("Pipe client connected");
 
-                // Handle in background, allow next connection
+                // Handle in background — HandleClientAsync owns disposal of server
                 _ = HandleClientAsync(server, ct);
             }
             catch (OperationCanceledException) { break; }
@@ -116,7 +116,8 @@ public class PipeServer : BackgroundService
         }
         finally
         {
-            if (server.IsConnected) server.Disconnect();
+            try { if (server.IsConnected) server.Disconnect(); } catch { }
+            server.Dispose();
         }
     }
 
