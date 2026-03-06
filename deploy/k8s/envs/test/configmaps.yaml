@@ -23,8 +23,8 @@ data:
   SMTP_PORT: "465"
   EMAIL_FROM: "otp@shepaland.ru"
   EMAIL_FROM_NAME: "Кадеро"
-  SWAGGER_API_DOCS_URL: "/docs/auth/v3/api-docs"
-  SWAGGER_CONFIG_URL: "/docs/auth/v3/api-docs/swagger-config"
+  SWAGGER_API_DOCS_URL: "/screenrecorder/docs/auth/v3/api-docs"
+  SWAGGER_CONFIG_URL: "/screenrecorder/docs/auth/v3/api-docs/swagger-config"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -39,8 +39,8 @@ data:
   AUTH_SERVICE_URL: "http://auth-service:8081"
   HEARTBEAT_TIMEOUT: "90"
   JAVA_OPTS: "-Xms256m -Xmx512m"
-  SWAGGER_API_DOCS_URL: "/docs/cp/v3/api-docs"
-  SWAGGER_CONFIG_URL: "/docs/cp/v3/api-docs/swagger-config"
+  SWAGGER_API_DOCS_URL: "/screenrecorder/docs/cp/v3/api-docs"
+  SWAGGER_CONFIG_URL: "/screenrecorder/docs/cp/v3/api-docs/swagger-config"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -59,5 +59,5 @@ data:
   S3_PRESIGN_EXPIRY: "300"
   S3_PRESIGN_ENDPOINT: "https://services-test.shepaland.ru"
   JAVA_OPTS: "-Xms256m -Xmx768m"
-  SWAGGER_API_DOCS_URL: "/docs/ingest/v3/api-docs"
-  SWAGGER_CONFIG_URL: "/docs/ingest/v3/api-docs/swagger-config"
+  SWAGGER_API_DOCS_URL: "/screenrecorder/docs/ingest/v3/api-docs"
+  SWAGGER_CONFIG_URL: "/screenrecorder/docs/ingest/v3/api-docs/swagger-config"
