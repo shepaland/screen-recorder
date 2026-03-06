@@ -23,7 +23,8 @@ public class SessionManager
         _logger = logger;
     }
 
-    public async Task<string> StartSessionAsync(CancellationToken ct = default)
+    public async Task<string> StartSessionAsync(int fps = 1, string resolution = "1280x720",
+        CancellationToken ct = default)
     {
         await _authManager.EnsureValidTokenAsync();
         var creds = _credentialStore.Load();
@@ -35,8 +36,8 @@ public class SessionManager
             device_id = _authManager.DeviceId,
             metadata = new
             {
-                resolution = "1920x1080",
-                fps = 5,
+                resolution,
+                fps,
                 codec = "h264"
             }
         };
@@ -51,14 +52,24 @@ public class SessionManager
     {
         if (_currentSessionId == null) return;
 
-        await _authManager.EnsureValidTokenAsync();
-        var creds = _credentialStore.Load();
-        var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";
+        try
+        {
+            await _authManager.EnsureValidTokenAsync();
+            var creds = _credentialStore.Load();
+            var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";
 
-        var url = $"{baseUrl}/api/ingest/v1/ingest/sessions/{_currentSessionId}/end";
-        await _apiClient.PutAsync<object>(url, null, ct);
-        _logger.LogInformation("Recording session ended: {SessionId}", _currentSessionId);
-        _currentSessionId = null;
+            var url = $"{baseUrl}/api/ingest/v1/ingest/sessions/{_currentSessionId}/end";
+            await _apiClient.PutAsync<object>(url, null, ct);
+            _logger.LogInformation("Recording session ended: {SessionId}", _currentSessionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to end session {SessionId} on server", _currentSessionId);
+        }
+        finally
+        {
+            _currentSessionId = null;
+        }
     }
 }
 

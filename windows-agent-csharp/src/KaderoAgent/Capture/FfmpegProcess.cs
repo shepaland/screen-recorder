@@ -83,6 +83,15 @@ public class FfmpegProcess
         _logger.LogInformation("FFmpeg started directly, PID={Pid}", _process.Id);
     }
 
+    public bool HasExited
+    {
+        get
+        {
+            try { return _process == null || _process.HasExited; }
+            catch { return true; }
+        }
+    }
+
     public void Stop()
     {
         if (_process == null || _process.HasExited) return;

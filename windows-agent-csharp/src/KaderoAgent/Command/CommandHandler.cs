@@ -1,8 +1,10 @@
 using KaderoAgent.Auth;
 using KaderoAgent.Capture;
+using KaderoAgent.Configuration;
 using KaderoAgent.Upload;
 using KaderoAgent.Util;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace KaderoAgent.Command;
 
@@ -13,16 +15,22 @@ public class CommandHandler
     private readonly UploadQueue _uploadQueue;
     private readonly AuthManager _authManager;
     private readonly ApiClient _apiClient;
+    private readonly IOptions<AgentConfig> _config;
     private readonly ILogger<CommandHandler> _logger;
 
+    private DateTime? _sessionStartTime;
+    private string _currentBaseUrl = "";
+
     public CommandHandler(ScreenCaptureManager captureManager, SessionManager sessionManager,
-        UploadQueue uploadQueue, AuthManager authManager, ApiClient apiClient, ILogger<CommandHandler> logger)
+        UploadQueue uploadQueue, AuthManager authManager, ApiClient apiClient,
+        IOptions<AgentConfig> config, ILogger<CommandHandler> logger)
     {
         _captureManager = captureManager;
         _sessionManager = sessionManager;
         _uploadQueue = uploadQueue;
         _authManager = authManager;
         _apiClient = apiClient;
+        _config = config;
         _logger = logger;
     }
 
@@ -41,7 +49,7 @@ public class CommandHandler
                     await StopRecording(ct);
                     break;
                 case "UPDATE_SETTINGS":
-                    // TODO: update config from payload
+                    UpdateSettings(cmd.Payload);
                     break;
                 case "RESTART_AGENT":
                     Environment.Exit(0); // Service will auto-restart
@@ -60,29 +68,144 @@ public class CommandHandler
         }
     }
 
+    /// <summary>Auto-start recording using server config or defaults. Called from AgentService on boot.</summary>
+    public async Task AutoStartRecordingAsync(string baseUrl, CancellationToken ct)
+    {
+        var serverCfg = _authManager.ServerConfig;
+        var autoStart = serverCfg?.AutoStart ?? _config.Value.AutoStart;
+
+        if (!autoStart)
+        {
+            _logger.LogInformation("AutoStart is disabled, waiting for server command");
+            return;
+        }
+
+        if (_captureManager.IsRecording)
+        {
+            _logger.LogDebug("Already recording, skip auto-start");
+            return;
+        }
+
+        _logger.LogInformation("Auto-starting recording...");
+        await StartRecording(baseUrl, ct);
+    }
+
+    /// <summary>Check if FFmpeg crashed and restart recording.</summary>
+    public async Task CheckAndRecoverAsync(string baseUrl, CancellationToken ct)
+    {
+        if (!_captureManager.IsRecording) return;
+
+        if (_captureManager.HasCrashed)
+        {
+            _logger.LogWarning("FFmpeg crash detected, restarting recording...");
+            _captureManager.ResetAfterCrash();
+    
+
+            // End old session, start new one
+            try { await _sessionManager.EndSessionAsync(ct); } catch { }
+            await StartRecording(baseUrl, ct);
+        }
+    }
+
+    /// <summary>Check if session exceeded max duration and rotate.</summary>
+    public async Task CheckSessionRotationAsync(string baseUrl, CancellationToken ct)
+    {
+        if (!_captureManager.IsRecording || _sessionStartTime == null) return;
+
+        var serverCfg = _authManager.ServerConfig;
+        var maxHours = serverCfg?.SessionMaxDurationHours ?? _config.Value.SessionMaxDurationHours;
+        var elapsed = DateTime.UtcNow - _sessionStartTime.Value;
+
+        if (elapsed.TotalHours >= maxHours)
+        {
+            _logger.LogInformation("Session max duration ({MaxH}h) reached, rotating...", maxHours);
+            await RotateSessionAsync(baseUrl, ct);
+        }
+    }
+
     private async Task StartRecording(string baseUrl, CancellationToken ct)
     {
         if (_captureManager.IsRecording) return;
 
-        var sessionId = await _sessionManager.StartSessionAsync(ct);
+        _currentBaseUrl = baseUrl;
 
-        var config = _authManager.ServerConfig;
-        var fps = config?.CaptureFps ?? 5;
-        var segDuration = config?.SegmentDurationSec ?? 10;
-        var quality = config?.Quality ?? "medium";
+        // Get settings: server overrides > local defaults
+        var serverCfg = _authManager.ServerConfig;
+        var fps = serverCfg?.CaptureFps > 0 ? serverCfg.CaptureFps : _config.Value.CaptureFps;
+        var segDuration = serverCfg?.SegmentDurationSec > 0 ? serverCfg.SegmentDurationSec : _config.Value.SegmentDurationSec;
+        var quality = !string.IsNullOrEmpty(serverCfg?.Quality) ? serverCfg.Quality : _config.Value.Quality;
+        var resolution = !string.IsNullOrEmpty(serverCfg?.Resolution) ? serverCfg.Resolution : _config.Value.Resolution;
 
-        _captureManager.Start(sessionId, fps, segDuration, quality);
+        // Create session on server (offline-tolerant)
+        string sessionId;
+        try
+        {
+            sessionId = await _sessionManager.StartSessionAsync(fps, resolution, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to create server session, using local session ID");
+            sessionId = Guid.NewGuid().ToString();
+        }
+
+        _captureManager.Start(sessionId, fps, segDuration, quality, resolution);
         _uploadQueue.StartProcessing(baseUrl, ct);
+        _sessionStartTime = DateTime.UtcNow;
 
         // Start watching for new segments
         _ = Task.Run(() => WatchSegments(sessionId, baseUrl, ct), ct);
+
+        _logger.LogInformation("Recording started: session={Session}, fps={Fps}, res={Res}, maxH={MaxH}",
+            sessionId, fps, resolution,
+            serverCfg?.SessionMaxDurationHours ?? _config.Value.SessionMaxDurationHours);
     }
 
     private async Task StopRecording(CancellationToken ct)
     {
         _captureManager.Stop();
         _uploadQueue.StopProcessing();
+        _sessionStartTime = null;
+
         await _sessionManager.EndSessionAsync(ct);
+    }
+
+    private async Task RotateSessionAsync(string baseUrl, CancellationToken ct)
+    {
+        _logger.LogInformation("Rotating recording session...");
+
+        // Stop current
+        _captureManager.Stop();
+        try { await _sessionManager.EndSessionAsync(ct); } catch { }
+
+        // Brief pause for FFmpeg cleanup
+        await Task.Delay(1000, ct);
+
+        // Start new session with same settings
+        _sessionStartTime = null;
+        await StartRecording(baseUrl, ct);
+    }
+
+    private void UpdateSettings(Dictionary<string, object>? payload)
+    {
+        if (payload == null) return;
+
+        _logger.LogInformation("Updating settings from server command");
+
+        // Settings will take effect on next recording start
+        // (ServerConfig is the primary source, these are emergency overrides)
+        if (payload.TryGetValue("capture_fps", out var fpsObj) && fpsObj is int fps)
+            _config.Value.CaptureFps = fps;
+        if (payload.TryGetValue("resolution", out var resObj) && resObj is string res)
+            _config.Value.Resolution = res;
+        if (payload.TryGetValue("quality", out var qObj) && qObj is string q)
+            _config.Value.Quality = q;
+        if (payload.TryGetValue("segment_duration_sec", out var segObj) && segObj is int seg)
+            _config.Value.SegmentDurationSec = seg;
+        if (payload.TryGetValue("auto_start", out var autoObj) && autoObj is bool auto)
+            _config.Value.AutoStart = auto;
+
+        _logger.LogInformation("Settings updated: fps={Fps}, res={Res}, quality={Quality}",
+            _config.Value.CaptureFps, _config.Value.Resolution, _config.Value.Quality);
     }
 
     private async Task WatchSegments(string sessionId, string baseUrl, CancellationToken ct)
@@ -94,6 +217,8 @@ public class CommandHandler
         while (!ct.IsCancellationRequested && _captureManager.IsRecording)
         {
             await Task.Delay(2000, ct); // Check every 2 seconds
+
+            if (!Directory.Exists(dir)) continue;
 
             var files = Directory.GetFiles(dir, "segment_*.mp4")
                 .OrderBy(f => f)
@@ -117,19 +242,26 @@ public class CommandHandler
         }
 
         // Upload remaining files after stop
-        await Task.Delay(1000, ct);
-        var remaining = Directory.GetFiles(dir, "segment_*.mp4")
-            .Where(f => !processedFiles.Contains(f))
-            .OrderBy(f => f);
-
-        foreach (var file in remaining)
+        try
         {
-            await _uploadQueue.EnqueueAsync(new SegmentInfo
+            await Task.Delay(1000, ct);
+            if (Directory.Exists(dir))
             {
-                FilePath = file,
-                SessionId = sessionId,
-                SequenceNum = sequenceNum++
-            });
+                var remaining = Directory.GetFiles(dir, "segment_*.mp4")
+                    .Where(f => !processedFiles.Contains(f))
+                    .OrderBy(f => f);
+
+                foreach (var file in remaining)
+                {
+                    await _uploadQueue.EnqueueAsync(new SegmentInfo
+                    {
+                        FilePath = file,
+                        SessionId = sessionId,
+                        SequenceNum = sequenceNum++
+                    });
+                }
+            }
         }
+        catch (OperationCanceledException) { }
     }
 }

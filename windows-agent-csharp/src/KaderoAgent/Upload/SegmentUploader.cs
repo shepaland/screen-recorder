@@ -1,7 +1,10 @@
 using System.Security.Cryptography;
 using KaderoAgent.Auth;
+using KaderoAgent.Capture;
+using KaderoAgent.Configuration;
 using KaderoAgent.Util;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace KaderoAgent.Upload;
 
@@ -9,12 +12,18 @@ public class SegmentUploader
 {
     private readonly ApiClient _apiClient;
     private readonly AuthManager _authManager;
+    private readonly ScreenCaptureManager _captureManager;
+    private readonly IOptions<AgentConfig> _config;
     private readonly ILogger<SegmentUploader> _logger;
 
-    public SegmentUploader(ApiClient apiClient, AuthManager authManager, ILogger<SegmentUploader> logger)
+    public SegmentUploader(ApiClient apiClient, AuthManager authManager,
+        ScreenCaptureManager captureManager, IOptions<AgentConfig> config,
+        ILogger<SegmentUploader> logger)
     {
         _apiClient = apiClient;
         _authManager = authManager;
+        _captureManager = captureManager;
+        _config = config;
         _logger = logger;
     }
 
@@ -29,6 +38,17 @@ public class SegmentUploader
             var checksum = Convert.ToHexString(SHA256.HashData(fileBytes)).ToLower();
             var baseUrl = serverUrl.TrimEnd('/');
 
+            // Use actual recording settings, not hardcoded values
+            var serverCfg = _authManager.ServerConfig;
+            var fps = _captureManager.CurrentFps > 0
+                ? _captureManager.CurrentFps
+                : (serverCfg?.CaptureFps > 0 ? serverCfg.CaptureFps : _config.Value.CaptureFps);
+            var resolution = !string.IsNullOrEmpty(_captureManager.CurrentResolution)
+                ? _captureManager.CurrentResolution
+                : (!string.IsNullOrEmpty(serverCfg?.Resolution) ? serverCfg.Resolution : _config.Value.Resolution);
+            var segDuration = serverCfg?.SegmentDurationSec > 0
+                ? serverCfg.SegmentDurationSec : _config.Value.SegmentDurationSec;
+
             // 1. Presign
             var presignBody = new
             {
@@ -36,10 +56,10 @@ public class SegmentUploader
                 session_id = sessionId,
                 sequence_num = sequenceNum,
                 size_bytes = fileBytes.Length,
-                duration_ms = 10000,
+                duration_ms = segDuration * 1000,
                 checksum_sha256 = checksum,
                 content_type = "video/mp4",
-                metadata = new { resolution = "1920x1080", fps = 5, codec = "h264" }
+                metadata = new { resolution, fps, codec = "h264" }
             };
 
             var presignUrl = $"{baseUrl}/api/ingest/v1/ingest/presign";

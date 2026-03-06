@@ -1,4 +1,5 @@
 using KaderoAgent.Auth;
+using KaderoAgent.Command;
 using KaderoAgent.Storage;
 using KaderoAgent.Upload;
 using Microsoft.Extensions.Hosting;
@@ -13,16 +14,19 @@ public class AgentService : BackgroundService
     private readonly UploadQueue _uploadQueue;
     private readonly SegmentFileManager _fileManager;
     private readonly CredentialStore _credentialStore;
+    private readonly CommandHandler _commandHandler;
     private readonly ILogger<AgentService> _logger;
 
     public AgentService(AuthManager authManager, LocalDatabase db, UploadQueue uploadQueue,
-        SegmentFileManager fileManager, CredentialStore credentialStore, ILogger<AgentService> logger)
+        SegmentFileManager fileManager, CredentialStore credentialStore,
+        CommandHandler commandHandler, ILogger<AgentService> logger)
     {
         _authManager = authManager;
         _db = db;
         _uploadQueue = uploadQueue;
         _fileManager = fileManager;
         _credentialStore = credentialStore;
+        _commandHandler = commandHandler;
         _logger = logger;
     }
 
@@ -40,13 +44,14 @@ public class AgentService : BackgroundService
 
         _logger.LogInformation("Authenticated as device {DeviceId}", _authManager.DeviceId);
 
+        var creds = _credentialStore.Load();
+        var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";
+
         // Upload any pending segments from offline buffer
         var pending = _db.GetPendingSegments();
         if (pending.Count > 0)
         {
             _logger.LogInformation("Found {Count} pending segments, uploading...", pending.Count);
-            var creds = _credentialStore.Load();
-            var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";
             _uploadQueue.StartProcessing(baseUrl, ct);
             foreach (var seg in pending)
             {
@@ -57,11 +62,36 @@ public class AgentService : BackgroundService
             }
         }
 
-        // Main loop - periodic maintenance
+        // Auto-start recording if configured
+        try
+        {
+            await _commandHandler.AutoStartRecordingAsync(baseUrl, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Auto-start recording failed, will retry on next cycle");
+        }
+
+        // Main loop - periodic maintenance + monitoring
         while (!ct.IsCancellationRequested)
         {
-            _fileManager.EvictOldSegments();
-            await Task.Delay(TimeSpan.FromMinutes(5), ct);
+            try
+            {
+                // Evict old segments when buffer exceeds limit
+                _fileManager.EvictOldSegments();
+
+                // Check if FFmpeg crashed and restart
+                await _commandHandler.CheckAndRecoverAsync(baseUrl, ct);
+
+                // Check session max duration and rotate
+                await _commandHandler.CheckSessionRotationAsync(baseUrl, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Maintenance cycle error");
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(30), ct);
         }
     }
 }
