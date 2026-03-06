@@ -50,6 +50,9 @@ springdoc:
     path: /swagger-ui.html
     operations-sorter: alpha
     tags-sorter: alpha
+    url: ${SWAGGER_API_DOCS_URL:/v3/api-docs}
+    config-url: ${SWAGGER_CONFIG_URL:/v3/api-docs/swagger-config}
+    disable-swagger-default-url: true
 
 management:
   endpoints:

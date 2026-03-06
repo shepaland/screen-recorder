@@ -17,6 +17,8 @@ data:
   JAVA_OPTS: "-Xms256m -Xmx512m"
   INGEST_BASE_URL: "https://services.shepaland.ru/screenrecorder/api/ingest/v1/ingest"
   CONTROL_PLANE_BASE_URL: "https://services.shepaland.ru/screenrecorder/api/cp/v1/devices"
+  SWAGGER_API_DOCS_URL: "/docs/auth/v3/api-docs"
+  SWAGGER_CONFIG_URL: "/docs/auth/v3/api-docs/swagger-config"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -31,6 +33,8 @@ data:
   AUTH_SERVICE_URL: "http://auth-service:8081"
   HEARTBEAT_TIMEOUT: "90"
   JAVA_OPTS: "-Xms256m -Xmx512m"
+  SWAGGER_API_DOCS_URL: "/docs/cp/v3/api-docs"
+  SWAGGER_CONFIG_URL: "/docs/cp/v3/api-docs/swagger-config"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -49,3 +53,5 @@ data:
   S3_PRESIGN_EXPIRY: "300"
   S3_PRESIGN_ENDPOINT: "https://services.shepaland.ru"
   JAVA_OPTS: "-Xms256m -Xmx768m"
+  SWAGGER_API_DOCS_URL: "/docs/ingest/v3/api-docs"
+  SWAGGER_CONFIG_URL: "/docs/ingest/v3/api-docs/swagger-config"
