@@ -8,8 +8,11 @@ using System.Text.Json.Serialization;
 /// <summary>
 /// Named Pipe client for Tray application.
 /// Connects to PipeServer running in Windows Service.
-/// Thread-safe: uses SemaphoreSlim to serialize pipe operations.
-/// All IO operations have timeouts to prevent STA message pump starvation.
+///
+/// IMPORTANT: This class must be called from thread pool threads ONLY.
+/// Never call from the STA/UI thread — use ThreadPool.QueueUserWorkItem or
+/// System.Threading.Timer and marshal results back via BeginInvoke.
+/// All async methods use ConfigureAwait(false) as defense-in-depth.
 /// </summary>
 public class PipeClient : IDisposable
 {
@@ -17,9 +20,8 @@ public class PipeClient : IDisposable
     private StreamReader? _reader;
     private StreamWriter? _writer;
     private readonly JsonSerializerOptions _jsonOptions;
-    private readonly SemaphoreSlim _sendLock = new(1, 1);
-    private static readonly TimeSpan SendTimeout = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan LockTimeout = TimeSpan.FromSeconds(3);
+    private readonly object _pipeLock = new();
+    private static readonly TimeSpan IoTimeout = TimeSpan.FromSeconds(5);
 
     public bool IsConnected => _pipe?.IsConnected == true;
 
@@ -37,10 +39,17 @@ public class PipeClient : IDisposable
         try
         {
             Disconnect();
-            _pipe = new NamedPipeClientStream(".", PipeProtocol.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
-            await _pipe.ConnectAsync(timeoutMs);
-            _reader = new StreamReader(_pipe, Encoding.UTF8);
-            _writer = new StreamWriter(_pipe, Encoding.UTF8) { AutoFlush = true };
+            var pipe = new NamedPipeClientStream(".", PipeProtocol.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+            await pipe.ConnectAsync(timeoutMs).ConfigureAwait(false);
+            var reader = new StreamReader(pipe, Encoding.UTF8);
+            var writer = new StreamWriter(pipe, Encoding.UTF8) { AutoFlush = true };
+
+            lock (_pipeLock)
+            {
+                _pipe = pipe;
+                _reader = reader;
+                _writer = writer;
+            }
             return true;
         }
         catch
@@ -52,22 +61,29 @@ public class PipeClient : IDisposable
 
     public async Task<PipeResponse?> SendAsync(PipeRequest request)
     {
-        if (!IsConnected) return null;
+        StreamReader? reader;
+        StreamWriter? writer;
 
-        // Serialize pipe access — prevent concurrent read/write on same stream
-        if (!await _sendLock.WaitAsync(LockTimeout)) return null;
+        lock (_pipeLock)
+        {
+            if (_pipe == null || !_pipe.IsConnected) return null;
+            reader = _reader;
+            writer = _writer;
+        }
+
+        if (reader == null || writer == null) return null;
+
         try
         {
-            using var cts = new CancellationTokenSource(SendTimeout);
+            using var cts = new CancellationTokenSource(IoTimeout);
             var json = JsonSerializer.Serialize(request, _jsonOptions);
-            await _writer!.WriteLineAsync(json.AsMemory(), cts.Token);
-            var responseLine = await _reader!.ReadLineAsync(cts.Token);
+            await writer.WriteLineAsync(json.AsMemory(), cts.Token).ConfigureAwait(false);
+            var responseLine = await reader.ReadLineAsync(cts.Token).ConfigureAwait(false);
             if (responseLine == null) return null;
             return JsonSerializer.Deserialize<PipeResponse>(responseLine, _jsonOptions);
         }
         catch (OperationCanceledException)
         {
-            // Timeout — pipe is stuck, disconnect and let next poll reconnect
             Disconnect();
             return null;
         }
@@ -76,15 +92,11 @@ public class PipeClient : IDisposable
             Disconnect();
             return null;
         }
-        finally
-        {
-            _sendLock.Release();
-        }
     }
 
     public async Task<AgentStatus?> GetStatusAsync()
     {
-        var response = await SendAsync(new PipeRequest { Command = "get_status" });
+        var response = await SendAsync(new PipeRequest { Command = "get_status" }).ConfigureAwait(false);
         return response?.Status;
     }
 
@@ -97,19 +109,18 @@ public class PipeClient : IDisposable
         };
         if (!string.IsNullOrEmpty(serverUrl)) request.Params["server_url"] = serverUrl;
         if (!string.IsNullOrEmpty(token)) request.Params["token"] = token;
-        return await SendAsync(request);
+        return await SendAsync(request).ConfigureAwait(false);
     }
 
     public void Disconnect()
     {
-        _reader?.Dispose(); _reader = null;
-        _writer?.Dispose(); _writer = null;
-        _pipe?.Dispose(); _pipe = null;
+        lock (_pipeLock)
+        {
+            _reader?.Dispose(); _reader = null;
+            _writer?.Dispose(); _writer = null;
+            _pipe?.Dispose(); _pipe = null;
+        }
     }
 
-    public void Dispose()
-    {
-        Disconnect();
-        _sendLock.Dispose();
-    }
+    public void Dispose() => Disconnect();
 }

@@ -8,6 +8,9 @@ using KaderoAgent.Resources;
 /// <summary>
 /// Status window with glass/acrylic UI style.
 /// Borderless, draggable, opens at bottom-right corner above taskbar.
+///
+/// ARCHITECTURE: All pipe I/O runs on thread pool threads via System.Threading.Timer.
+/// UI updates are marshaled to STA thread via BeginInvoke.
 /// </summary>
 public class StatusWindow : Form
 {
@@ -40,9 +43,9 @@ public class StatusWindow : Form
     private Button _reconnectBtn = null!;
     private Label _statusMessage = null!;
 
-    // Auto-refresh timer
-    private System.Windows.Forms.Timer _refreshTimer = null!;
-    private bool _refreshing; // Re-entrance guard for timer-based refresh
+    // Auto-refresh timer (thread pool based)
+    private System.Threading.Timer? _refreshTimer;
+    private int _refreshing; // 0=idle, 1=busy — Interlocked for thread safety
 
     public StatusWindow(PipeClient pipeClient, Action onReconnect)
     {
@@ -198,39 +201,71 @@ public class StatusWindow : Form
 
     private void StartAutoRefresh()
     {
-        _refreshTimer = new System.Windows.Forms.Timer { Interval = 2000 };
-        _refreshTimer.Tick += async (_, _) => await RefreshStatusAsync();
-        _refreshTimer.Start();
-        _ = RefreshStatusAsync();
+        _refreshTimer = new System.Threading.Timer(
+            callback: _ => RefreshStatusOnThreadPool(),
+            state: null,
+            dueTime: 0,
+            period: 2000);
     }
 
-    private async Task RefreshStatusAsync()
+    /// <summary>
+    /// Runs on thread pool thread. All pipe I/O completes here.
+    /// </summary>
+    private void RefreshStatusOnThreadPool()
     {
-        if (_refreshing) return; // Skip if previous refresh still running
-        _refreshing = true;
+        if (Interlocked.CompareExchange(ref _refreshing, 1, 0) != 0)
+            return;
+
         try
         {
+            if (IsDisposed) return;
+
             if (!_pipeClient.IsConnected)
             {
-                var connected = await _pipeClient.ConnectAsync(1000);
-                if (!connected) { SetDisconnectedState(); return; }
+                var connected = _pipeClient.ConnectAsync(1000).GetAwaiter().GetResult();
+                if (!connected)
+                {
+                    MarshalSetDisconnectedState();
+                    return;
+                }
             }
 
-            var status = await _pipeClient.GetStatusAsync();
-            if (status == null) { SetDisconnectedState(); return; }
-            UpdateUI(status);
+            var status = _pipeClient.GetStatusAsync().GetAwaiter().GetResult();
+            if (status == null)
+            {
+                MarshalSetDisconnectedState();
+                return;
+            }
+            MarshalUpdateUI(status);
         }
-        catch { SetDisconnectedState(); }
+        catch
+        {
+            MarshalSetDisconnectedState();
+        }
         finally
         {
-            _refreshing = false;
+            Interlocked.Exchange(ref _refreshing, 0);
         }
+    }
+
+    private void MarshalSetDisconnectedState()
+    {
+        if (IsDisposed) return;
+        try { BeginInvoke(SetDisconnectedState); }
+        catch (ObjectDisposedException) { }
+        catch (InvalidOperationException) { }
+    }
+
+    private void MarshalUpdateUI(AgentStatus status)
+    {
+        if (IsDisposed) return;
+        try { BeginInvoke(() => UpdateUI(status)); }
+        catch (ObjectDisposedException) { }
+        catch (InvalidOperationException) { }
     }
 
     private void SetDisconnectedState()
     {
-        if (InvokeRequired) { Invoke(SetDisconnectedState); return; }
-
         _connectionStatusLabel.Text = "Нет связи с сервисом";
         _connectionIndicator.BackColor = GlassHelper.StatusGray;
         _connectionIndicator.Invalidate();
@@ -241,8 +276,6 @@ public class StatusWindow : Form
 
     private void UpdateUI(AgentStatus status)
     {
-        if (InvokeRequired) { Invoke(() => UpdateUI(status)); return; }
-
         // Connection
         switch (status.ConnectionStatus)
         {
@@ -305,44 +338,58 @@ public class StatusWindow : Form
             _serverUrlBox.Text = status.ServerUrl;
     }
 
-    private async void OnReconnect(object? sender, EventArgs e)
+    private void OnReconnect(object? sender, EventArgs e)
     {
         _reconnectBtn.Enabled = false;
         _statusMessage.Text = "Переподключение...";
         _statusMessage.ForeColor = GlassHelper.TextSecondary;
 
-        try
-        {
-            if (!_pipeClient.IsConnected)
-                await _pipeClient.ConnectAsync();
+        var serverUrl = _serverUrlBox.Text.Trim();
+        var token = string.IsNullOrWhiteSpace(_tokenBox.Text) ? null : _tokenBox.Text.Trim();
 
-            var response = await _pipeClient.ReconnectAsync(
-                _serverUrlBox.Text.Trim(),
-                string.IsNullOrWhiteSpace(_tokenBox.Text) ? null : _tokenBox.Text.Trim()
-            );
+        // Pipe I/O on thread pool, marshal result back to UI
+        ThreadPool.QueueUserWorkItem(_ =>
+        {
+            try
+            {
+                if (!_pipeClient.IsConnected)
+                    _pipeClient.ConnectAsync().GetAwaiter().GetResult();
 
-            if (response?.Success == true)
-            {
-                _statusMessage.Text = "Подключено!";
-                _statusMessage.ForeColor = GlassHelper.StatusGreen;
-                _tokenBox.Text = "";
-                _onReconnect?.Invoke();
+                var response = _pipeClient.ReconnectAsync(serverUrl, token).GetAwaiter().GetResult();
+
+                if (IsDisposed) return;
+                BeginInvoke(() =>
+                {
+                    if (response?.Success == true)
+                    {
+                        _statusMessage.Text = "Подключено!";
+                        _statusMessage.ForeColor = GlassHelper.StatusGreen;
+                        _tokenBox.Text = "";
+                        _onReconnect?.Invoke();
+                    }
+                    else
+                    {
+                        _statusMessage.Text = response?.Error ?? "Ошибка подключения";
+                        _statusMessage.ForeColor = GlassHelper.StatusRed;
+                    }
+                    _reconnectBtn.Enabled = true;
+                });
             }
-            else
+            catch (Exception ex)
             {
-                _statusMessage.Text = response?.Error ?? "Ошибка подключения";
-                _statusMessage.ForeColor = GlassHelper.StatusRed;
+                if (IsDisposed) return;
+                try
+                {
+                    BeginInvoke(() =>
+                    {
+                        _statusMessage.Text = $"Ошибка: {ex.Message}";
+                        _statusMessage.ForeColor = GlassHelper.StatusRed;
+                        _reconnectBtn.Enabled = true;
+                    });
+                }
+                catch { }
             }
-        }
-        catch (Exception ex)
-        {
-            _statusMessage.Text = $"Ошибка: {ex.Message}";
-            _statusMessage.ForeColor = GlassHelper.StatusRed;
-        }
-        finally
-        {
-            _reconnectBtn.Enabled = true;
-        }
+        });
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
@@ -350,10 +397,22 @@ public class StatusWindow : Form
         if (e.CloseReason == CloseReason.UserClosing)
         {
             e.Cancel = true;
+            _refreshTimer?.Change(Timeout.Infinite, Timeout.Infinite); // Stop timer while hidden
             Hide();
             return;
         }
-        _refreshTimer?.Stop();
+        _refreshTimer?.Dispose();
+        _refreshTimer = null;
         base.OnFormClosing(e);
+    }
+
+    protected override void OnVisibleChanged(EventArgs e)
+    {
+        base.OnVisibleChanged(e);
+        if (Visible)
+        {
+            // Resume timer when shown
+            _refreshTimer?.Change(0, 2000);
+        }
     }
 }

@@ -9,6 +9,10 @@ using KaderoAgent.Util;
 /// <summary>
 /// Tray application — UI shell for monitoring and configuring KaderoAgent Windows Service.
 /// Does NOT perform any recording or upload. Only communicates with Service via Named Pipe.
+///
+/// ARCHITECTURE: All pipe I/O runs on thread pool threads via System.Threading.Timer.
+/// UI updates are marshaled to STA thread via BeginInvoke. This prevents
+/// WindowsFormsSynchronizationContext deadlocks that freeze the context menu.
 /// </summary>
 public class TrayApplication : ApplicationContext
 {
@@ -16,17 +20,24 @@ public class TrayApplication : ApplicationContext
     private readonly PipeClient _pipeClient;
     private StatusWindow? _statusWindow;
     private AboutDialog? _aboutDialog;
-    private System.Windows.Forms.Timer _statusTimer = null!;
+    private System.Threading.Timer? _statusTimer;
 
     // Menu items that need updating
     private ToolStripMenuItem _statusItem = null!;
     private string _lastConnectionStatus = "";
     private string _lastRecordingStatus = "";
-    private bool _polling; // Re-entrance guard for timer-based polling
+    private int _polling; // 0=idle, 1=busy — Interlocked for thread safety
+
+    // Hidden control for BeginInvoke marshaling (NotifyIcon has no Invoke method)
+    private readonly Control _invokeControl;
 
     public TrayApplication()
     {
         _pipeClient = new PipeClient();
+
+        // Create hidden control on STA thread for marshaling UI calls
+        _invokeControl = new Control();
+        _invokeControl.CreateControl();
 
         _trayIcon = new NotifyIcon
         {
@@ -38,7 +49,7 @@ public class TrayApplication : ApplicationContext
 
         _trayIcon.DoubleClick += OnTrayDoubleClick;
 
-        // Start background status polling
+        // Start background status polling on thread pool
         StartStatusPolling();
     }
 
@@ -47,7 +58,7 @@ public class TrayApplication : ApplicationContext
         var menu = new ContextMenuStrip();
 
         var openItem = new ToolStripMenuItem("Открыть Кадеро");
-        openItem.Font = new System.Drawing.Font(openItem.Font, System.Drawing.FontStyle.Bold); // Bold = default action
+        openItem.Font = new System.Drawing.Font(openItem.Font, System.Drawing.FontStyle.Bold);
         openItem.Click += OnTrayDoubleClick;
         menu.Items.Add(openItem);
 
@@ -93,46 +104,64 @@ public class TrayApplication : ApplicationContext
 
     private void StartStatusPolling()
     {
-        _statusTimer = new System.Windows.Forms.Timer { Interval = 3000 };
-        _statusTimer.Tick += async (_, _) => await PollStatusAsync();
-        _statusTimer.Start();
-        _ = PollStatusAsync(); // Initial
+        // System.Threading.Timer fires on THREAD POOL, not on UI/STA thread.
+        // Pipe I/O never touches the STA message pump.
+        _statusTimer = new System.Threading.Timer(
+            callback: _ => PollStatusOnThreadPool(),
+            state: null,
+            dueTime: 0,
+            period: 3000);
     }
 
-    private async Task PollStatusAsync()
+    /// <summary>
+    /// Runs on thread pool thread. All pipe I/O completes here.
+    /// UI updates are posted to STA thread via BeginInvoke (non-blocking).
+    /// </summary>
+    private void PollStatusOnThreadPool()
     {
-        if (_polling) return; // Skip if previous poll still running
-        _polling = true;
+        if (Interlocked.CompareExchange(ref _polling, 1, 0) != 0)
+            return;
+
         try
         {
             if (!_pipeClient.IsConnected)
             {
-                var connected = await _pipeClient.ConnectAsync(1000);
+                var connected = _pipeClient.ConnectAsync(1000).GetAwaiter().GetResult();
                 if (!connected)
                 {
-                    UpdateTrayIcon("disconnected", "stopped");
+                    MarshalUpdateTrayIcon("disconnected", "stopped");
                     return;
                 }
             }
 
-            var status = await _pipeClient.GetStatusAsync();
+            var status = _pipeClient.GetStatusAsync().GetAwaiter().GetResult();
             if (status != null)
-            {
-                UpdateTrayIcon(status.ConnectionStatus, status.RecordingStatus);
-            }
+                MarshalUpdateTrayIcon(status.ConnectionStatus, status.RecordingStatus);
             else
-            {
-                UpdateTrayIcon("disconnected", "stopped");
-            }
+                MarshalUpdateTrayIcon("disconnected", "stopped");
         }
         catch
         {
-            UpdateTrayIcon("disconnected", "stopped");
+            MarshalUpdateTrayIcon("disconnected", "stopped");
         }
         finally
         {
-            _polling = false;
+            Interlocked.Exchange(ref _polling, 0);
         }
+    }
+
+    /// <summary>
+    /// Posts UI update to STA thread. Non-blocking — returns immediately.
+    /// </summary>
+    private void MarshalUpdateTrayIcon(string connectionStatus, string recordingStatus)
+    {
+        if (_invokeControl.IsDisposed) return;
+        try
+        {
+            _invokeControl.BeginInvoke(() => UpdateTrayIcon(connectionStatus, recordingStatus));
+        }
+        catch (ObjectDisposedException) { }
+        catch (InvalidOperationException) { }
     }
 
     private void UpdateTrayIcon(string connectionStatus, string recordingStatus)
@@ -186,7 +215,7 @@ public class TrayApplication : ApplicationContext
     {
         if (_statusWindow == null || _statusWindow.IsDisposed)
         {
-            _statusWindow = new StatusWindow(_pipeClient, () => { /* callback after reconnect */ });
+            _statusWindow = new StatusWindow(_pipeClient, () => { });
         }
 
         _statusWindow.Show();
@@ -194,28 +223,30 @@ public class TrayApplication : ApplicationContext
         _statusWindow.Activate();
     }
 
-    private async void OnReconnect(object? sender, EventArgs e)
+    private void OnReconnect(object? sender, EventArgs e)
     {
-        try
+        // Pipe I/O on thread pool — never on STA thread
+        ThreadPool.QueueUserWorkItem(_ =>
         {
-            if (!_pipeClient.IsConnected)
-                await _pipeClient.ConnectAsync();
-
-            await _pipeClient.ReconnectAsync(null, null);
-        }
-        catch { /* silently ignore */ }
+            try
+            {
+                if (!_pipeClient.IsConnected)
+                    _pipeClient.ConnectAsync().GetAwaiter().GetResult();
+                _pipeClient.ReconnectAsync(null, null).GetAwaiter().GetResult();
+            }
+            catch { }
+        });
     }
 
     private void OnRestartService(object? sender, EventArgs e)
     {
         try
         {
-            // Run sc.exe as admin to restart service
             var psi = new ProcessStartInfo
             {
                 FileName = "cmd.exe",
                 Arguments = "/c sc stop KaderoAgent && timeout /t 3 && sc start KaderoAgent",
-                Verb = "runas", // UAC elevation
+                Verb = "runas",
                 UseShellExecute = true,
                 WindowStyle = ProcessWindowStyle.Hidden
             };
@@ -237,11 +268,12 @@ public class TrayApplication : ApplicationContext
 
     private void OnExit(object? sender, EventArgs e)
     {
-        _statusTimer?.Stop();
+        _statusTimer?.Dispose();
         _statusWindow?.Close();
         _aboutDialog?.Close();
         _pipeClient.Dispose();
         _trayIcon.Visible = false;
+        _invokeControl.Dispose();
         Application.Exit();
     }
 }
