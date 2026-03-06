@@ -10,6 +10,7 @@ using KaderoAgent.Upload;
 using KaderoAgent.Util;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 // Configure log4net — set log path before loading config
 var logPath = Path.Combine(
