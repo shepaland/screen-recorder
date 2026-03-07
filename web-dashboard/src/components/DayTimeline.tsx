@@ -119,89 +119,52 @@ export default function DayTimeline({
   const hours = Array.from({ length: 25 }, (_, i) => i);
 
   return (
-    <div className="space-y-2">
-      {/* Timeline bar */}
-      <div className="relative w-full">
-        {/* Hour grid */}
-        <div className="relative h-10 bg-gray-200 rounded-lg overflow-hidden">
-          {/* Hour markers */}
-          {hours.map((h) => (
-            <div
-              key={h}
-              className="absolute top-0 bottom-0 border-l border-gray-300"
-              style={{ left: `${(h / 24) * 100}%` }}
-            />
-          ))}
+    <div className="relative w-full">
+      {/* Hour grid */}
+      <div className="relative h-10 bg-gray-200 rounded-lg overflow-hidden">
+        {/* Hour markers */}
+        {hours.map((h) => (
+          <div
+            key={h}
+            className="absolute top-0 bottom-0 border-l border-gray-300"
+            style={{ left: `${(h / 24) * 100}%` }}
+          />
+        ))}
 
-          {/* Recording blocks (red) */}
-          {blocks.map((block, idx) => {
-            const left = (block.startMin / TOTAL_MINUTES) * 100;
-            const width = ((block.endMin - block.startMin) / TOTAL_MINUTES) * 100;
-            const isActive = block.session.session_id === activeSessionId;
-            const isLive = block.session.status === 'active';
-
-            return (
-              <div
-                key={idx}
-                className={`absolute top-0 bottom-0 cursor-pointer transition-all ${
-                  isActive
-                    ? 'bg-red-700 ring-2 ring-red-400 z-10'
-                    : 'bg-red-600 hover:bg-red-500 z-0'
-                } ${isLive ? 'animate-pulse' : ''}`}
-                style={{ left: `${left}%`, width: `${Math.max(width, 0.5)}%` }}
-                onClick={() => onSegmentClick?.(block.session.session_id, 0)}
-                title={`${formatTimeInTz(block.startTs, timezone)} - ${formatTimeInTz(block.endTs, timezone)} ${tzShort}`}
-              />
-            );
-          })}
-        </div>
-
-        {/* Hour labels */}
-        <div className="relative h-5 mt-0.5">
-          {[0, 3, 6, 9, 12, 15, 18, 21, 24].map((h) => (
-            <span
-              key={h}
-              className="absolute text-[10px] text-gray-500 -translate-x-1/2"
-              style={{ left: `${(h / 24) * 100}%` }}
-            >
-              {h.toString().padStart(2, '0')}:00
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Period labels */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {/* Recording blocks (red) */}
         {blocks.map((block, idx) => {
+          const left = (block.startMin / TOTAL_MINUTES) * 100;
+          const width = ((block.endMin - block.startMin) / TOTAL_MINUTES) * 100;
           const isActive = block.session.session_id === activeSessionId;
           const isLive = block.session.status === 'active';
+
           return (
-            <button
+            <div
               key={idx}
-              onClick={() => onSegmentClick?.(block.session.session_id, 0)}
-              className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded ${
+              className={`absolute top-0 bottom-0 cursor-pointer transition-all ${
                 isActive
-                  ? 'bg-red-100 text-red-800 font-semibold'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              <span className="font-mono">
-                {formatTimeInTz(block.startTs, timezone)}
-              </span>
-              <span className="text-gray-400">-</span>
-              <span className="font-mono">
-                {formatTimeInTz(block.endTs, timezone)}
-              </span>
-              <span className="text-gray-400 ml-0.5">{tzShort}</span>
-              {isLive && (
-                <span className="ml-1 inline-flex items-center gap-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  <span className="text-red-600 font-semibold">LIVE</span>
-                </span>
-              )}
-            </button>
+                  ? 'bg-red-700 ring-2 ring-red-400 z-10'
+                  : 'bg-red-600 hover:bg-red-500 z-0'
+              } ${isLive ? 'animate-pulse' : ''}`}
+              style={{ left: `${left}%`, width: `${Math.max(width, 0.5)}%` }}
+              onClick={() => onSegmentClick?.(block.session.session_id, 0)}
+              title={`${formatTimeInTz(block.startTs, timezone)} - ${formatTimeInTz(block.endTs, timezone)} ${tzShort}`}
+            />
           );
         })}
+      </div>
+
+      {/* Hour labels */}
+      <div className="relative h-5 mt-0.5">
+        {[0, 3, 6, 9, 12, 15, 18, 21, 24].map((h) => (
+          <span
+            key={h}
+            className="absolute text-[10px] text-gray-500 -translate-x-1/2"
+            style={{ left: `${(h / 24) * 100}%` }}
+          >
+            {h.toString().padStart(2, '0')}:00
+          </span>
+        ))}
       </div>
     </div>
   );
