@@ -220,11 +220,13 @@ public class RecordingService {
 
         String timezone = device.getTimezone() != null ? device.getTimezone() : "Europe/Moscow";
 
-        Pageable pageable = PageRequest.of(page, size);
-        Page<Object[]> dayPage = sessionRepository.findRecordingDaysByDeviceId(
-                deviceId, principal.getTenantId(), timezone, pageable);
+        int offset = page * size;
+        List<Object[]> dayRows = sessionRepository.findRecordingDaysByDeviceId(
+                deviceId, principal.getTenantId(), timezone, size, offset);
+        long totalElements = sessionRepository.countRecordingDaysByDeviceId(
+                deviceId, principal.getTenantId(), timezone);
 
-        List<RecordingDayResponse> days = dayPage.getContent().stream()
+        List<RecordingDayResponse> days = dayRows.stream()
                 .map(row -> RecordingDayResponse.builder()
                         .date(row[0].toString())
                         .sessionCount(((Number) row[1]).intValue())
@@ -237,15 +239,17 @@ public class RecordingService {
                         .build())
                 .toList();
 
+        int totalPages = (int) Math.ceil((double) totalElements / size);
+
         return DeviceDaysResponse.builder()
                 .deviceId(deviceId)
                 .deviceHostname(device.getHostname())
                 .timezone(timezone)
                 .days(days)
-                .page(dayPage.getNumber())
-                .size(dayPage.getSize())
-                .totalElements(dayPage.getTotalElements())
-                .totalPages(dayPage.getTotalPages())
+                .page(page)
+                .size(size)
+                .totalElements(totalElements)
+                .totalPages(totalPages)
                 .build();
     }
 

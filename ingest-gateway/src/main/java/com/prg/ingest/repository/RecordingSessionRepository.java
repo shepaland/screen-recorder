@@ -63,19 +63,25 @@ public interface RecordingSessionRepository extends JpaRepository<RecordingSessi
               AND rs.tenant_id = :tenantId
             GROUP BY DATE(rs.started_ts AT TIME ZONE :tz)
             ORDER BY recording_date DESC
-            """,
-            countQuery = """
+            LIMIT :limit OFFSET :offset
+            """, nativeQuery = true)
+    List<Object[]> findRecordingDaysByDeviceId(
+            @Param("deviceId") UUID deviceId,
+            @Param("tenantId") UUID tenantId,
+            @Param("tz") String timezone,
+            @Param("limit") int limit,
+            @Param("offset") int offset);
+
+    @Query(value = """
             SELECT COUNT(DISTINCT DATE(rs.started_ts AT TIME ZONE :tz))
             FROM recording_sessions rs
             WHERE rs.device_id = :deviceId
               AND rs.tenant_id = :tenantId
-            """,
-            nativeQuery = true)
-    Page<Object[]> findRecordingDaysByDeviceId(
+            """, nativeQuery = true)
+    long countRecordingDaysByDeviceId(
             @Param("deviceId") UUID deviceId,
             @Param("tenantId") UUID tenantId,
-            @Param("tz") String timezone,
-            Pageable pageable);
+            @Param("tz") String timezone);
 
     @Query(value = """
             SELECT rs.* FROM recording_sessions rs
