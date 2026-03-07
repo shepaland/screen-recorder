@@ -317,7 +317,7 @@ export default function DeviceRecordingsPage() {
 
       <div className="flex flex-1 min-h-0">
         {/* Left panel: Day list */}
-        <div className="w-56 shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col">
+        <div className="w-48 shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col">
           <div className="shrink-0 px-3 py-2 border-b border-gray-200">
             <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
               <CalendarDaysIcon className="h-4 w-4" />
@@ -401,7 +401,7 @@ export default function DeviceRecordingsPage() {
           )}
         </div>
 
-        {/* Right panel: Video player + Timeline */}
+        {/* Center panel: Video player + Timeline */}
         <div className="flex-1 flex flex-col min-w-0 bg-gray-900">
           {timelineLoading ? (
             <div className="flex-1 flex items-center justify-center">
@@ -438,17 +438,16 @@ export default function DeviceRecordingsPage() {
 
               {/* Segment navigation bar */}
               {activeSegments.length > 1 && (
-                <div className="shrink-0 flex items-center gap-2 px-4 py-2 bg-gray-800">
+                <div className="shrink-0 flex items-center gap-2 px-4 py-1.5 bg-gray-800">
                   <button
                     onClick={() => setActiveSegmentIndex(Math.max(0, activeSegmentIndex - 1))}
                     disabled={activeSegmentIndex === 0}
                     className="p-1 text-gray-400 hover:text-white disabled:opacity-30"
                   >
-                    <ChevronLeftIcon className="h-5 w-5" />
+                    <ChevronLeftIcon className="h-4 w-4" />
                   </button>
 
-                  {/* Segment progress bar */}
-                  <div className="flex-1 flex items-center gap-0.5 h-3">
+                  <div className="flex-1 flex items-center gap-0.5 h-2.5">
                     {activeSegments.map((seg, idx) => (
                       <button
                         key={seg.id}
@@ -472,7 +471,7 @@ export default function DeviceRecordingsPage() {
                     disabled={activeSegmentIndex >= activeSegments.length - 1}
                     className="p-1 text-gray-400 hover:text-white disabled:opacity-30"
                   >
-                    <ChevronRightIcon className="h-5 w-5" />
+                    <ChevronRightIcon className="h-4 w-4" />
                   </button>
 
                   <span className="text-xs text-gray-400 ml-2 shrink-0">
@@ -481,19 +480,8 @@ export default function DeviceRecordingsPage() {
                 </div>
               )}
 
-              {/* Audit event timeline */}
-              {!auditLoading && auditEvents.length > 0 && (
-                <AuditEventTimeline
-                  events={auditEvents}
-                  timezone={timeline.timezone}
-                  sessions={timeline.sessions}
-                  onEventClick={handleAuditEventClick}
-                  activeEventId={activeAuditEventId}
-                />
-              )}
-
               {/* Day timeline */}
-              <div className="shrink-0 px-4 py-3 bg-gray-800 border-t border-gray-700">
+              <div className="shrink-0 px-4 py-2 bg-gray-800 border-t border-gray-700">
                 <DayTimeline
                   sessions={timeline.sessions}
                   timezone={timeline.timezone}
@@ -506,7 +494,7 @@ export default function DeviceRecordingsPage() {
 
               {/* Session info bar */}
               {activeSession && (
-                <div className="shrink-0 px-4 py-2 bg-gray-950 border-t border-gray-800 flex items-center gap-4 text-xs text-gray-400">
+                <div className="shrink-0 px-4 py-1.5 bg-gray-950 border-t border-gray-800 flex items-center gap-4 text-xs text-gray-400">
                   <span>
                     <span className="text-gray-500">Сессия:</span>{' '}
                     {activeSession.session_id.substring(0, 8)}
@@ -538,7 +526,7 @@ export default function DeviceRecordingsPage() {
                   </span>
                   {activeSegment && (
                     <span className="ml-auto">
-                      <span className="text-gray-500">Текущий сегмент:</span>{' '}
+                      <span className="text-gray-500">Сегмент:</span>{' '}
                       #{activeSegment.sequence_num} ({formatBytes(activeSegment.size_bytes)})
                     </span>
                   )}
@@ -547,6 +535,29 @@ export default function DeviceRecordingsPage() {
             </>
           )}
         </div>
+
+        {/* Right panel: Audit events */}
+        {timeline && selectedDate && !timelineLoading && (
+          <div className="w-80 shrink-0 border-l border-gray-700 bg-gray-800 flex flex-col min-h-0">
+            {auditLoading ? (
+              <div className="flex-1 flex items-center justify-center">
+                <LoadingSpinner size="sm" />
+              </div>
+            ) : auditEvents.length > 0 ? (
+              <AuditEventTimeline
+                events={auditEvents}
+                timezone={timeline.timezone}
+                sessions={timeline.sessions}
+                onEventClick={handleAuditEventClick}
+                activeEventId={activeAuditEventId}
+              />
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
+                Нет событий аудита
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

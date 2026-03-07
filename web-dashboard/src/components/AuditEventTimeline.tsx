@@ -73,11 +73,11 @@ export default function AuditEventTimeline({
   }
 
   return (
-    <div className="bg-gray-800 border-t border-gray-700">
+    <div className="flex flex-col h-full min-h-0">
       {/* Header with filter */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700/50">
-        <h3 className="text-sm font-semibold text-gray-300">
-          Аудит событий ({filteredEvents.length})
+      <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b border-gray-700/50">
+        <h3 className="text-xs font-semibold text-gray-300">
+          Аудит ({filteredEvents.length})
         </h3>
         <div className="flex gap-1">
           {FILTER_OPTIONS.map((opt) => (
@@ -96,15 +96,14 @@ export default function AuditEventTimeline({
         </div>
       </div>
 
-      {/* Events table */}
-      <div className="overflow-y-auto max-h-48">
-        <table className="min-w-full divide-y divide-gray-700">
-          <thead className="bg-gray-800/80 sticky top-0">
+      {/* Events table — fills remaining height */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <table className="w-full">
+          <thead className="bg-gray-800/90 sticky top-0 z-10">
             <tr>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-400">Тип</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-400">Время</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-400">Сессия</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-400">Детали</th>
+              <th className="px-2 py-1.5 text-left text-[10px] font-semibold text-gray-400">Тип</th>
+              <th className="px-2 py-1.5 text-left text-[10px] font-semibold text-gray-400">Время</th>
+              <th className="px-2 py-1.5 text-left text-[10px] font-semibold text-gray-400">Детали</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-700/50">
@@ -122,20 +121,17 @@ export default function AuditEventTimeline({
                       : 'hover:bg-gray-700/50'
                   }`}
                 >
-                  <td className="whitespace-nowrap px-3 py-1.5 text-xs">
+                  <td className="whitespace-nowrap px-2 py-1 text-xs">
                     <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset ${config.bgColor}`}
+                      className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset ${config.bgColor}`}
                     >
                       {config.label}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-1.5 text-xs text-gray-300">
+                  <td className="whitespace-nowrap px-2 py-1 text-[11px] text-gray-300 tabular-nums">
                     {formatTimeInTz(event.event_ts, timezone)}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-1.5 text-xs text-gray-500">
-                    {event.session_id ? event.session_id.substring(0, 8) : '\u2014'}
-                  </td>
-                  <td className="whitespace-nowrap px-3 py-1.5 text-xs text-gray-400">
+                  <td className="px-2 py-1 text-[11px] text-gray-400 truncate max-w-[120px]">
                     {getEventDetails(event)}
                   </td>
                 </tr>
