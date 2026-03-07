@@ -48,6 +48,9 @@ public class DeviceAuditEvent {
     @Column(name = "correlation_id")
     private UUID correlationId;
 
+    @Column(name = "username", length = 256)
+    private String username;
+
     @PrePersist
     protected void onCreate() {
         if (id == null) id = UUID.randomUUID();

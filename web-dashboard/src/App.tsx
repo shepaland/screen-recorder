@@ -24,6 +24,8 @@ import TenantCreatePage from './pages/TenantCreatePage';
 import RecordingsPage from './pages/RecordingsPage';
 import DeviceGridPage from './pages/DeviceGridPage';
 import DeviceRecordingsPage from './pages/DeviceRecordingsPage';
+import UserListPage from './pages/UserListPage';
+import UserReportsPage from './pages/UserReportsPage';
 import DownloadPage from './pages/DownloadPage';
 import RecordingSettingsPage from './pages/RecordingSettingsPage';
 
@@ -57,7 +59,12 @@ function App() {
         />
 
         {/* Recordings Archive */}
-        <Route path="/recordings" element={<DeviceGridPage />} />
+        <Route path="/archive/devices" element={<DeviceGridPage />} />
+        <Route path="/archive/devices/:deviceId" element={<DeviceRecordingsPage />} />
+        <Route path="/archive/users" element={<UserListPage />} />
+        <Route path="/archive/users/:username" element={<UserReportsPage />} />
+        {/* Legacy redirects */}
+        <Route path="/recordings" element={<Navigate to="/archive/devices" replace />} />
         <Route path="/recordings/:deviceId" element={<DeviceRecordingsPage />} />
         <Route path="/recordings-old" element={<RecordingsPage />} />
 

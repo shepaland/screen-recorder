@@ -1,6 +1,8 @@
 package com.prg.ingest.dto.request;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -15,16 +17,17 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SubmitAuditEventsRequest {
+public class SubmitFocusIntervalsRequest {
 
     @NotNull(message = "device_id is required")
     private UUID deviceId;
 
+    @NotBlank(message = "username is required")
     @Size(max = 256, message = "username must not exceed 256 characters")
     private String username;
 
-    @NotNull(message = "events are required")
-    @Size(min = 1, max = 100, message = "events must contain 1 to 100 items")
+    @NotEmpty(message = "intervals must not be empty")
+    @Size(max = 100, message = "intervals must contain at most 100 items")
     @Valid
-    private List<AuditEventItem> events;
+    private List<FocusIntervalItem> intervals;
 }

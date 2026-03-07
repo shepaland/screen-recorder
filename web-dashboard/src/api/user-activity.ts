@@ -1,0 +1,124 @@
+import ingestApiClient from './ingest';
+import type {
+  UserListResponse,
+  UserActivityResponse,
+  AppsReportResponse,
+  DomainsReportResponse,
+  WorktimeResponse,
+  TimesheetResponse,
+} from '../types/user-activity';
+
+export async function getUsers(params?: {
+  page?: number;
+  size?: number;
+  search?: string;
+  sortBy?: string;
+  sortDir?: string;
+  isActive?: boolean;
+}): Promise<UserListResponse> {
+  const { data } = await ingestApiClient.get<UserListResponse>('/users', {
+    params: {
+      page: params?.page ?? 0,
+      size: params?.size ?? 20,
+      search: params?.search,
+      sort_by: params?.sortBy,
+      sort_dir: params?.sortDir,
+      is_active: params?.isActive,
+    },
+  });
+  return data;
+}
+
+export async function getUserActivity(
+  username: string,
+  from: string,
+  to: string,
+  deviceId?: string,
+): Promise<UserActivityResponse> {
+  const { data } = await ingestApiClient.get<UserActivityResponse>(
+    `/users/${encodeURIComponent(username)}/activity`,
+    { params: { from, to, device_id: deviceId } },
+  );
+  return data;
+}
+
+export async function getUserApps(
+  username: string,
+  from: string,
+  to: string,
+  params?: { page?: number; size?: number; deviceId?: string },
+): Promise<AppsReportResponse> {
+  const { data } = await ingestApiClient.get<AppsReportResponse>(
+    `/users/${encodeURIComponent(username)}/apps`,
+    {
+      params: {
+        from,
+        to,
+        page: params?.page,
+        size: params?.size,
+        device_id: params?.deviceId,
+      },
+    },
+  );
+  return data;
+}
+
+export async function getUserDomains(
+  username: string,
+  from: string,
+  to: string,
+  params?: { page?: number; size?: number; deviceId?: string },
+): Promise<DomainsReportResponse> {
+  const { data } = await ingestApiClient.get<DomainsReportResponse>(
+    `/users/${encodeURIComponent(username)}/domains`,
+    {
+      params: {
+        from,
+        to,
+        page: params?.page,
+        size: params?.size,
+        device_id: params?.deviceId,
+      },
+    },
+  );
+  return data;
+}
+
+export async function getUserWorktime(
+  username: string,
+  from: string,
+  to: string,
+  timezone = 'Europe/Moscow',
+  deviceId?: string,
+): Promise<WorktimeResponse> {
+  const { data } = await ingestApiClient.get<WorktimeResponse>(
+    `/users/${encodeURIComponent(username)}/worktime`,
+    { params: { from, to, timezone, device_id: deviceId } },
+  );
+  return data;
+}
+
+export async function getUserTimesheet(
+  username: string,
+  month: string,
+  params?: {
+    workStart?: string;
+    workEnd?: string;
+    timezone?: string;
+    deviceId?: string;
+  },
+): Promise<TimesheetResponse> {
+  const { data } = await ingestApiClient.get<TimesheetResponse>(
+    `/users/${encodeURIComponent(username)}/timesheet`,
+    {
+      params: {
+        month,
+        work_start: params?.workStart,
+        work_end: params?.workEnd,
+        timezone: params?.timezone ?? 'Europe/Moscow',
+        device_id: params?.deviceId,
+      },
+    },
+  );
+  return data;
+}

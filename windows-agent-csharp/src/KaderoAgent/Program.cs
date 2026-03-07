@@ -154,6 +154,12 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<AuditEventSink>())
 builder.Services.AddHostedService(sp => sp.GetRequiredService<SessionWatcher>());
 builder.Services.AddHostedService<ProcessWatcher>();
 
+// Activity tracking: user session info, focus interval sink, active window tracker
+builder.Services.AddSingleton<UserSessionInfo>();
+builder.Services.AddSingleton<FocusIntervalSink>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<FocusIntervalSink>());
+builder.Services.AddHostedService<ActiveWindowTracker>();
+
 // IPC: status provider and command executor (available in all modes)
 builder.Services.AddSingleton<AgentStatusProvider>();
 builder.Services.AddSingleton<IStatusProvider>(sp => sp.GetRequiredService<AgentStatusProvider>());
@@ -287,6 +293,14 @@ if (!args.Contains("--service"))
             catch { /* non-fatal: tray is optional */ }
         }
     }
+}
+
+// Initialize FocusIntervalSink with current username
+{
+    var userSessionInfo = host.Services.GetRequiredService<UserSessionInfo>();
+    var focusSink = host.Services.GetRequiredService<FocusIntervalSink>();
+    var username = userSessionInfo.GetCurrentUsername();
+    focusSink.SetUsername(username);
 }
 
 // Ensure only one agent host runs at a time (Windows Service OR standalone).

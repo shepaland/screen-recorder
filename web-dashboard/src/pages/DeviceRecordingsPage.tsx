@@ -291,7 +291,7 @@ export default function DeviceRecordingsPage() {
       {/* Top bar */}
       <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-gray-200 bg-white">
         <button
-          onClick={() => navigate('/recordings')}
+          onClick={() => navigate('/archive/devices')}
           className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
         >
           <ArrowLeftIcon className="h-5 w-5" />

@@ -7,10 +7,12 @@ import com.prg.ingest.dto.response.DeviceAuditEventsResponse;
 import com.prg.ingest.dto.response.SubmitAuditEventsResponse;
 import com.prg.ingest.entity.Device;
 import com.prg.ingest.entity.DeviceAuditEvent;
+import com.prg.ingest.entity.DeviceUserSession;
 import com.prg.ingest.exception.AccessDeniedException;
 import com.prg.ingest.exception.ResourceNotFoundException;
 import com.prg.ingest.repository.DeviceAuditEventRepository;
 import com.prg.ingest.repository.DeviceRepository;
+import com.prg.ingest.repository.DeviceUserSessionRepository;
 import com.prg.ingest.security.DevicePrincipal;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,7 @@ public class AuditEventService {
 
     private final DeviceAuditEventRepository auditEventRepository;
     private final DeviceRepository deviceRepository;
+    private final DeviceUserSessionRepository userSessionRepository;
     private final EntityManager entityManager;
 
     @Transactional
@@ -37,8 +40,13 @@ public class AuditEventService {
             DevicePrincipal principal,
             UUID correlationId) {
 
+        // Validate device_id present in JWT (mandatory for ingestion endpoints)
+        if (principal.getDeviceId() == null) {
+            throw new AccessDeniedException("device_id is required in JWT", "DEVICE_ID_REQUIRED");
+        }
+
         // Validate device_id matches JWT
-        if (principal.getDeviceId() != null && !principal.getDeviceId().equals(request.getDeviceId())) {
+        if (!principal.getDeviceId().equals(request.getDeviceId())) {
             throw new AccessDeniedException("device_id mismatch with JWT claims", "DEVICE_MISMATCH");
         }
 
@@ -75,6 +83,7 @@ public class AuditEventService {
                     .eventTs(item.getEventTs())
                     .details(item.getDetails() != null ? item.getDetails() : Map.of())
                     .correlationId(correlationId)
+                    .username(request.getUsername())
                     .build();
 
             entityManager.persist(entity);
@@ -89,6 +98,11 @@ public class AuditEventService {
 
         if (accepted % 50 != 0) {
             entityManager.flush();
+        }
+
+        // Upsert DeviceUserSession if username is provided
+        if (request.getUsername() != null && !request.getUsername().isBlank()) {
+            upsertUserSession(principal.getTenantId(), request.getDeviceId(), request.getUsername());
         }
 
         log.info("AUDIT_EVENTS_SUBMITTED: device_id={}, accepted={}, duplicates={}, tenant_id={}, correlation_id={}",
@@ -189,6 +203,36 @@ public class AuditEventService {
         if (value instanceof java.sql.Timestamp ts) return ts.toInstant();
         if (value instanceof java.time.OffsetDateTime odt) return odt.toInstant();
         return Instant.parse(value.toString());
+    }
+
+    private void upsertUserSession(UUID tenantId, UUID deviceId, String username) {
+        Optional<DeviceUserSession> existing = userSessionRepository
+                .findByTenantIdAndDeviceIdAndUsernameAndIsActiveTrue(tenantId, deviceId, username);
+
+        if (existing.isPresent()) {
+            DeviceUserSession session = existing.get();
+            session.setLastSeenTs(Instant.now());
+            session.setUpdatedTs(Instant.now());
+            userSessionRepository.save(session);
+        } else {
+            String windowsDomain = null;
+            String displayName = username;
+            if (username.contains("\\")) {
+                String[] parts = username.split("\\\\", 2);
+                windowsDomain = parts[0];
+                displayName = parts[1];
+            }
+
+            DeviceUserSession newSession = DeviceUserSession.builder()
+                    .tenantId(tenantId)
+                    .deviceId(deviceId)
+                    .username(username)
+                    .windowsDomain(windowsDomain)
+                    .displayName(displayName)
+                    .isActive(true)
+                    .build();
+            userSessionRepository.save(newSession);
+        }
     }
 
     @SuppressWarnings("unchecked")

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   HomeIcon,
   UsersIcon,
@@ -11,9 +11,10 @@ import {
   Cog6ToothIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  FilmIcon,
   ArrowDownTrayIcon,
   AdjustmentsHorizontalIcon,
+  ArchiveBoxIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import PermissionGate from './PermissionGate';
 import TenantSwitcher from './TenantSwitcher';
@@ -33,7 +34,6 @@ interface NavItem {
 /** Full navigation for superadmin (password auth, SUPER_ADMIN role). */
 const superAdminNavigation: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: HomeIcon, permission: 'DASHBOARD:VIEW' },
-  { name: 'Архив записей', href: '/recordings', icon: FilmIcon },
   { name: 'Users', href: '/users', icon: UsersIcon, permission: 'USERS:READ' },
   { name: 'Roles', href: '/roles', icon: ShieldCheckIcon, permission: 'ROLES:READ' },
   { name: 'Устройства', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
@@ -44,10 +44,14 @@ const superAdminNavigation: NavItem[] = [
   { name: 'Tenants', href: '/tenants', icon: BuildingOfficeIcon, permission: 'TENANTS:READ' },
 ];
 
+const archiveSubmenu: NavItem[] = [
+  { name: 'Устройства', href: '/archive/devices', icon: ComputerDesktopIcon },
+  { name: 'Пользователи', href: '/archive/users', icon: UserGroupIcon },
+];
+
 /** Tenant-scoped items under the company name. */
 const tenantScopedNavigation: NavItem[] = [
   { name: 'Контрольная панель', href: '/', icon: HomeIcon, permission: 'DASHBOARD:VIEW' },
-  { name: 'Архив записей', href: '/recordings', icon: FilmIcon },
   { name: 'Токены регистрации', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
   { name: 'Устройства', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
   { name: 'Настройки записи', href: '/recording-settings', icon: AdjustmentsHorizontalIcon, permission: 'DEVICES:READ' },
@@ -99,13 +103,18 @@ function NavList({
 
 export default function Sidebar({ onClose }: SidebarProps) {
   const { user } = useAuth();
+  const location = useLocation();
   const [isTenantMenuExpanded, setIsTenantMenuExpanded] = useState(true);
+  const [isArchiveExpanded, setIsArchiveExpanded] = useState(
+    location.pathname.startsWith('/archive') || location.pathname.startsWith('/recordings'),
+  );
 
   const handleClick = () => {
     onClose?.();
   };
 
   const isSuperAdmin = user?.roles?.includes('SUPER_ADMIN');
+  const isArchiveActive = location.pathname.startsWith('/archive') || location.pathname.startsWith('/recordings');
 
   return (
     <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-gray-950 px-6 pb-4">
@@ -117,9 +126,34 @@ export default function Sidebar({ onClose }: SidebarProps) {
       <nav className="flex flex-1 flex-col">
         <ul role="list" className="flex flex-1 flex-col gap-y-7">
           {isSuperAdmin ? (
-            /* ---- SuperAdmin: flat list (unchanged) ---- */
+            /* ---- SuperAdmin: flat list + archive submenu ---- */
             <li>
               <NavList items={superAdminNavigation} onClick={handleClick} />
+              {/* Archive submenu */}
+              <ul role="list" className="-mx-2 mt-1 space-y-1">
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setIsArchiveExpanded(!isArchiveExpanded)}
+                    className={`group flex w-full items-center gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 ${
+                      isArchiveActive
+                        ? 'bg-red-700 text-white'
+                        : 'text-gray-300 hover:bg-red-700 hover:text-white'
+                    }`}
+                  >
+                    <ArchiveBoxIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
+                    Архив
+                    {isArchiveExpanded ? (
+                      <ChevronDownIcon className="ml-auto h-4 w-4" />
+                    ) : (
+                      <ChevronRightIcon className="ml-auto h-4 w-4" />
+                    )}
+                  </button>
+                  {isArchiveExpanded && (
+                    <NavList items={archiveSubmenu} onClick={handleClick} indent />
+                  )}
+                </li>
+              </ul>
             </li>
           ) : (
             /* ---- OAuth user: structured menu ---- */
@@ -144,7 +178,34 @@ export default function Sidebar({ onClose }: SidebarProps) {
                   </button>
                 </div>
                 {isTenantMenuExpanded && (
-                  <NavList items={tenantScopedNavigation} onClick={handleClick} indent />
+                  <>
+                    <NavList items={tenantScopedNavigation} onClick={handleClick} indent />
+                    {/* Archive submenu */}
+                    <ul role="list" className="ml-4 mt-1 space-y-1">
+                      <li>
+                        <button
+                          type="button"
+                          onClick={() => setIsArchiveExpanded(!isArchiveExpanded)}
+                          className={`group flex w-full items-center gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 ${
+                            isArchiveActive
+                              ? 'bg-red-700 text-white'
+                              : 'text-gray-300 hover:bg-red-700 hover:text-white'
+                          }`}
+                        >
+                          <ArchiveBoxIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
+                          Архив
+                          {isArchiveExpanded ? (
+                            <ChevronDownIcon className="ml-auto h-4 w-4" />
+                          ) : (
+                            <ChevronRightIcon className="ml-auto h-4 w-4" />
+                          )}
+                        </button>
+                        {isArchiveExpanded && (
+                          <NavList items={archiveSubmenu} onClick={handleClick} indent />
+                        )}
+                      </li>
+                    </ul>
+                  </>
                 )}
               </li>
 

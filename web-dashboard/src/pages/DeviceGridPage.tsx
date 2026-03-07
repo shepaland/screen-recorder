@@ -71,7 +71,7 @@ export default function DeviceGridPage() {
   }, [fetchDevices]);
 
   const handleDeviceClick = (deviceId: string) => {
-    navigate(`/recordings/${deviceId}`);
+    navigate(`/archive/devices/${deviceId}`);
   };
 
   if (loading && devices.length === 0) {
