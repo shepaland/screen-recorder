@@ -287,7 +287,7 @@ export default function DeviceRecordingsPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden -m-6 sm:-m-6 lg:-m-8 -mb-6">
       {/* Top bar */}
       <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-gray-200 bg-white">
         <button
