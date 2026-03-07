@@ -2,10 +2,7 @@ package com.prg.ingest.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.prg.ingest.dto.RecordingDownloadResult;
-import com.prg.ingest.dto.response.PageResponse;
-import com.prg.ingest.dto.response.RecordingDetailResponse;
-import com.prg.ingest.dto.response.RecordingListItemResponse;
-import com.prg.ingest.dto.response.RecordingSegmentsResponse;
+import com.prg.ingest.dto.response.*;
 import com.prg.ingest.entity.Segment;
 import com.prg.ingest.exception.AccessDeniedException;
 import com.prg.ingest.filter.JwtValidationFilter;
@@ -146,6 +143,49 @@ public class RecordingController {
         } else {
             streamAsMp4(download, httpResponse);
         }
+    }
+
+    /**
+     * GET /api/v1/ingest/recordings/by-device/{deviceId}/days
+     * Returns list of recording days for a device, grouped by calendar day (in device timezone).
+     */
+    @GetMapping("/by-device/{deviceId}/days")
+    public ResponseEntity<DeviceDaysResponse> getDeviceRecordingDays(
+            @PathVariable UUID deviceId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "30") int size,
+            HttpServletRequest httpRequest) {
+
+        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_RECORDINGS_READ);
+
+        if (size < 1) size = 1;
+        if (size > 365) size = 365;
+        if (page < 0) page = 0;
+
+        log.debug("Getting device recording days: tenant={} device={} page={} size={}",
+                principal.getTenantId(), deviceId, page, size);
+
+        DeviceDaysResponse response = recordingService.getDeviceRecordingDays(deviceId, principal, page, size);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/v1/ingest/recordings/by-device/{deviceId}/days/{date}/timeline
+     * Returns full timeline for a specific day with sessions and segments.
+     */
+    @GetMapping("/by-device/{deviceId}/days/{date}/timeline")
+    public ResponseEntity<DayTimelineResponse> getDeviceDayTimeline(
+            @PathVariable UUID deviceId,
+            @PathVariable String date,
+            HttpServletRequest httpRequest) {
+
+        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_RECORDINGS_READ);
+
+        log.debug("Getting day timeline: tenant={} device={} date={}",
+                principal.getTenantId(), deviceId, date);
+
+        DayTimelineResponse response = recordingService.getDeviceDayTimeline(deviceId, date, principal);
+        return ResponseEntity.ok(response);
     }
 
     // ---- Private helpers ----

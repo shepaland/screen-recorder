@@ -30,6 +30,15 @@ public class Device {
     @Column(length = 20, nullable = false)
     private String status;
 
+    @Column(name = "os_version", length = 255)
+    private String osVersion;
+
+    @Column(name = "os_type", length = 20)
+    private String osType;
+
+    @Column(name = "timezone", length = 50)
+    private String timezone;
+
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
 

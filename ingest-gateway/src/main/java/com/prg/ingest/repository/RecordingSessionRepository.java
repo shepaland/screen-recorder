@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -46,4 +47,46 @@ public interface RecordingSessionRepository extends JpaRepository<RecordingSessi
             @Param("fromTs") Instant fromTs,
             @Param("toTs") Instant toTs,
             Pageable pageable);
+
+    @Query(value = """
+            SELECT
+                DATE(rs.started_ts AT TIME ZONE :tz) as recording_date,
+                COUNT(DISTINCT rs.id) as session_count,
+                COALESCE(SUM(rs.segment_count), 0) as segment_count,
+                COALESCE(SUM(rs.total_bytes), 0) as total_bytes,
+                COALESCE(SUM(rs.total_duration_ms), 0) as total_duration_ms,
+                BOOL_OR(rs.status = 'active') as is_live,
+                MIN(rs.started_ts) as first_started_ts,
+                MAX(COALESCE(rs.ended_ts, rs.updated_ts)) as last_ended_ts
+            FROM recording_sessions rs
+            WHERE rs.device_id = :deviceId
+              AND rs.tenant_id = :tenantId
+            GROUP BY DATE(rs.started_ts AT TIME ZONE :tz)
+            ORDER BY recording_date DESC
+            """,
+            countQuery = """
+            SELECT COUNT(DISTINCT DATE(rs.started_ts AT TIME ZONE :tz))
+            FROM recording_sessions rs
+            WHERE rs.device_id = :deviceId
+              AND rs.tenant_id = :tenantId
+            """,
+            nativeQuery = true)
+    Page<Object[]> findRecordingDaysByDeviceId(
+            @Param("deviceId") UUID deviceId,
+            @Param("tenantId") UUID tenantId,
+            @Param("tz") String timezone,
+            Pageable pageable);
+
+    @Query(value = """
+            SELECT rs.* FROM recording_sessions rs
+            WHERE rs.device_id = :deviceId
+              AND rs.tenant_id = :tenantId
+              AND DATE(rs.started_ts AT TIME ZONE :tz) = CAST(:date AS date)
+            ORDER BY rs.started_ts ASC
+            """, nativeQuery = true)
+    List<RecordingSession> findSessionsByDeviceIdAndDate(
+            @Param("deviceId") UUID deviceId,
+            @Param("tenantId") UUID tenantId,
+            @Param("tz") String timezone,
+            @Param("date") String date);
 }

@@ -22,11 +22,13 @@ export interface DeviceResponse {
   id: string;
   hostname: string;
   os_version: string;
+  os_type: string | null;
   agent_version: string;
   status: 'offline' | 'online' | 'recording' | 'error';
   last_heartbeat_ts: string | null;
   last_recording_ts: string | null;
   ip_address: string | null;
+  timezone: string | null;
   is_active: boolean;
   is_deleted: boolean;
   deleted_ts: string | null;
@@ -38,6 +40,57 @@ export interface DeviceResponse {
     last_name: string;
   };
   created_ts: string;
+}
+
+// --- Recording Archive types ---
+
+export interface DeviceDaysResponse {
+  device_id: string;
+  device_hostname: string;
+  timezone: string;
+  days: RecordingDayItem[];
+  page: number;
+  size: number;
+  total_elements: number;
+  total_pages: number;
+}
+
+export interface RecordingDayItem {
+  date: string;               // YYYY-MM-DD
+  session_count: number;
+  segment_count: number;
+  total_bytes: number;
+  total_duration_ms: number;
+  live: boolean;
+  first_started_ts: string;
+  last_ended_ts: string | null;
+}
+
+export interface DayTimelineResponse {
+  device_id: string;
+  date: string;
+  timezone: string;
+  sessions: TimelineSession[];
+}
+
+export interface TimelineSession {
+  session_id: string;
+  status: string;
+  started_ts: string;
+  ended_ts: string | null;
+  segment_count: number;
+  total_duration_ms: number;
+  total_bytes: number;
+  segments: TimelineSegment[];
+}
+
+export interface TimelineSegment {
+  id: string;
+  sequence_num: number;
+  duration_ms: number;
+  size_bytes: number;
+  status: string;
+  s3_key: string;
 }
 
 export interface DeviceDetailResponse extends DeviceResponse {

@@ -172,6 +172,12 @@ public class DeviceService {
         if (request.getAgentVersion() != null) {
             device.setAgentVersion(request.getAgentVersion());
         }
+        if (request.getTimezone() != null) {
+            device.setTimezone(request.getTimezone());
+        }
+        if (request.getOsType() != null) {
+            device.setOsType(request.getOsType());
+        }
         if ("recording".equals(request.getStatus())) {
             device.setLastRecordingTs(Instant.now());
         }
@@ -221,11 +227,13 @@ public class DeviceService {
                 .userId(device.getUserId())
                 .hostname(device.getHostname())
                 .osVersion(device.getOsVersion())
+                .osType(device.getOsType())
                 .agentVersion(device.getAgentVersion())
                 .status(device.getStatus())
                 .lastHeartbeatTs(device.getLastHeartbeatTs())
                 .lastRecordingTs(device.getLastRecordingTs())
                 .ipAddress(device.getIpAddress())
+                .timezone(device.getTimezone())
                 .settings(device.getSettings())
                 .isActive(device.getIsActive())
                 .isDeleted(device.getIsDeleted())
@@ -243,12 +251,14 @@ public class DeviceService {
                 .registrationTokenId(device.getRegistrationTokenId())
                 .hostname(device.getHostname())
                 .osVersion(device.getOsVersion())
+                .osType(device.getOsType())
                 .agentVersion(device.getAgentVersion())
                 .hardwareId(device.getHardwareId())
                 .status(device.getStatus())
                 .lastHeartbeatTs(device.getLastHeartbeatTs())
                 .lastRecordingTs(device.getLastRecordingTs())
                 .ipAddress(device.getIpAddress())
+                .timezone(device.getTimezone())
                 .settings(device.getSettings())
                 .isActive(device.getIsActive())
                 .isDeleted(device.getIsDeleted())

@@ -21,5 +21,9 @@ public class HeartbeatRequest {
 
     private String agentVersion;
 
+    private String timezone;
+
+    private String osType;
+
     private Map<String, Object> metrics;
 }

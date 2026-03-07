@@ -92,4 +92,29 @@ export async function downloadRecording(id: string): Promise<{ blob: Blob; filen
   return { blob: response.data, filename };
 }
 
+// --- Device Recording Archive API ---
+
+import type { DeviceDaysResponse, DayTimelineResponse } from '../types/device';
+
+export async function getDeviceRecordingDays(
+  deviceId: string,
+  params?: { page?: number; size?: number },
+): Promise<DeviceDaysResponse> {
+  const response = await ingestApiClient.get<DeviceDaysResponse>(
+    `/recordings/by-device/${deviceId}/days`,
+    { params },
+  );
+  return response.data;
+}
+
+export async function getDeviceDayTimeline(
+  deviceId: string,
+  date: string,
+): Promise<DayTimelineResponse> {
+  const response = await ingestApiClient.get<DayTimelineResponse>(
+    `/recordings/by-device/${deviceId}/days/${date}/timeline`,
+  );
+  return response.data;
+}
+
 export default ingestApiClient;

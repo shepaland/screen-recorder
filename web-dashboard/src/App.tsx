@@ -22,6 +22,8 @@ import SettingsPage from './pages/SettingsPage';
 import TenantsPage from './pages/TenantsPage';
 import TenantCreatePage from './pages/TenantCreatePage';
 import RecordingsPage from './pages/RecordingsPage';
+import DeviceGridPage from './pages/DeviceGridPage';
+import DeviceRecordingsPage from './pages/DeviceRecordingsPage';
 import DownloadPage from './pages/DownloadPage';
 import RecordingSettingsPage from './pages/RecordingSettingsPage';
 
@@ -54,8 +56,10 @@ function App() {
           }
         />
 
-        {/* Recordings */}
-        <Route path="/recordings" element={<RecordingsPage />} />
+        {/* Recordings Archive */}
+        <Route path="/recordings" element={<DeviceGridPage />} />
+        <Route path="/recordings/:deviceId" element={<DeviceRecordingsPage />} />
+        <Route path="/recordings-old" element={<RecordingsPage />} />
 
         {/* Download */}
         <Route path="/download" element={<DownloadPage />} />

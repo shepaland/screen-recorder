@@ -211,6 +211,101 @@ public class RecordingService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public DeviceDaysResponse getDeviceRecordingDays(UUID deviceId, DevicePrincipal principal, int page, int size) {
+        // 1. Find device, get timezone
+        Device device = deviceRepository.findByIdAndTenantId(deviceId, principal.getTenantId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Device not found: " + deviceId, "DEVICE_NOT_FOUND"));
+
+        String timezone = device.getTimezone() != null ? device.getTimezone() : "Europe/Moscow";
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Object[]> dayPage = sessionRepository.findRecordingDaysByDeviceId(
+                deviceId, principal.getTenantId(), timezone, pageable);
+
+        List<RecordingDayResponse> days = dayPage.getContent().stream()
+                .map(row -> RecordingDayResponse.builder()
+                        .date(row[0].toString())
+                        .sessionCount(((Number) row[1]).intValue())
+                        .segmentCount(((Number) row[2]).intValue())
+                        .totalBytes(((Number) row[3]).longValue())
+                        .totalDurationMs(((Number) row[4]).longValue())
+                        .live((Boolean) row[5])
+                        .firstStartedTs(row[6] != null ? ((java.sql.Timestamp) row[6]).toInstant() : null)
+                        .lastEndedTs(row[7] != null ? ((java.sql.Timestamp) row[7]).toInstant() : null)
+                        .build())
+                .toList();
+
+        return DeviceDaysResponse.builder()
+                .deviceId(deviceId)
+                .deviceHostname(device.getHostname())
+                .timezone(timezone)
+                .days(days)
+                .page(dayPage.getNumber())
+                .size(dayPage.getSize())
+                .totalElements(dayPage.getTotalElements())
+                .totalPages(dayPage.getTotalPages())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public DayTimelineResponse getDeviceDayTimeline(UUID deviceId, String date, DevicePrincipal principal) {
+        // 1. Find device, get timezone
+        Device device = deviceRepository.findByIdAndTenantId(deviceId, principal.getTenantId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Device not found: " + deviceId, "DEVICE_NOT_FOUND"));
+
+        String timezone = device.getTimezone() != null ? device.getTimezone() : "Europe/Moscow";
+
+        // 2. Get all sessions for this day
+        List<RecordingSession> sessions = sessionRepository.findSessionsByDeviceIdAndDate(
+                deviceId, principal.getTenantId(), timezone, date);
+
+        if (sessions.isEmpty()) {
+            throw new ResourceNotFoundException(
+                    "No recordings found for device " + deviceId + " on " + date,
+                    "NO_RECORDINGS_FOR_DATE");
+        }
+
+        // 3. Build timeline with segments
+        List<TimelineSessionResponse> sessionResponses = sessions.stream()
+                .map(session -> {
+                    List<Segment> segments = segmentRepository
+                            .findBySessionIdAndTenantIdOrderBySequenceNum(session.getId(), principal.getTenantId());
+
+                    List<TimelineSegmentResponse> segmentResponses = segments.stream()
+                            .map(seg -> TimelineSegmentResponse.builder()
+                                    .id(seg.getId())
+                                    .sequenceNum(seg.getSequenceNum())
+                                    .durationMs(seg.getDurationMs() != null ? seg.getDurationMs() : 0L)
+                                    .sizeBytes(seg.getSizeBytes() != null ? seg.getSizeBytes() : 0L)
+                                    .status(seg.getStatus())
+                                    .s3Key(seg.getS3Key())
+                                    .build())
+                            .toList();
+
+                    return TimelineSessionResponse.builder()
+                            .sessionId(session.getId())
+                            .status(session.getStatus())
+                            .startedTs(session.getStartedTs())
+                            .endedTs(session.getEndedTs())
+                            .segmentCount(session.getSegmentCount())
+                            .totalDurationMs(session.getTotalDurationMs())
+                            .totalBytes(session.getTotalBytes())
+                            .segments(segmentResponses)
+                            .build();
+                })
+                .toList();
+
+        return DayTimelineResponse.builder()
+                .deviceId(deviceId)
+                .date(date)
+                .timezone(timezone)
+                .sessions(sessionResponses)
+                .build();
+    }
+
     private String buildDownloadFilename(RecordingSession session, String hostname) {
         String ts = session.getStartedTs().toString()
                 .replace(":", "-")

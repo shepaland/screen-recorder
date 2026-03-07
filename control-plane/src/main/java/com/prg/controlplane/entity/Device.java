@@ -55,6 +55,12 @@ public class Device {
     @Column(name = "ip_address", length = 45)
     private String ipAddress;
 
+    @Column(name = "os_type", length = 20)
+    private String osType;
+
+    @Column(name = "timezone", length = 50)
+    private String timezone;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "settings", columnDefinition = "jsonb")
     @Builder.Default
