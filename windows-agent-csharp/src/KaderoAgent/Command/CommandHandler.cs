@@ -24,6 +24,7 @@ public class CommandHandler
     // Crash recovery backoff
     private int _consecutiveFailures;
     private const int MaxConsecutiveFailures = 5;
+    private DateTime _lastRecoveryAttempt = DateTime.MinValue;
 
     public CommandHandler(ScreenCaptureManager captureManager, SessionManager sessionManager,
         UploadQueue uploadQueue, AuthManager authManager, ApiClient apiClient,
@@ -117,6 +118,19 @@ public class CommandHandler
                 return;
             }
 
+            // Exponential backoff: 30s, 60s, 120s, 240s between recovery attempts
+            var backoffSeconds = 30 * (1 << Math.Min(_consecutiveFailures - 1, 3));
+            var elapsed = DateTime.UtcNow - _lastRecoveryAttempt;
+            if (elapsed.TotalSeconds < backoffSeconds)
+            {
+                _logger.LogInformation("Crash recovery backoff: waiting {Remaining}s before retry",
+                    (int)(backoffSeconds - elapsed.TotalSeconds));
+                try { await _sessionManager.EndSessionAsync(ct); } catch { }
+                return;
+            }
+
+            _lastRecoveryAttempt = DateTime.UtcNow;
+
             // End old session, start new one
             try { await _sessionManager.EndSessionAsync(ct); } catch { }
             await StartRecording(baseUrl, ct);
@@ -174,8 +188,8 @@ public class CommandHandler
             return;
         }
 
-        // FFmpeg started successfully — reset failure counter
-        _consecutiveFailures = 0;
+        // Don't reset _consecutiveFailures here — only reset after first segment is produced
+        // (in WatchSegments) to prevent infinite crash loops when gdigrab has no desktop
         _uploadQueue.StartProcessing(baseUrl, ct);
         _sessionStartTime = DateTime.UtcNow;
 
@@ -257,7 +271,25 @@ public class CommandHandler
             foreach (var file in completeFiles)
             {
                 if (processedFiles.Contains(file)) continue;
+
+                // Skip 0-byte segments (gdigrab failure / no desktop)
+                var fileInfo = new FileInfo(file);
+                if (fileInfo.Length == 0)
+                {
+                    _logger.LogWarning("Skipping 0-byte segment {File} (possible gdigrab failure)", file);
+                    processedFiles.Add(file);
+                    try { File.Delete(file); } catch { }
+                    continue;
+                }
+
                 processedFiles.Add(file);
+
+                // First real segment produced — reset crash counter
+                if (_consecutiveFailures > 0)
+                {
+                    _logger.LogInformation("First segment produced, resetting crash counter from {Count}", _consecutiveFailures);
+                    _consecutiveFailures = 0;
+                }
 
                 await _uploadQueue.EnqueueAsync(new SegmentInfo
                 {
