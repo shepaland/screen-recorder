@@ -1,6 +1,7 @@
 package com.prg.auth.service;
 
 import com.prg.auth.config.FrontendConfig;
+import com.prg.auth.config.MailruOAuthConfig;
 import com.prg.auth.config.YandexOAuthConfig;
 import com.prg.auth.dto.response.LoginResponse;
 import com.prg.auth.dto.response.OAuthCallbackResponse;
@@ -24,6 +25,8 @@ import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
 
@@ -33,34 +36,62 @@ import java.util.*;
 public class OAuthService {
 
     private final YandexOAuthClient yandexClient;
+    private final MailruOAuthClient mailruClient;
     private final OAuthIdentityRepository oauthIdentityRepository;
     private final UserOAuthLinkRepository userOAuthLinkRepository;
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final YandexOAuthConfig oauthConfig;
+    private final MailruOAuthConfig mailruOAuthConfig;
     private final FrontendConfig frontendConfig;
     private final AuditService auditService;
+    private final OAuthStateStore stateStore;
 
-    private static final String PROVIDER_YANDEX = "yandex";
+    public static final String PROVIDER_YANDEX = "yandex";
+    public static final String PROVIDER_MAILRU = "mailru";
+
+    // ======================== Authorization URLs ========================
 
     /**
      * Build Yandex authorization URL for redirect.
+     * State parameter is stored server-side for CSRF validation on callback.
+     * redirect_uri is URL-encoded.
      */
     public String getAuthorizationUrl() {
-        String state = UUID.randomUUID().toString();
+        String state = stateStore.generateAndStore();
         return oauthConfig.getAuthorizeUrl()
                 + "?response_type=code"
                 + "&client_id=" + oauthConfig.getClientId()
-                + "&redirect_uri=" + oauthConfig.getCallbackUrl()
+                + "&redirect_uri=" + urlEncode(oauthConfig.getCallbackUrl())
                 + "&state=" + state;
     }
 
     /**
-     * Handle OAuth callback: exchange code, get user info, determine next step.
+     * Build Mail.ru authorization URL for redirect.
+     * State parameter is stored server-side for CSRF validation on callback.
+     * redirect_uri is URL-encoded. Scope=userinfo is included.
+     */
+    public String getMailruAuthorizationUrl() {
+        String state = stateStore.generateAndStore();
+        return mailruOAuthConfig.getAuthorizeUrl()
+                + "?response_type=code"
+                + "&client_id=" + mailruOAuthConfig.getClientId()
+                + "&redirect_uri=" + urlEncode(mailruOAuthConfig.getCallbackUrl())
+                + "&scope=" + mailruOAuthConfig.getScope()
+                + "&state=" + state;
+    }
+
+    // ======================== Callbacks ========================
+
+    /**
+     * Handle Yandex OAuth callback: validate state, exchange code, get user info, determine next step.
      */
     @Transactional
     public OAuthCallbackResult handleCallback(String code, String state, String ipAddress, String userAgent) {
+        // Validate state parameter (CSRF protection)
+        validateState(state);
+
         // 1. Exchange code for Yandex access token
         String yandexAccessToken = yandexClient.exchangeCodeForToken(code);
 
@@ -72,7 +103,7 @@ public class OAuthService {
         String displayName = (String) yandexUserInfo.get("display_name");
         String firstName = (String) yandexUserInfo.get("first_name");
         String lastName = (String) yandexUserInfo.get("last_name");
-        String avatarUrl = getAvatarUrl(yandexUserInfo);
+        String avatarUrl = getYandexAvatarUrl(yandexUserInfo);
 
         if (displayName == null) {
             displayName = (firstName != null ? firstName : "") + (lastName != null ? " " + lastName : "");
@@ -81,27 +112,80 @@ public class OAuthService {
 
         log.info("OAuth callback: provider=yandex, yandex_id={}, email={}", yandexId, email);
 
+        return processOAuthCallback(PROVIDER_YANDEX, yandexId, email, displayName, avatarUrl,
+                yandexUserInfo, ipAddress, userAgent);
+    }
+
+    /**
+     * Handle Mail.ru OAuth callback: validate state, exchange code, get user info, determine next step.
+     */
+    @Transactional
+    public OAuthCallbackResult handleMailruCallback(String code, String state, String ipAddress, String userAgent) {
+        // Validate state parameter (CSRF protection)
+        validateState(state);
+
+        // 1. Exchange code for Mail.ru access token
+        String mailruAccessToken = mailruClient.exchangeCodeForToken(code);
+
+        // 2. Get user info from Mail.ru
+        Map<String, Object> mailruUserInfo = mailruClient.getUserInfo(mailruAccessToken);
+
+        String mailruId = String.valueOf(mailruUserInfo.get("id"));
+        String email = (String) mailruUserInfo.get("email");
+        String displayName = (String) mailruUserInfo.get("name");
+        String firstName = (String) mailruUserInfo.get("first_name");
+        String lastName = (String) mailruUserInfo.get("last_name");
+        String avatarUrl = (String) mailruUserInfo.get("image");
+
+        // Fallback for display name
+        if (displayName == null || displayName.isBlank()) {
+            displayName = (firstName != null ? firstName : "") + (lastName != null ? " " + lastName : "");
+            displayName = displayName.trim();
+        }
+
+        log.info("OAuth callback: provider=mailru, mailru_id={}, email={}", mailruId, email);
+
+        return processOAuthCallback(PROVIDER_MAILRU, mailruId, email, displayName, avatarUrl,
+                mailruUserInfo, ipAddress, userAgent);
+    }
+
+    // ======================== Common OAuth callback processing ========================
+
+    /**
+     * Common processing for all OAuth providers after user info is retrieved.
+     * Handles: find/create OAuthIdentity, check links, return appropriate result.
+     */
+    private OAuthCallbackResult processOAuthCallback(
+            String provider,
+            String providerSub,
+            String email,
+            String displayName,
+            String avatarUrl,
+            Map<String, Object> rawAttributes,
+            String ipAddress,
+            String userAgent) {
+
         // 3. Find or create OAuthIdentity
-        OAuthIdentity identity = oauthIdentityRepository.findByProviderAndProviderSub(PROVIDER_YANDEX, yandexId)
+        OAuthIdentity identity = oauthIdentityRepository.findByProviderAndProviderSub(provider, providerSub)
                 .orElse(null);
 
         if (identity == null) {
             identity = OAuthIdentity.builder()
-                    .provider(PROVIDER_YANDEX)
-                    .providerSub(yandexId)
+                    .provider(provider)
+                    .providerSub(providerSub)
                     .email(email)
                     .name(displayName)
                     .avatarUrl(avatarUrl)
-                    .rawAttributes(yandexUserInfo)
+                    .rawAttributes(rawAttributes)
                     .build();
             identity = oauthIdentityRepository.save(identity);
-            log.info("Created new OAuthIdentity: id={}, provider=yandex, email={}", identity.getId(), email);
+            log.info("Created new OAuthIdentity: id={}, provider={}, email={}", identity.getId(), provider, email);
         } else {
             // 4. Update existing identity with fresh data
             identity.setEmail(email);
             identity.setName(displayName);
             identity.setAvatarUrl(avatarUrl);
-            identity.setRawAttributes(yandexUserInfo);
+            identity.setRawAttributes(rawAttributes);
             identity = oauthIdentityRepository.save(identity);
             log.debug("Updated OAuthIdentity: id={}, email={}", identity.getId(), email);
         }
@@ -144,7 +228,7 @@ public class OAuthService {
         log.info("OAuth auto-login: oauth_identity_id={}, tenant={}, total_tenants={}",
                 identity.getId(), tenant.getSlug(), activeLinks.size());
 
-        AuthResult<LoginResponse> loginResult = performOAuthLogin(user, tenant, ipAddress, userAgent);
+        AuthResult<LoginResponse> loginResult = performOAuthLogin(user, tenant, ipAddress, userAgent, provider);
 
         OAuthCallbackResponse response = OAuthCallbackResponse.builder()
                 .status("authenticated")
@@ -160,11 +244,20 @@ public class OAuthService {
                 .build();
     }
 
+    // ======================== OAuth Login ========================
+
     /**
      * Perform OAuth login for a specific user/tenant combo. Generates tokens, updates last login, audits.
+     *
+     * @param user      the user to log in
+     * @param tenant    the tenant context
+     * @param ipAddress client IP address
+     * @param userAgent client user agent
+     * @param provider  OAuth provider name (for audit logging)
      */
     @Transactional
-    public AuthResult<LoginResponse> performOAuthLogin(User user, Tenant tenant, String ipAddress, String userAgent) {
+    public AuthResult<LoginResponse> performOAuthLogin(User user, Tenant tenant,
+                                                        String ipAddress, String userAgent, String provider) {
         List<String> roles = user.getRoles().stream().map(r -> r.getCode()).toList();
         List<String> permissions = user.getRoles().stream()
                 .flatMap(r -> r.getPermissions().stream())
@@ -195,7 +288,7 @@ public class OAuthService {
         userRepository.updateLastLoginTs(user.getId(), Instant.now());
 
         auditService.logAction(tenant.getId(), user.getId(), "OAUTH_LOGIN", "AUTH", user.getId(),
-                Map.of("provider", PROVIDER_YANDEX, "roles", roles),
+                Map.of("provider", provider, "roles", roles),
                 ipAddress, userAgent, getCorrelationId());
 
         List<RoleResponse> roleResponses = user.getRoles().stream()
@@ -231,6 +324,17 @@ public class OAuthService {
     }
 
     /**
+     * Backward-compatible overload for existing callers (defaults to PROVIDER_YANDEX).
+     */
+    @Transactional
+    public AuthResult<LoginResponse> performOAuthLogin(User user, Tenant tenant,
+                                                        String ipAddress, String userAgent) {
+        return performOAuthLogin(user, tenant, ipAddress, userAgent, PROVIDER_YANDEX);
+    }
+
+    // ======================== Token helpers ========================
+
+    /**
      * Generate an intermediate JWT token for OAuth flow (onboarding or tenant selection).
      */
     public String generateOAuthIntermediateToken(OAuthIdentity identity) {
@@ -255,10 +359,12 @@ public class OAuthService {
                         "OAuth identity not found", "OAUTH_IDENTITY_NOT_FOUND"));
     }
 
+    // ======================== Avatar helpers ========================
+
     /**
      * Extract avatar URL from Yandex user info.
      */
-    public String getAvatarUrl(Map<String, Object> yandexUserInfo) {
+    public String getYandexAvatarUrl(Map<String, Object> yandexUserInfo) {
         Boolean isAvatarEmpty = (Boolean) yandexUserInfo.get("is_avatar_empty");
         if (Boolean.TRUE.equals(isAvatarEmpty)) {
             return null;
@@ -269,6 +375,16 @@ public class OAuthService {
         }
         return "https://avatars.yandex.net/get-yapic/" + defaultAvatarId + "/islands-200";
     }
+
+    /**
+     * @deprecated Use {@link #getYandexAvatarUrl(Map)} instead. Kept for backward compatibility.
+     */
+    @Deprecated
+    public String getAvatarUrl(Map<String, Object> yandexUserInfo) {
+        return getYandexAvatarUrl(yandexUserInfo);
+    }
+
+    // ======================== Utility ========================
 
     /**
      * Calculate refresh token TTL based on tenant and user settings.
@@ -305,6 +421,22 @@ public class OAuthService {
      */
     public List<UserOAuthLink> findActiveLinksForIdentity(UUID oauthIdentityId) {
         return userOAuthLinkRepository.findActiveLinksWithUserAndTenant(oauthIdentityId);
+    }
+
+    /**
+     * Validate the OAuth state parameter. Throws InvalidCredentialsException if invalid or expired.
+     */
+    private void validateState(String state) {
+        if (!stateStore.validateAndConsume(state)) {
+            log.warn("Invalid or expired OAuth state parameter");
+            throw new InvalidCredentialsException(
+                    "Invalid or expired OAuth state parameter", "OAUTH_STATE_INVALID");
+        }
+    }
+
+    private String urlEncode(String value) {
+        if (value == null) return "";
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     private UUID getCorrelationId() {

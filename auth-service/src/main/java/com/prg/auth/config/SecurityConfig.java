@@ -56,6 +56,8 @@ public class SecurityConfig {
                                 "/api/v1/auth/validate-registration-token",
                                 "/api/v1/auth/oauth/yandex",
                                 "/api/v1/auth/oauth/yandex/callback",
+                                "/api/v1/auth/oauth/mailru",
+                                "/api/v1/auth/oauth/mailru/callback",
                                 "/api/v1/auth/oauth/select-tenant",
                                 "/api/v1/auth/oauth/onboarding",
                                 "/api/v1/auth/register/initiate",

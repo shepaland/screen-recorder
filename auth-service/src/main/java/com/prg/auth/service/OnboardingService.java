@@ -131,12 +131,13 @@ public class OnboardingService {
         log.info("Onboarding complete: tenant_id={}, user_id={}, oauth_identity_id={}",
                 tenant.getId(), user.getId(), identity.getId());
 
-        // 8. Generate tokens
-        AuthResult<LoginResponse> loginResult = oauthService.performOAuthLogin(user, tenant, ipAddress, userAgent);
+        // 8. Generate tokens (pass actual provider from OAuth identity for correct audit)
+        AuthResult<LoginResponse> loginResult = oauthService.performOAuthLogin(
+                user, tenant, ipAddress, userAgent, identity.getProvider());
 
         // 9. Audit
         auditService.logAction(tenant.getId(), user.getId(), "ONBOARDING_COMPLETE", "AUTH", user.getId(),
-                Map.of("tenant_slug", tenant.getSlug(), "provider", "yandex"),
+                Map.of("tenant_slug", tenant.getSlug(), "provider", identity.getProvider()),
                 ipAddress, userAgent, getCorrelationId());
 
         // 10. Build response

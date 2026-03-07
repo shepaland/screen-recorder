@@ -1,6 +1,7 @@
 package com.prg.auth.controller;
 
 import com.prg.auth.config.FrontendConfig;
+import com.prg.auth.config.MailruOAuthConfig;
 import com.prg.auth.dto.request.OnboardingRequest;
 import com.prg.auth.dto.request.SelectTenantRequest;
 import com.prg.auth.dto.response.LoginResponse;
@@ -13,6 +14,7 @@ import com.prg.auth.entity.UserOAuthLink;
 import com.prg.auth.exception.AccessDeniedException;
 import com.prg.auth.exception.InvalidCredentialsException;
 import com.prg.auth.service.AuthResult;
+import com.prg.auth.service.OAuthRateLimiter;
 import com.prg.auth.service.OAuthService;
 import com.prg.auth.service.OnboardingService;
 import jakarta.servlet.http.Cookie;
@@ -38,9 +40,13 @@ public class OAuthController {
     private final OAuthService oauthService;
     private final OnboardingService onboardingService;
     private final FrontendConfig frontendConfig;
+    private final MailruOAuthConfig mailruOAuthConfig;
+    private final OAuthRateLimiter oauthRateLimiter;
 
     private static final String REFRESH_TOKEN_COOKIE = "refresh_token";
     private static final String COOKIE_PATH = "/";
+
+    // ======================== Yandex OAuth ========================
 
     /**
      * GET /api/v1/auth/oauth/yandex
@@ -67,11 +73,72 @@ public class OAuthController {
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
 
+        String ipAddress = getClientIp(httpRequest);
+        oauthRateLimiter.checkCallbackRateLimit(ipAddress);
+
+        return processOAuthCallback("yandex", code, state, error, httpRequest, httpResponse);
+    }
+
+    // ======================== Mail.ru OAuth ========================
+
+    /**
+     * GET /api/v1/auth/oauth/mailru
+     * Redirect to Mail.ru authorization page.
+     */
+    @GetMapping("/mailru")
+    public ResponseEntity<Void> initiateMailruOAuth() {
+        if (!mailruOAuthConfig.isEnabled()) {
+            log.warn("Mail.ru OAuth is disabled");
+            String frontendBaseUrl = frontendConfig.getBaseUrl();
+            String redirectUrl = frontendBaseUrl + "/login?error=" + urlEncode("Mail.ru OAuth is not configured");
+            return ResponseEntity.status(HttpStatus.FOUND)
+                    .header("Location", redirectUrl)
+                    .build();
+        }
+
+        String authorizationUrl = oauthService.getMailruAuthorizationUrl();
+        log.info("Initiating Mail.ru OAuth redirect");
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .header("Location", authorizationUrl)
+                .build();
+    }
+
+    /**
+     * GET /api/v1/auth/oauth/mailru/callback?code=...&state=...
+     * Process Mail.ru callback. This is a browser redirect flow, not JSON API.
+     */
+    @GetMapping("/mailru/callback")
+    public ResponseEntity<Void> handleMailruCallback(
+            @RequestParam(required = false) String code,
+            @RequestParam(required = false) String state,
+            @RequestParam(required = false) String error,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
+
+        String ipAddress = getClientIp(httpRequest);
+        oauthRateLimiter.checkCallbackRateLimit(ipAddress);
+
+        return processOAuthCallback("mailru", code, state, error, httpRequest, httpResponse);
+    }
+
+    // ======================== Common OAuth callback processing ========================
+
+    /**
+     * Common controller-level processing for OAuth callbacks from any provider.
+     */
+    private ResponseEntity<Void> processOAuthCallback(
+            String provider,
+            String code,
+            String state,
+            String error,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
+
         String frontendBaseUrl = frontendConfig.getBaseUrl();
 
-        // Handle error from Yandex
+        // Handle error from provider
         if (error != null && !error.isBlank()) {
-            log.warn("Yandex OAuth error: {}", error);
+            log.warn("{} OAuth error: {}", provider, error);
             String redirectUrl = frontendBaseUrl + "/login?error=" + urlEncode("OAuth authorization denied");
             return ResponseEntity.status(HttpStatus.FOUND)
                     .header("Location", redirectUrl)
@@ -79,7 +146,7 @@ public class OAuthController {
         }
 
         if (code == null || code.isBlank()) {
-            log.warn("Yandex OAuth callback missing code parameter");
+            log.warn("{} OAuth callback missing code parameter", provider);
             String redirectUrl = frontendBaseUrl + "/login?error=" + urlEncode("Missing authorization code");
             return ResponseEntity.status(HttpStatus.FOUND)
                     .header("Location", redirectUrl)
@@ -90,9 +157,14 @@ public class OAuthController {
             String ipAddress = getClientIp(httpRequest);
             String userAgent = httpRequest.getHeader("User-Agent");
 
-            OAuthService.OAuthCallbackResult result = oauthService.handleCallback(code, state, ipAddress, userAgent);
-            OAuthCallbackResponse response = result.getResponse();
+            OAuthService.OAuthCallbackResult result;
+            if ("mailru".equals(provider)) {
+                result = oauthService.handleMailruCallback(code, state, ipAddress, userAgent);
+            } else {
+                result = oauthService.handleCallback(code, state, ipAddress, userAgent);
+            }
 
+            OAuthCallbackResponse response = result.getResponse();
             String redirectUrl;
 
             switch (response.getStatus()) {
@@ -123,19 +195,21 @@ public class OAuthController {
                 }
             }
 
-            log.info("OAuth callback processed: status={}", response.getStatus());
+            log.info("OAuth callback processed: provider={}, status={}", provider, response.getStatus());
             return ResponseEntity.status(HttpStatus.FOUND)
                     .header("Location", redirectUrl)
                     .build();
 
         } catch (Exception e) {
-            log.error("OAuth callback processing failed: {}", e.getMessage(), e);
+            log.error("{} OAuth callback processing failed: {}", provider, e.getMessage(), e);
             String redirectUrl = frontendBaseUrl + "/login?error=" + urlEncode("Authentication failed");
             return ResponseEntity.status(HttpStatus.FOUND)
                     .header("Location", redirectUrl)
                     .build();
         }
     }
+
+    // ======================== Onboarding & tenant selection ========================
 
     /**
      * POST /api/v1/auth/oauth/onboarding
@@ -148,13 +222,15 @@ public class OAuthController {
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
 
+        String ipAddress = getClientIp(httpRequest);
+        oauthRateLimiter.checkOnboardingRateLimit(ipAddress);
+
         String oauthToken = extractBearerToken(httpRequest);
         if (oauthToken == null || oauthToken.isBlank()) {
             throw new InvalidCredentialsException(
                     "OAuth token is required", "OAUTH_TOKEN_MISSING");
         }
 
-        String ipAddress = getClientIp(httpRequest);
         String userAgent = httpRequest.getHeader("User-Agent");
 
         OnboardingService.OnboardingResult result = onboardingService.onboard(
@@ -209,7 +285,7 @@ public class OAuthController {
         Tenant tenant = user.getTenant();
 
         AuthResult<LoginResponse> loginResult =
-                oauthService.performOAuthLogin(user, tenant, ipAddress, userAgent);
+                oauthService.performOAuthLogin(user, tenant, ipAddress, userAgent, identity.getProvider());
 
         long refreshTtl = oauthService.calculateRefreshTokenTtl(user, tenant);
         setRefreshTokenCookie(httpResponse, loginResult.getRawRefreshToken(), refreshTtl);
