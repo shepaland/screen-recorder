@@ -268,8 +268,8 @@ public class RecordingService {
                         .totalBytes(((Number) row[3]).longValue())
                         .totalDurationMs(((Number) row[4]).longValue())
                         .live((Boolean) row[5])
-                        .firstStartedTs(row[6] != null ? ((java.sql.Timestamp) row[6]).toInstant() : null)
-                        .lastEndedTs(row[7] != null ? ((java.sql.Timestamp) row[7]).toInstant() : null)
+                        .firstStartedTs(toInstant(row[6]))
+                        .lastEndedTs(toInstant(row[7]))
                         .build())
                 .toList();
 
@@ -360,6 +360,19 @@ public class RecordingService {
     private String sanitizeForFilename(String input) {
         if (input == null || input.isBlank()) return "unknown";
         return input.replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
+
+    /**
+     * Safely convert a native query timestamp column to Instant.
+     * Hibernate 6 + PostgreSQL timestamptz returns java.time.Instant directly,
+     * but older drivers may return java.sql.Timestamp.
+     */
+    private static Instant toInstant(Object value) {
+        if (value == null) return null;
+        if (value instanceof Instant inst) return inst;
+        if (value instanceof java.sql.Timestamp ts) return ts.toInstant();
+        if (value instanceof java.time.OffsetDateTime odt) return odt.toInstant();
+        return Instant.parse(value.toString());
     }
 
     private record DeviceInfo(String hostname, boolean deleted) {}
