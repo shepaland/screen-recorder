@@ -11,6 +11,7 @@ import com.prg.ingest.repository.DeviceRepository;
 import com.prg.ingest.repository.RecordingSessionRepository;
 import com.prg.ingest.repository.SegmentRepository;
 import com.prg.ingest.security.DevicePrincipal;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -32,6 +33,7 @@ public class RecordingService {
     private final SegmentRepository segmentRepository;
     private final DeviceRepository deviceRepository;
     private final S3Service s3Service;
+    private final EntityManager entityManager;
 
     @Transactional(readOnly = true)
     public PageResponse<RecordingListItemResponse> listRecordings(
@@ -220,11 +222,43 @@ public class RecordingService {
 
         String timezone = device.getTimezone() != null ? device.getTimezone() : "Europe/Moscow";
 
-        int offset = page * size;
-        List<Object[]> dayRows = sessionRepository.findRecordingDaysByDeviceId(
-                deviceId, principal.getTenantId(), timezone, size, offset);
-        long totalElements = sessionRepository.countRecordingDaysByDeviceId(
-                deviceId, principal.getTenantId(), timezone);
+        int queryOffset = page * size;
+
+        @SuppressWarnings("unchecked")
+        List<Object[]> dayRows = entityManager.createNativeQuery("""
+                SELECT
+                    DATE(rs.started_ts AT TIME ZONE :tz) as recording_date,
+                    COUNT(DISTINCT rs.id) as session_count,
+                    COALESCE(SUM(rs.segment_count), 0) as segment_count,
+                    COALESCE(SUM(rs.total_bytes), 0) as total_bytes,
+                    COALESCE(SUM(rs.total_duration_ms), 0) as total_duration_ms,
+                    BOOL_OR(rs.status = 'active') as is_live,
+                    MIN(rs.started_ts) as first_started_ts,
+                    MAX(COALESCE(rs.ended_ts, rs.updated_ts)) as last_ended_ts
+                FROM recording_sessions rs
+                WHERE rs.device_id = :deviceId
+                  AND rs.tenant_id = :tenantId
+                GROUP BY 1
+                ORDER BY 1 DESC
+                LIMIT :lim OFFSET :off
+                """)
+                .setParameter("deviceId", deviceId)
+                .setParameter("tenantId", principal.getTenantId())
+                .setParameter("tz", timezone)
+                .setParameter("lim", size)
+                .setParameter("off", queryOffset)
+                .getResultList();
+
+        long totalElements = ((Number) entityManager.createNativeQuery("""
+                SELECT COUNT(DISTINCT DATE(rs.started_ts AT TIME ZONE :tz))
+                FROM recording_sessions rs
+                WHERE rs.device_id = :deviceId
+                  AND rs.tenant_id = :tenantId
+                """)
+                .setParameter("deviceId", deviceId)
+                .setParameter("tenantId", principal.getTenantId())
+                .setParameter("tz", timezone)
+                .getSingleResult()).longValue();
 
         List<RecordingDayResponse> days = dayRows.stream()
                 .map(row -> RecordingDayResponse.builder()
