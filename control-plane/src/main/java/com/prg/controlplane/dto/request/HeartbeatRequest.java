@@ -16,7 +16,7 @@ import java.util.Map;
 public class HeartbeatRequest {
 
     @NotBlank(message = "Status is required")
-    @Pattern(regexp = "^(offline|online|recording|error)$", message = "Invalid status value")
+    @Pattern(regexp = "^(offline|online|recording|error|idle)$", message = "Invalid status value")
     private String status;
 
     private String agentVersion;
@@ -24,6 +24,8 @@ public class HeartbeatRequest {
     private String timezone;
 
     private String osType;
+
+    private Boolean sessionLocked;
 
     private Map<String, Object> metrics;
 }
