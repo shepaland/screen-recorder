@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   getDeviceRecordingDays,
   getDeviceDayTimeline,
+  getDeviceAuditEvents,
   downloadRecording,
 } from '../api/ingest';
 import { getDevice } from '../api/devices';
@@ -12,7 +13,9 @@ import type {
   TimelineSegment,
   DeviceDetailResponse,
 } from '../types/device';
+import type { AuditEvent } from '../types/audit-event';
 import DayTimeline from '../components/DayTimeline';
+import AuditEventTimeline from '../components/AuditEventTimeline';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { formatBytes, formatDuration } from '../utils/timeAgo';
 import {
@@ -61,6 +64,11 @@ export default function DeviceRecordingsPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<DayTimelineResponse | null>(null);
   const [timelineLoading, setTimelineLoading] = useState(false);
+
+  // Audit events
+  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [activeAuditEventId, setActiveAuditEventId] = useState<string | undefined>();
 
   // Video player state
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -139,6 +147,28 @@ export default function DeviceRecordingsPage() {
     return () => { cancelled = true; };
   }, [deviceId, selectedDate]);
 
+  // Fetch audit events for selected date
+  useEffect(() => {
+    if (!deviceId || !selectedDate) return;
+    let cancelled = false;
+
+    const fetchAuditEvents = async () => {
+      try {
+        setAuditLoading(true);
+        const resp = await getDeviceAuditEvents(deviceId, selectedDate, { size: 1000 });
+        if (!cancelled) setAuditEvents(resp.events);
+      } catch (err) {
+        console.error('Failed to load audit events', err);
+        if (!cancelled) setAuditEvents([]);
+      } finally {
+        if (!cancelled) setAuditLoading(false);
+      }
+    };
+
+    fetchAuditEvents();
+    return () => { cancelled = true; };
+  }, [deviceId, selectedDate]);
+
   // Update video URL when segment changes
   useEffect(() => {
     if (activeSegment && activeSegment.s3_key) {
@@ -190,6 +220,54 @@ export default function DeviceRecordingsPage() {
     setActiveSegmentIndex(0);
     setTimeline(null);
     setVideoUrl(null);
+    setAuditEvents([]);
+    setActiveAuditEventId(undefined);
+  };
+
+  // Find segment for audit event by timestamp
+  const handleAuditEventClick = (event: AuditEvent) => {
+    setActiveAuditEventId(event.id);
+
+    if (!timeline) return;
+
+    const eventTime = new Date(event.event_ts).getTime();
+
+    for (const session of timeline.sessions) {
+      let segStartMs = new Date(session.started_ts).getTime();
+
+      for (let i = 0; i < session.segments.length; i++) {
+        const seg = session.segments[i];
+        const segEndMs = segStartMs + seg.duration_ms;
+
+        if (eventTime >= segStartMs && eventTime < segEndMs) {
+          setActiveSessionId(session.session_id);
+          setActiveSegmentIndex(i);
+          return;
+        }
+        segStartMs = segEndMs;
+      }
+    }
+
+    // Fallback: find closest session/segment
+    let closestSession = timeline.sessions[0];
+    let closestSegIdx = 0;
+    let minDiff = Infinity;
+
+    for (const session of timeline.sessions) {
+      let segStartMs = new Date(session.started_ts).getTime();
+      for (let i = 0; i < session.segments.length; i++) {
+        const diff = Math.abs(eventTime - segStartMs);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestSession = session;
+          closestSegIdx = i;
+        }
+        segStartMs += session.segments[i].duration_ms;
+      }
+    }
+
+    setActiveSessionId(closestSession.session_id);
+    setActiveSegmentIndex(closestSegIdx);
   };
 
   // Download active session
@@ -401,6 +479,17 @@ export default function DeviceRecordingsPage() {
                     {activeSegmentIndex + 1}/{activeSegments.length}
                   </span>
                 </div>
+              )}
+
+              {/* Audit event timeline */}
+              {!auditLoading && auditEvents.length > 0 && (
+                <AuditEventTimeline
+                  events={auditEvents}
+                  timezone={timeline.timezone}
+                  sessions={timeline.sessions}
+                  onEventClick={handleAuditEventClick}
+                  activeEventId={activeAuditEventId}
+                />
               )}
 
               {/* Day timeline */}

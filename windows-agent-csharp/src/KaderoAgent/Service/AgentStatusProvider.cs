@@ -1,5 +1,6 @@
 namespace KaderoAgent.Service;
 
+using KaderoAgent.Audit;
 using KaderoAgent.Auth;
 using KaderoAgent.Capture;
 using KaderoAgent.Configuration;
@@ -14,6 +15,8 @@ public class AgentStatusProvider : IStatusProvider
     private readonly ScreenCaptureManager _captureManager;
     private readonly UploadQueue _uploadQueue;
     private readonly MetricsCollector _metrics;
+    private readonly SessionWatcher _sessionWatcher;
+    private readonly IAuditEventSink _auditSink;
     private readonly IOptions<AgentConfig> _config;
 
     private readonly object _lock = new();
@@ -23,13 +26,16 @@ public class AgentStatusProvider : IStatusProvider
 
     public AgentStatusProvider(AuthManager authManager, CredentialStore credentialStore,
         ScreenCaptureManager captureManager, UploadQueue uploadQueue,
-        MetricsCollector metrics, IOptions<AgentConfig> config)
+        MetricsCollector metrics, SessionWatcher sessionWatcher,
+        IAuditEventSink auditSink, IOptions<AgentConfig> config)
     {
         _authManager = authManager;
         _credentialStore = credentialStore;
         _captureManager = captureManager;
         _uploadQueue = uploadQueue;
         _metrics = metrics;
+        _sessionWatcher = sessionWatcher;
+        _auditSink = auditSink;
         _config = config;
     }
 
@@ -69,6 +75,8 @@ public class AgentStatusProvider : IStatusProvider
             MemoryMb = _metrics.GetMemoryUsageMb(),
             DiskFreeGb = _metrics.GetDiskFreeGb(),
             SegmentsQueued = _uploadQueue.QueuedCount,
+            SessionLocked = !_sessionWatcher.IsSessionActive,
+            AuditEventsQueued = _auditSink.QueuedCount,
             LastHeartbeatTs = lastHb,
             LastError = lastError
         };

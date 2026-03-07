@@ -63,10 +63,11 @@ public class HeartbeatService : BackgroundService
                 var baseUrl = creds.ServerUrl.TrimEnd('/');
                 var url = $"{baseUrl}/api/cp/v1/devices/{_authManager.DeviceId}/heartbeat";
 
-                var status = _captureManager.IsRecording ? "recording" : "online";
+                var status = _captureManager.IsRecording ? "recording" : (_commandHandler.IsPausedByLock ? "idle" : "online");
                 var body = new
                 {
                     status,
+                    session_locked = _commandHandler.IsPausedByLock,
                     agent_version = "1.0.0",
                     metrics = new
                     {

@@ -1,3 +1,4 @@
+using KaderoAgent.Audit;
 using KaderoAgent.Auth;
 using KaderoAgent.Command;
 using KaderoAgent.Storage;
@@ -15,11 +16,13 @@ public class AgentService : BackgroundService
     private readonly SegmentFileManager _fileManager;
     private readonly CredentialStore _credentialStore;
     private readonly CommandHandler _commandHandler;
+    private readonly SessionWatcher? _sessionWatcher;
     private readonly ILogger<AgentService> _logger;
 
     public AgentService(AuthManager authManager, LocalDatabase db, UploadQueue uploadQueue,
         SegmentFileManager fileManager, CredentialStore credentialStore,
-        CommandHandler commandHandler, ILogger<AgentService> logger)
+        CommandHandler commandHandler, ILogger<AgentService> logger,
+        SessionWatcher? sessionWatcher = null)
     {
         _authManager = authManager;
         _db = db;
@@ -27,6 +30,7 @@ public class AgentService : BackgroundService
         _fileManager = fileManager;
         _credentialStore = credentialStore;
         _commandHandler = commandHandler;
+        _sessionWatcher = sessionWatcher;
         _logger = logger;
     }
 
@@ -65,7 +69,15 @@ public class AgentService : BackgroundService
         // Auto-start recording if configured
         try
         {
-            await _commandHandler.AutoStartRecordingAsync(baseUrl, ct);
+            // Check that session is not locked before auto-starting
+            if (_sessionWatcher != null && !_sessionWatcher.IsSessionActive)
+            {
+                _logger.LogInformation("Session is locked, skipping auto-start");
+            }
+            else
+            {
+                await _commandHandler.AutoStartRecordingAsync(baseUrl, ct);
+            }
         }
         catch (Exception ex)
         {

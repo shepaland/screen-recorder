@@ -95,6 +95,7 @@ export async function downloadRecording(id: string): Promise<{ blob: Blob; filen
 // --- Device Recording Archive API ---
 
 import type { DeviceDaysResponse, DayTimelineResponse } from '../types/device';
+import type { DeviceAuditEventsResponse } from '../types/audit-event';
 
 export async function getDeviceRecordingDays(
   deviceId: string,
@@ -113,6 +114,20 @@ export async function getDeviceDayTimeline(
 ): Promise<DayTimelineResponse> {
   const response = await ingestApiClient.get<DayTimelineResponse>(
     `/recordings/by-device/${deviceId}/days/${date}/timeline`,
+  );
+  return response.data;
+}
+
+// --- Device Audit Events API ---
+
+export async function getDeviceAuditEvents(
+  deviceId: string,
+  date: string,
+  params?: { event_type?: string; page?: number; size?: number },
+): Promise<DeviceAuditEventsResponse> {
+  const response = await ingestApiClient.get<DeviceAuditEventsResponse>(
+    '/audit-events',
+    { params: { device_id: deviceId, date, ...params } },
   );
   return response.data;
 }

@@ -20,6 +20,7 @@ public class CommandHandler
 
     private DateTime? _sessionStartTime;
     private string _currentBaseUrl = "";
+    private bool _isPausedByLock;
 
     // Crash recovery backoff
     private int _consecutiveFailures;
@@ -37,6 +38,45 @@ public class CommandHandler
         _apiClient = apiClient;
         _config = config;
         _logger = logger;
+    }
+
+    public string? CurrentSessionId => _sessionManager.CurrentSessionId;
+    public bool IsPausedByLock => _isPausedByLock;
+
+    public async Task PauseRecordingAsync(CancellationToken ct)
+    {
+        if (!_captureManager.IsRecording && !_isPausedByLock) return;
+
+        _logger.LogInformation("Pausing recording: screen locked");
+        _captureManager.Stop();
+        _uploadQueue.StopProcessing();
+
+        try { await _sessionManager.EndSessionAsync(ct); } catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to end session during pause");
+        }
+
+        _sessionStartTime = null;
+        _isPausedByLock = true;
+    }
+
+    public async Task ResumeRecordingAsync(string baseUrl, CancellationToken ct)
+    {
+        if (!_isPausedByLock) return;
+
+        _isPausedByLock = false;
+        _logger.LogInformation("Resuming recording: screen unlocked");
+
+        var serverCfg = _authManager.ServerConfig;
+        var autoStart = serverCfg?.AutoStart ?? _config.Value.AutoStart;
+
+        if (!autoStart)
+        {
+            _logger.LogInformation("AutoStart is disabled, not resuming after unlock");
+            return;
+        }
+
+        await StartRecording(baseUrl, ct);
     }
 
     public async Task HandleAsync(PendingCommand cmd, string baseUrl, CancellationToken ct)

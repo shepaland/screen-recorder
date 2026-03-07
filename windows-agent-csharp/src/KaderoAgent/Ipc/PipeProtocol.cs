@@ -36,6 +36,8 @@ public class AgentStatus
     public string? Resolution { get; set; }
     public int SessionMaxDurationHours { get; set; }
     public bool AutoStart { get; set; }
+    public bool SessionLocked { get; set; }
+    public int AuditEventsQueued { get; set; }
     public string AgentVersion { get; set; } = "1.0.0";
     public DateTime? LastHeartbeatTs { get; set; }
     public string? LastError { get; set; }

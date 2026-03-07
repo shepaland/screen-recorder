@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using KaderoAgent.Audit;
 using KaderoAgent.Auth;
 using KaderoAgent.Capture;
 using KaderoAgent.Command;
@@ -144,6 +145,14 @@ builder.Services.AddSingleton<SegmentUploader>();
 builder.Services.AddSingleton<UploadQueue>();
 builder.Services.AddSingleton<ScreenCaptureManager>();
 builder.Services.AddSingleton<CommandHandler>();
+
+// Audit: session watcher, process watcher, event sink
+builder.Services.AddSingleton<AuditEventSink>();
+builder.Services.AddSingleton<IAuditEventSink>(sp => sp.GetRequiredService<AuditEventSink>());
+builder.Services.AddSingleton<SessionWatcher>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<AuditEventSink>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<SessionWatcher>());
+builder.Services.AddHostedService<ProcessWatcher>();
 
 // IPC: status provider and command executor (available in all modes)
 builder.Services.AddSingleton<AgentStatusProvider>();
