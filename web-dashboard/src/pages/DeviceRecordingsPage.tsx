@@ -287,9 +287,9 @@ export default function DeviceRecordingsPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+    <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
       {/* Top bar */}
-      <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-gray-200 bg-white">
+      <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-gray-200 bg-white">
         <button
           onClick={() => navigate('/recordings')}
           className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"

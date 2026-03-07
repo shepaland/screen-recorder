@@ -121,7 +121,7 @@ export default function DayTimeline({
   return (
     <div className="relative w-full">
       {/* Hour grid */}
-      <div className="relative h-10 bg-gray-200 rounded-lg overflow-hidden">
+      <div className="relative h-8 bg-gray-200 rounded-lg overflow-hidden">
         {/* Hour markers */}
         {hours.map((h) => (
           <div
@@ -155,7 +155,7 @@ export default function DayTimeline({
       </div>
 
       {/* Hour labels */}
-      <div className="relative h-5 mt-0.5">
+      <div className="relative h-4 mt-0.5">
         {[0, 3, 6, 9, 12, 15, 18, 21, 24].map((h) => (
           <span
             key={h}
