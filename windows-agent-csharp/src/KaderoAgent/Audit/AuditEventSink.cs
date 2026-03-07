@@ -126,7 +126,7 @@ public class AuditEventSink : BackgroundService, IAuditEventSink
             return;
         }
 
-        var url = $"{baseUrl}/api/v1/ingest/audit-events";
+        var url = $"{baseUrl}/audit-events";
 
         var body = new
         {

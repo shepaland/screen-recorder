@@ -1,5 +1,6 @@
 using KaderoAgent.Command;
 using KaderoAgent.Auth;
+using KaderoAgent.Storage;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
@@ -10,7 +11,7 @@ public class SessionWatcher : BackgroundService
 {
     private readonly IAuditEventSink _sink;
     private readonly CommandHandler _commandHandler;
-    private readonly AuthManager _authManager;
+    private readonly CredentialStore _credentialStore;
     private readonly ILogger<SessionWatcher> _logger;
 
     private volatile bool _isSessionActive = true;
@@ -21,12 +22,12 @@ public class SessionWatcher : BackgroundService
     public SessionWatcher(
         IAuditEventSink sink,
         CommandHandler commandHandler,
-        AuthManager authManager,
+        CredentialStore credentialStore,
         ILogger<SessionWatcher> logger)
     {
         _sink = sink;
         _commandHandler = commandHandler;
-        _authManager = authManager;
+        _credentialStore = credentialStore;
         _logger = logger;
     }
 
@@ -79,7 +80,8 @@ public class SessionWatcher : BackgroundService
                             EventType = "SESSION_UNLOCK",
                             Details = new Dictionary<string, object> { ["reason"] = "SessionUnlock" }
                         });
-                        var baseUrl = _authManager.ServerConfig?.IngestBaseUrl ?? "";
+                        var creds = _credentialStore.Load();
+                        var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";
                         await _commandHandler.ResumeRecordingAsync(baseUrl, CancellationToken.None);
                         break;
 
