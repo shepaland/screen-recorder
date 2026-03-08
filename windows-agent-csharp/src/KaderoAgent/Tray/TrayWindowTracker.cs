@@ -102,7 +102,32 @@ public class TrayWindowTracker : IDisposable
         bool isBrowser = BrowserDomainParser.IsBrowser(_lastProcessName);
         string? browserName = null, domain = null;
         if (isBrowser)
-            (browserName, domain) = BrowserDomainParser.ParseTitle(_lastWindowTitle, _lastProcessName);
+        {
+            // Strategy 1: UI Automation — read URL from browser address bar
+            try
+            {
+                var url = BrowserUrlExtractor.GetUrl(_lastHwnd);
+                if (!string.IsNullOrEmpty(url))
+                {
+                    domain = BrowserUrlExtractor.ExtractDomainFromUrl(url);
+                    if (domain != null)
+                        _log.Debug($"Domain from UI Automation: {domain}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Debug($"UI Automation URL extraction failed: {ex.Message}");
+            }
+
+            // Strategy 2: Parse window title (regex + known mappings)
+            var (parsedBrowser, parsedDomain) = BrowserDomainParser.ParseTitle(_lastWindowTitle, _lastProcessName);
+            browserName = parsedBrowser;
+            if (domain == null && parsedDomain != null)
+            {
+                domain = parsedDomain;
+                _log.Debug($"Domain from title parser: {domain}");
+            }
+        }
 
         var interval = new FocusIntervalData
         {
