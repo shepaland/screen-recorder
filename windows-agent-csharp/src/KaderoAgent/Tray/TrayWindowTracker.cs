@@ -39,6 +39,10 @@ public class TrayWindowTracker : IDisposable
     private string _lastWindowTitle = "";
     private DateTime _focusStartedAt;
 
+    // Browser domain captured at interval START (not end) to avoid tab-switch lag
+    private string? _lastBrowserName;
+    private string? _lastDomain;
+
     // Pending intervals (shared between poll and send timers — use lock)
     private readonly List<FocusIntervalData> _pending = new();
     private readonly object _pendingLock = new();
@@ -64,7 +68,6 @@ public class TrayWindowTracker : IDisposable
         {
             var hwnd = GetForegroundWindow();
             if (hwnd == IntPtr.Zero) return;
-            if (hwnd == _lastHwnd) return;
 
             GetWindowThreadProcessId(hwnd, out uint pid);
             string processName;
@@ -78,18 +81,72 @@ public class TrayWindowTracker : IDisposable
             var title = sb.ToString().Trim();
             if (string.IsNullOrEmpty(title)) return;
 
+            // Same window AND same title — nothing changed (no tab switch, no navigation)
+            if (hwnd == _lastHwnd && title == _lastWindowTitle) return;
+
             var now = DateTime.UtcNow;
+
+            // Complete the previous interval using domain captured at its START
             CompletePreviousInterval(now);
 
+            // Start new interval
             _lastHwnd        = hwnd;
             _lastProcessName = processName;
             _lastWindowTitle = title;
             _focusStartedAt  = now;
+
+            // Capture browser domain NOW (at interval start) so it's correct
+            _lastBrowserName = null;
+            _lastDomain = null;
+            if (BrowserDomainParser.IsBrowser(processName))
+            {
+                CaptureBrowserDomain(hwnd, title, processName);
+            }
         }
         catch (Exception ex)
         {
             _log.Debug($"TrayWindowTracker.Poll error: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Capture browser domain at interval START via UI Automation + title parser.
+    /// </summary>
+    private void CaptureBrowserDomain(IntPtr hwnd, string title, string processName)
+    {
+        // Invalidate URL cache on every tab/window change so stale URLs aren't returned
+        BrowserUrlExtractor.InvalidateCache();
+
+        // Strategy 1: UI Automation — read URL from browser address bar
+        try
+        {
+            var url = BrowserUrlExtractor.GetUrl(hwnd);
+            if (!string.IsNullOrEmpty(url))
+            {
+                _lastDomain = BrowserUrlExtractor.ExtractDomainFromUrl(url);
+                _log.Info($"BrowserUrl: url='{url}' → domain='{_lastDomain}' (hwnd={hwnd})");
+            }
+            else
+            {
+                _log.Info($"BrowserUrl: no URL from UI Automation (hwnd={hwnd}, title='{title}')");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.Warn($"UI Automation URL extraction failed: {ex.Message}");
+        }
+
+        // Strategy 2: Parse window title (regex + known mappings)
+        var (parsedBrowser, parsedDomain) = BrowserDomainParser.ParseTitle(title, processName);
+        _lastBrowserName = parsedBrowser;
+        if (_lastDomain == null && parsedDomain != null)
+        {
+            _lastDomain = parsedDomain;
+            _log.Info($"Domain from title parser: '{_lastDomain}' (title='{title}')");
+        }
+
+        if (_lastDomain == null)
+            _log.Warn($"Browser domain NOT resolved: process={processName}, title='{title}'");
     }
 
     private void CompletePreviousInterval(DateTime now)
@@ -100,34 +157,6 @@ public class TrayWindowTracker : IDisposable
         if (durationMs < MinIntervalMs) return;
 
         bool isBrowser = BrowserDomainParser.IsBrowser(_lastProcessName);
-        string? browserName = null, domain = null;
-        if (isBrowser)
-        {
-            // Strategy 1: UI Automation — read URL from browser address bar
-            try
-            {
-                var url = BrowserUrlExtractor.GetUrl(_lastHwnd);
-                if (!string.IsNullOrEmpty(url))
-                {
-                    domain = BrowserUrlExtractor.ExtractDomainFromUrl(url);
-                    if (domain != null)
-                        _log.Debug($"Domain from UI Automation: {domain}");
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.Debug($"UI Automation URL extraction failed: {ex.Message}");
-            }
-
-            // Strategy 2: Parse window title (regex + known mappings)
-            var (parsedBrowser, parsedDomain) = BrowserDomainParser.ParseTitle(_lastWindowTitle, _lastProcessName);
-            browserName = parsedBrowser;
-            if (domain == null && parsedDomain != null)
-            {
-                domain = parsedDomain;
-                _log.Debug($"Domain from title parser: {domain}");
-            }
-        }
 
         var interval = new FocusIntervalData
         {
@@ -135,8 +164,8 @@ public class TrayWindowTracker : IDisposable
             ProcessName  = _lastProcessName + ".exe",
             WindowTitle  = _lastWindowTitle,
             IsBrowser    = isBrowser,
-            BrowserName  = browserName,
-            Domain       = domain,
+            BrowserName  = isBrowser ? _lastBrowserName : null,
+            Domain       = isBrowser ? _lastDomain : null,
             StartedAt    = _focusStartedAt.ToString("o"),
             EndedAt      = now.ToString("o"),
             DurationMs   = durationMs

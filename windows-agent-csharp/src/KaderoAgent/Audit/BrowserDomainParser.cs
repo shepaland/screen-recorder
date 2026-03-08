@@ -73,7 +73,10 @@ public static class BrowserDomainParser
         // AI / Tools
         { "Claude", "claude.ai" },
         { "ChatGPT", "chatgpt.com" },
+        { "Grok", "grok.com" },
         { "Gemini", "gemini.google.com" },
+        { "DeepSeek", "chat.deepseek.com" },
+        { "Perplexity", "perplexity.ai" },
         { "Notion", "notion.so" },
         { "Figma", "figma.com" },
         { "Miro", "miro.com" },
@@ -95,11 +98,15 @@ public static class BrowserDomainParser
         { "Google Calendar", "calendar.google.com" },
         { "Google Maps", "maps.google.com" },
 
-        // Shopping
+        // Shopping / Delivery
         { "Amazon", "amazon.com" },
         { "Wildberries", "wildberries.ru" },
         { "OZON", "ozon.ru" },
         { "AliExpress", "aliexpress.com" },
+        { "Яндекс Еда", "eda.yandex.ru" },
+        { "Delivery Club", "delivery-club.ru" },
+        { "Самокат", "samokat.ru" },
+        { "Лавка", "lavka.yandex.ru" },
 
         // Cloud / Services
         { "Jira", "atlassian.net" },
@@ -108,11 +115,16 @@ public static class BrowserDomainParser
         { "AWS", "console.aws.amazon.com" },
         { "Azure", "portal.azure.com" },
 
-        // News
+        // News / Knowledge
         { "Habr", "habr.com" },
         { "Хабр", "habr.com" },
         { "Wikipedia", "wikipedia.org" },
         { "Википедия", "ru.wikipedia.org" },
+        { "Яндекс Новости", "dzen.ru" },
+        { "Дзен", "dzen.ru" },
+
+        // Kadero
+        { "Кадеро", "kadero.ru" },
     };
 
     public static bool IsBrowser(string processName)
