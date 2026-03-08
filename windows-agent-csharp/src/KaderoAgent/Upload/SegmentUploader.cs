@@ -106,6 +106,19 @@ public class SegmentUploader
                 sequenceNum, sessionId);
             return true;
         }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            // 409 = session is not active (closed/ended). Discard to prevent infinite retry.
+            _logger.LogWarning("Session not active (409) for segment {Seq} of session {Session}, discarding",
+                sequenceNum, sessionId);
+            return true;
+        }
+        catch (FileNotFoundException)
+        {
+            // Segment file was evicted by SegmentFileManager. Discard from queue.
+            _logger.LogWarning("Segment file not found (evicted): {File}, discarding", filePath);
+            return true;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to upload segment {Seq}", sequenceNum);

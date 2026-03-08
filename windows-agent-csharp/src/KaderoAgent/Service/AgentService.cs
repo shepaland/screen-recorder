@@ -51,25 +51,9 @@ public class AgentService : BackgroundService
         var creds = _credentialStore.Load();
         var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";
 
-        // Upload any pending segments from offline buffer
-        var pending = _db.GetPendingSegments();
-        if (pending.Count > 0)
-        {
-            _logger.LogInformation("Found {Count} pending segments, uploading...", pending.Count);
-            _uploadQueue.StartProcessing(baseUrl, ct);
-            foreach (var seg in pending)
-            {
-                if (File.Exists(seg.FilePath))
-                    await _uploadQueue.EnqueueAsync(seg);
-                else
-                    _db.MarkSegmentUploaded(seg.FilePath);
-            }
-        }
-
-        // Auto-start recording if configured
+        // Auto-start recording FIRST (before pending segments, which can block)
         try
         {
-            // Check that session is not locked before auto-starting
             if (_sessionWatcher != null && !_sessionWatcher.IsSessionActive)
             {
                 _logger.LogInformation("Session is locked, skipping auto-start");
@@ -82,6 +66,26 @@ public class AgentService : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Auto-start recording failed, will retry on next cycle");
+        }
+
+        // Upload any pending segments from offline buffer (in background)
+        var pending = _db.GetPendingSegments();
+        if (pending.Count > 0)
+        {
+            _logger.LogInformation("Found {Count} pending segments, uploading...", pending.Count);
+            _uploadQueue.StartProcessing(baseUrl, ct);
+            _ = Task.Run(async () =>
+            {
+                foreach (var seg in pending)
+                {
+                    if (ct.IsCancellationRequested) break;
+                    if (File.Exists(seg.FilePath))
+                        await _uploadQueue.EnqueueAsync(seg);
+                    else
+                        _db.MarkSegmentUploaded(seg.FilePath);
+                }
+                _logger.LogInformation("Pending segments enqueue complete");
+            }, ct);
         }
 
         // Main loop - periodic maintenance + monitoring

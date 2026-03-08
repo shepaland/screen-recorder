@@ -86,9 +86,11 @@ public class SessionWatcher : BackgroundService
                             EventType = "SESSION_UNLOCK",
                             Details = new Dictionary<string, object> { ["reason"] = "SessionUnlock" }
                         });
-                        var creds = _credentialStore.Load();
-                        var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";
-                        await _commandHandler.ResumeRecordingAsync(baseUrl, CancellationToken.None);
+                        {
+                            var creds = _credentialStore.Load();
+                            var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";
+                            await _commandHandler.ResumeRecordingAsync(baseUrl, CancellationToken.None);
+                        }
                         break;
 
                     case SessionSwitchReason.SessionLogon:

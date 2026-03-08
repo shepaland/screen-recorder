@@ -49,13 +49,13 @@ public class UserActivityService {
                 SELECT username, display_name, windows_domain,
                        device_count, device_ids, first_seen_ts, last_seen_ts, is_active
                 FROM v_tenant_users
-                WHERE tenant_id = :tenantId
+                WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId)
                 """);
 
         StringBuilder countSql = new StringBuilder("""
                 SELECT COUNT(*)
                 FROM v_tenant_users
-                WHERE tenant_id = :tenantId
+                WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId)
                 """);
 
         if (search != null && !search.isBlank()) {
@@ -133,7 +133,7 @@ public class UserActivityService {
                        COUNT(DISTINCT process_name),
                        COUNT(DISTINCT CASE WHEN is_browser = true THEN domain END)
                 FROM app_focus_intervals
-                WHERE tenant_id = :tenantId AND username = :username
+                WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId) AND username = :username
                   AND started_at >= CAST(:from AS timestamptz)
                   AND started_at < CAST(:to AS timestamptz) + INTERVAL '1 day'
                 """);
@@ -160,7 +160,7 @@ public class UserActivityService {
         StringBuilder sessionCountSql = new StringBuilder("""
                 SELECT COUNT(DISTINCT session_id)
                 FROM app_focus_intervals
-                WHERE tenant_id = :tenantId AND username = :username
+                WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId) AND username = :username
                   AND started_at >= CAST(:from AS timestamptz)
                   AND started_at < CAST(:to AS timestamptz) + INTERVAL '1 day'
                   AND session_id IS NOT NULL
@@ -182,7 +182,7 @@ public class UserActivityService {
                        SUM(duration_ms) AS total_duration,
                        COUNT(*) AS cnt
                 FROM app_focus_intervals
-                WHERE tenant_id = :tenantId AND username = :username
+                WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId) AND username = :username
                   AND started_at >= CAST(:from AS timestamptz)
                   AND started_at < CAST(:to AS timestamptz) + INTERVAL '1 day'
                 """);
@@ -214,7 +214,7 @@ public class UserActivityService {
                        SUM(duration_ms) AS total_duration,
                        COUNT(*) AS cnt
                 FROM app_focus_intervals
-                WHERE tenant_id = :tenantId AND username = :username
+                WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId) AND username = :username
                   AND is_browser = true AND domain IS NOT NULL
                   AND started_at >= CAST(:from AS timestamptz)
                   AND started_at < CAST(:to AS timestamptz) + INTERVAL '1 day'
@@ -249,7 +249,7 @@ public class UserActivityService {
                        MIN(started_at),
                        MAX(COALESCE(ended_at, started_at))
                 FROM app_focus_intervals
-                WHERE tenant_id = :tenantId AND username = :username
+                WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId) AND username = :username
                   AND started_at >= CAST(:from AS timestamptz)
                   AND started_at < CAST(:to AS timestamptz) + INTERVAL '1 day'
                 """);
@@ -307,7 +307,7 @@ public class UserActivityService {
         StringBuilder totalSql = new StringBuilder("""
                 SELECT COALESCE(SUM(duration_ms), 0)
                 FROM app_focus_intervals
-                WHERE tenant_id = :tenantId AND username = :username
+                WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId) AND username = :username
                   AND started_at >= CAST(:from AS timestamptz)
                   AND started_at < CAST(:to AS timestamptz) + INTERVAL '1 day'
                 """);
@@ -331,7 +331,7 @@ public class UserActivityService {
                        SUM(duration_ms) AS total_duration,
                        COUNT(*) AS cnt
                 FROM app_focus_intervals
-                WHERE tenant_id = :tenantId AND username = :username
+                WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId) AND username = :username
                   AND started_at >= CAST(:from AS timestamptz)
                   AND started_at < CAST(:to AS timestamptz) + INTERVAL '1 day'
                 """);
@@ -352,7 +352,7 @@ public class UserActivityService {
         StringBuilder countSql = new StringBuilder("""
                 SELECT COUNT(DISTINCT process_name)
                 FROM app_focus_intervals
-                WHERE tenant_id = :tenantId AND username = :username
+                WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId) AND username = :username
                   AND started_at >= CAST(:from AS timestamptz)
                   AND started_at < CAST(:to AS timestamptz) + INTERVAL '1 day'
                 """);
@@ -402,7 +402,7 @@ public class UserActivityService {
         StringBuilder totalSql = new StringBuilder("""
                 SELECT COALESCE(SUM(duration_ms), 0)
                 FROM app_focus_intervals
-                WHERE tenant_id = :tenantId AND username = :username AND is_browser = true
+                WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId) AND username = :username AND is_browser = true
                   AND started_at >= CAST(:from AS timestamptz)
                   AND started_at < CAST(:to AS timestamptz) + INTERVAL '1 day'
                 """);
@@ -425,7 +425,7 @@ public class UserActivityService {
                        MIN(started_at) AS first_visit,
                        MAX(started_at) AS last_visit
                 FROM app_focus_intervals
-                WHERE tenant_id = :tenantId AND username = :username
+                WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId) AND username = :username
                   AND is_browser = true AND domain IS NOT NULL
                   AND started_at >= CAST(:from AS timestamptz)
                   AND started_at < CAST(:to AS timestamptz) + INTERVAL '1 day'
@@ -447,7 +447,7 @@ public class UserActivityService {
         StringBuilder countSql = new StringBuilder("""
                 SELECT COUNT(DISTINCT domain)
                 FROM app_focus_intervals
-                WHERE tenant_id = :tenantId AND username = :username AND is_browser = true AND domain IS NOT NULL
+                WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId) AND username = :username AND is_browser = true AND domain IS NOT NULL
                   AND started_at >= CAST(:from AS timestamptz)
                   AND started_at < CAST(:to AS timestamptz) + INTERVAL '1 day'
                 """);
@@ -503,7 +503,7 @@ public class UserActivityService {
                        MAX(COALESCE(ended_at, started_at) AT TIME ZONE :tz),
                        SUM(duration_ms)
                 FROM app_focus_intervals
-                WHERE tenant_id = :tenantId AND username = :username
+                WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId) AND username = :username
                   AND started_at >= CAST(:from AS date) AT TIME ZONE :tz
                   AND started_at < (CAST(:to AS date) + INTERVAL '1 day') AT TIME ZONE :tz
                 """);
@@ -690,7 +690,7 @@ public class UserActivityService {
 
     private String getDisplayName(UUID tenantId, String username) {
         var query = em.createNativeQuery(
-                "SELECT display_name FROM device_user_sessions WHERE tenant_id = :tenantId AND username = :username LIMIT 1")
+                "SELECT display_name FROM device_user_sessions WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId) AND username = :username LIMIT 1")
                 .setParameter("tenantId", tenantId)
                 .setParameter("username", username);
         try {

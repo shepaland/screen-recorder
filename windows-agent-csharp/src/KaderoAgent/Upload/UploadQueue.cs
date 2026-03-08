@@ -61,6 +61,8 @@ public class UploadQueue
             {
                 _db.SavePendingSegment(segment);
                 _logger.LogWarning("Segment queued for retry: {File}", segment.FilePath);
+                // Backoff to prevent hot retry loops
+                await Task.Delay(5000, ct);
             }
         }
     }

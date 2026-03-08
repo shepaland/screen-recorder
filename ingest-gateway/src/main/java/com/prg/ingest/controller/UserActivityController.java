@@ -35,14 +35,16 @@ public class UserActivityController {
             @RequestParam(name = "sort_by", defaultValue = "last_seen_ts") String sortBy,
             @RequestParam(name = "sort_dir", defaultValue = "desc") String sortDir,
             @RequestParam(name = "is_active", required = false) Boolean isActive,
+            @RequestParam(name = "tenant_id", required = false) UUID tenantIdParam,
             HttpServletRequest httpRequest) {
 
         DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_RECORDINGS_READ);
+        UUID tenantId = resolveEffectiveTenantId(principal, tenantIdParam);
 
-        log.debug("Getting users list: tenant={} page={} size={}", principal.getTenantId(), page, size);
+        log.debug("Getting users list: tenant={} page={} size={}", tenantId, page, size);
 
         UserListResponse response = userActivityService.getUsers(
-                principal.getTenantId(), page, size, search, sortBy, sortDir, isActive);
+                tenantId, page, size, search, sortBy, sortDir, isActive);
         return ResponseEntity.ok(response);
     }
 
@@ -56,14 +58,16 @@ public class UserActivityController {
             @RequestParam String from,
             @RequestParam String to,
             @RequestParam(name = "device_id", required = false) UUID deviceId,
+            @RequestParam(name = "tenant_id", required = false) UUID tenantIdParam,
             HttpServletRequest httpRequest) {
 
         DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_RECORDINGS_READ);
+        UUID tenantId = resolveEffectiveTenantId(principal, tenantIdParam);
 
-        log.debug("Getting user activity: tenant={} from={} to={}", principal.getTenantId(), from, to);
+        log.debug("Getting user activity: tenant={} from={} to={}", tenantId, from, to);
 
         UserActivityResponse response = userActivityService.getUserActivity(
-                principal.getTenantId(), username, from, to, deviceId);
+                tenantId, username, from, to, deviceId);
         return ResponseEntity.ok(response);
     }
 
@@ -80,12 +84,14 @@ public class UserActivityController {
             @RequestParam(name = "sort_by", defaultValue = "total_duration") String sortBy,
             @RequestParam(name = "sort_dir", defaultValue = "desc") String sortDir,
             @RequestParam(name = "device_id", required = false) UUID deviceId,
+            @RequestParam(name = "tenant_id", required = false) UUID tenantIdParam,
             HttpServletRequest httpRequest) {
 
         DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_RECORDINGS_READ);
+        UUID tenantId = resolveEffectiveTenantId(principal, tenantIdParam);
 
         AppsReportResponse response = userActivityService.getUserApps(
-                principal.getTenantId(), username, from, to, page, size, sortBy, sortDir, deviceId);
+                tenantId, username, from, to, page, size, sortBy, sortDir, deviceId);
         return ResponseEntity.ok(response);
     }
 
@@ -100,12 +106,14 @@ public class UserActivityController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(name = "device_id", required = false) UUID deviceId,
+            @RequestParam(name = "tenant_id", required = false) UUID tenantIdParam,
             HttpServletRequest httpRequest) {
 
         DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_RECORDINGS_READ);
+        UUID tenantId = resolveEffectiveTenantId(principal, tenantIdParam);
 
         DomainsReportResponse response = userActivityService.getUserDomains(
-                principal.getTenantId(), username, from, to, page, size, deviceId);
+                tenantId, username, from, to, page, size, deviceId);
         return ResponseEntity.ok(response);
     }
 
@@ -119,12 +127,14 @@ public class UserActivityController {
             @RequestParam String to,
             @RequestParam(defaultValue = "Europe/Moscow") String timezone,
             @RequestParam(name = "device_id", required = false) UUID deviceId,
+            @RequestParam(name = "tenant_id", required = false) UUID tenantIdParam,
             HttpServletRequest httpRequest) {
 
         DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_RECORDINGS_READ);
+        UUID tenantId = resolveEffectiveTenantId(principal, tenantIdParam);
 
         WorktimeResponse response = userActivityService.getUserWorktime(
-                principal.getTenantId(), username, from, to, timezone, deviceId);
+                tenantId, username, from, to, timezone, deviceId);
         return ResponseEntity.ok(response);
     }
 
@@ -139,12 +149,14 @@ public class UserActivityController {
             @RequestParam(name = "work_end", defaultValue = "18:00") String workEnd,
             @RequestParam(defaultValue = "Europe/Moscow") String timezone,
             @RequestParam(name = "device_id", required = false) UUID deviceId,
+            @RequestParam(name = "tenant_id", required = false) UUID tenantIdParam,
             HttpServletRequest httpRequest) {
 
         DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_RECORDINGS_READ);
+        UUID tenantId = resolveEffectiveTenantId(principal, tenantIdParam);
 
         TimesheetResponse response = userActivityService.getUserTimesheet(
-                principal.getTenantId(), username, month, workStart, workEnd, timezone, deviceId);
+                tenantId, username, month, workStart, workEnd, timezone, deviceId);
         return ResponseEntity.ok(response);
     }
 
@@ -165,5 +177,18 @@ public class UserActivityController {
                     "INSUFFICIENT_PERMISSIONS");
         }
         return principal;
+    }
+
+    /**
+     * Resolve effective tenant_id for the query.
+     * Users with "global" scope (SUPER_ADMIN) can specify tenant_id as query param,
+     * or omit it to query all tenants (null = no tenant filter).
+     * Regular users always use their JWT tenant_id.
+     */
+    private UUID resolveEffectiveTenantId(DevicePrincipal principal, UUID tenantIdParam) {
+        if (principal.hasScope("global")) {
+            return tenantIdParam; // null = all tenants, or specific tenant if provided
+        }
+        return principal.getTenantId();
     }
 }
