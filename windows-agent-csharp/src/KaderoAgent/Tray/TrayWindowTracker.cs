@@ -26,6 +26,7 @@ public class TrayWindowTracker : IDisposable
     private const int PollIntervalMs  = 5_000;
     private const int MinIntervalMs   = 3_000;
     private const int SendIntervalMs  = 30_000;
+    private const int FlushIntervalMs = 60_000; // flush long-running intervals every 60s
 
     private static readonly log4net.ILog _log = log4net.LogManager.GetLogger(typeof(TrayWindowTracker));
 
@@ -82,7 +83,12 @@ public class TrayWindowTracker : IDisposable
             if (string.IsNullOrEmpty(title)) return;
 
             // Same window AND same title — nothing changed (no tab switch, no navigation)
-            if (hwnd == _lastHwnd && title == _lastWindowTitle) return;
+            if (hwnd == _lastHwnd && title == _lastWindowTitle)
+            {
+                // Flush long-running intervals so analytics updates in real time
+                FlushIfLongRunning();
+                return;
+            }
 
             var now = DateTime.UtcNow;
 
@@ -147,6 +153,40 @@ public class TrayWindowTracker : IDisposable
 
         if (_lastDomain == null)
             _log.Warn($"Browser domain NOT resolved: process={processName}, title='{title}'");
+    }
+
+    /// <summary>
+    /// If the current interval has been running longer than FlushIntervalMs,
+    /// emit a completed interval for the elapsed time and start a new one.
+    /// This ensures long stays on a single page are reported incrementally.
+    /// </summary>
+    private void FlushIfLongRunning()
+    {
+        if (string.IsNullOrEmpty(_lastProcessName)) return;
+
+        var now = DateTime.UtcNow;
+        var durationMs = (int)(now - _focusStartedAt).TotalMilliseconds;
+        if (durationMs < FlushIntervalMs) return;
+
+        bool isBrowser = BrowserDomainParser.IsBrowser(_lastProcessName);
+
+        var interval = new FocusIntervalData
+        {
+            Id           = Guid.NewGuid().ToString(),
+            ProcessName  = _lastProcessName + ".exe",
+            WindowTitle  = _lastWindowTitle,
+            IsBrowser    = isBrowser,
+            BrowserName  = isBrowser ? _lastBrowserName : null,
+            Domain       = isBrowser ? _lastDomain : null,
+            StartedAt    = _focusStartedAt.ToString("o"),
+            EndedAt      = now.ToString("o"),
+            DurationMs   = durationMs
+        };
+
+        lock (_pendingLock) { _pending.Add(interval); }
+
+        // Reset start time for the next chunk (same window continues)
+        _focusStartedAt = now;
     }
 
     private void CompletePreviousInterval(DateTime now)
