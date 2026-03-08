@@ -39,8 +39,7 @@ public class UserActivityController {
 
         DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_RECORDINGS_READ);
 
-        log.debug("Getting users list: tenant={} page={} size={} search={}",
-                principal.getTenantId(), page, size, search);
+        log.debug("Getting users list: tenant={} page={} size={}", principal.getTenantId(), page, size);
 
         UserListResponse response = userActivityService.getUsers(
                 principal.getTenantId(), page, size, search, sortBy, sortDir, isActive);
@@ -48,11 +47,12 @@ public class UserActivityController {
     }
 
     /**
-     * GET /api/v1/ingest/users/{username}/activity — activity summary for user.
+     * GET /api/v1/ingest/users/activity?username=... — activity summary for user.
+     * Username passed as query param to support DOMAIN\\user format (backslash-safe).
      */
-    @GetMapping("/{username}/activity")
+    @GetMapping("/activity")
     public ResponseEntity<UserActivityResponse> getUserActivity(
-            @PathVariable String username,
+            @RequestParam String username,
             @RequestParam String from,
             @RequestParam String to,
             @RequestParam(name = "device_id", required = false) UUID deviceId,
@@ -60,8 +60,7 @@ public class UserActivityController {
 
         DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_RECORDINGS_READ);
 
-        log.debug("Getting user activity: tenant={} username={} from={} to={}",
-                principal.getTenantId(), username, from, to);
+        log.debug("Getting user activity: tenant={} from={} to={}", principal.getTenantId(), from, to);
 
         UserActivityResponse response = userActivityService.getUserActivity(
                 principal.getTenantId(), username, from, to, deviceId);
@@ -69,11 +68,11 @@ public class UserActivityController {
     }
 
     /**
-     * GET /api/v1/ingest/users/{username}/apps — apps usage report.
+     * GET /api/v1/ingest/users/apps?username=... — apps usage report.
      */
-    @GetMapping("/{username}/apps")
+    @GetMapping("/apps")
     public ResponseEntity<AppsReportResponse> getUserApps(
-            @PathVariable String username,
+            @RequestParam String username,
             @RequestParam String from,
             @RequestParam String to,
             @RequestParam(defaultValue = "0") int page,
@@ -91,11 +90,11 @@ public class UserActivityController {
     }
 
     /**
-     * GET /api/v1/ingest/users/{username}/domains — domains usage report.
+     * GET /api/v1/ingest/users/domains?username=... — domains usage report.
      */
-    @GetMapping("/{username}/domains")
+    @GetMapping("/domains")
     public ResponseEntity<DomainsReportResponse> getUserDomains(
-            @PathVariable String username,
+            @RequestParam String username,
             @RequestParam String from,
             @RequestParam String to,
             @RequestParam(defaultValue = "0") int page,
@@ -111,11 +110,11 @@ public class UserActivityController {
     }
 
     /**
-     * GET /api/v1/ingest/users/{username}/worktime — worktime report.
+     * GET /api/v1/ingest/users/worktime?username=... — worktime report.
      */
-    @GetMapping("/{username}/worktime")
+    @GetMapping("/worktime")
     public ResponseEntity<WorktimeResponse> getUserWorktime(
-            @PathVariable String username,
+            @RequestParam String username,
             @RequestParam String from,
             @RequestParam String to,
             @RequestParam(defaultValue = "Europe/Moscow") String timezone,
@@ -130,11 +129,11 @@ public class UserActivityController {
     }
 
     /**
-     * GET /api/v1/ingest/users/{username}/timesheet — monthly timesheet.
+     * GET /api/v1/ingest/users/timesheet?username=... — monthly timesheet.
      */
-    @GetMapping("/{username}/timesheet")
+    @GetMapping("/timesheet")
     public ResponseEntity<TimesheetResponse> getUserTimesheet(
-            @PathVariable String username,
+            @RequestParam String username,
             @RequestParam String month,
             @RequestParam(name = "work_start", defaultValue = "09:00") String workStart,
             @RequestParam(name = "work_end", defaultValue = "18:00") String workEnd,
