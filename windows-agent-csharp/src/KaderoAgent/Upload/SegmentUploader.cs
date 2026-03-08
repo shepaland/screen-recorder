@@ -91,6 +91,21 @@ public class SegmentUploader
             _logger.LogInformation("Segment {Seq} uploaded ({Size} bytes)", sequenceNum, fileBytes.Length);
             return true;
         }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            // 404 = session not found on server (expired/closed after re-login).
+            // Discard the segment to prevent infinite retry loop.
+            _logger.LogWarning("Session not found (404) for segment {Seq} of session {Session}, discarding",
+                sequenceNum, sessionId);
+            return true; // Mark as "uploaded" so it's removed from the queue
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            // 400 = invalid request (e.g. malformed session_id). Don't retry.
+            _logger.LogWarning(ex, "Bad request (400) uploading segment {Seq} of session {Session}, discarding",
+                sequenceNum, sessionId);
+            return true;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to upload segment {Seq}", sequenceNum);

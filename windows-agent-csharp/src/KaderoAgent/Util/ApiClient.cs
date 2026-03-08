@@ -14,6 +14,7 @@ public class ApiClient
     private readonly TokenStore _tokenStore;
     private readonly ILogger<ApiClient> _logger;
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
+    private Func<Task<bool>>? _tokenRefreshCallback;
     private string? _deviceId;
 
     public static readonly JsonSerializerOptions JsonOptions = new()
@@ -33,12 +34,15 @@ public class ApiClient
 
     public void SetDeviceId(string deviceId) => _deviceId = deviceId;
 
+    /// <summary>Set callback for auto-refreshing JWT when 401 is received.</summary>
+    public void SetTokenRefreshCallback(Func<Task<bool>> callback) => _tokenRefreshCallback = callback;
+
     public async Task<T?> GetAsync<T>(string url, CancellationToken ct = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, url);
         AddAuth(request);
         var response = await SendWithRetry(request, ct);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessWithLogging(response, request.Method, url, ct);
         var json = await response.Content.ReadAsStringAsync(ct);
         return JsonSerializer.Deserialize<T>(json, JsonOptions);
     }
@@ -53,7 +57,7 @@ public class ApiClient
         }
         AddAuth(request);
         var response = await SendWithRetry(request, ct);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessWithLogging(response, request.Method, url, ct);
         var json = await response.Content.ReadAsStringAsync(ct);
         if (string.IsNullOrWhiteSpace(json)) return default;
         return JsonSerializer.Deserialize<T>(json, JsonOptions);
@@ -69,7 +73,7 @@ public class ApiClient
         }
         AddAuth(request);
         var response = await SendWithRetry(request, ct);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessWithLogging(response, request.Method, url, ct);
         var json = await response.Content.ReadAsStringAsync(ct);
         if (string.IsNullOrWhiteSpace(json)) return default;
         return JsonSerializer.Deserialize<T>(json, JsonOptions);
@@ -99,15 +103,43 @@ public class ApiClient
 
     private async Task<HttpResponseMessage> SendWithRetry(HttpRequestMessage request, CancellationToken ct, int maxRetries = 3)
     {
+        bool tokenRefreshed = false;
+
         for (int i = 0; i < maxRetries; i++)
         {
             try
             {
-                // Clone request for retry
+                // Clone request for retry (re-add auth with potentially refreshed token)
                 var clone = await CloneRequest(request);
+                clone.Headers.Authorization = null;
+                clone.Headers.Remove("X-Device-ID");
+                AddAuth(clone);
+
                 _logger.LogDebug("HTTP {Method} {Url}", clone.Method, clone.RequestUri);
                 var response = await _http.SendAsync(clone, ct);
                 _logger.LogDebug("HTTP {Method} {Url} → {StatusCode}", clone.Method, clone.RequestUri, (int)response.StatusCode);
+
+                // 401 Unauthorized: try token refresh once, then retry
+                if (response.StatusCode == HttpStatusCode.Unauthorized && !tokenRefreshed && _tokenRefreshCallback != null)
+                {
+                    _logger.LogWarning("Got 401 from {Url}, attempting token refresh...", request.RequestUri);
+                    await _refreshLock.WaitAsync(ct);
+                    try
+                    {
+                        var refreshed = await _tokenRefreshCallback();
+                        tokenRefreshed = true;
+                        if (refreshed)
+                        {
+                            _logger.LogInformation("Token refreshed successfully, retrying request");
+                            continue; // Retry with new token
+                        }
+                        _logger.LogWarning("Token refresh failed, returning 401 response");
+                    }
+                    finally
+                    {
+                        _refreshLock.Release();
+                    }
+                }
 
                 if (response.StatusCode != HttpStatusCode.ServiceUnavailable &&
                     response.StatusCode != HttpStatusCode.GatewayTimeout)
@@ -125,6 +157,19 @@ public class ApiClient
         }
 
         throw new HttpRequestException($"Request failed after {maxRetries} retries");
+    }
+
+    /// <summary>Log response body on error before throwing HttpRequestException.</summary>
+    private async Task EnsureSuccessWithLogging(HttpResponseMessage response, HttpMethod method, string url, CancellationToken ct)
+    {
+        if (response.IsSuccessStatusCode) return;
+
+        var errorBody = "";
+        try { errorBody = await response.Content.ReadAsStringAsync(ct); } catch { }
+        _logger.LogError("HTTP {Method} {Url} failed: {StatusCode} - {Body}",
+            method, url, (int)response.StatusCode, errorBody);
+
+        response.EnsureSuccessStatusCode(); // Throw with standard message
     }
 
     private static async Task<HttpRequestMessage> CloneRequest(HttpRequestMessage req)

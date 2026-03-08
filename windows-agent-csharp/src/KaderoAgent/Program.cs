@@ -296,6 +296,13 @@ if (!args.Contains("--service"))
     }
 }
 
+// Wire up ApiClient token refresh callback for auto-refresh on 401
+{
+    var apiClient = host.Services.GetRequiredService<ApiClient>();
+    var authManager = host.Services.GetRequiredService<AuthManager>();
+    apiClient.SetTokenRefreshCallback(() => authManager.RefreshTokenAsync());
+}
+
 // Initialize FocusIntervalSink with current username
 {
     var userSessionInfo = host.Services.GetRequiredService<UserSessionInfo>();

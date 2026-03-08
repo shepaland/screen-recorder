@@ -12,6 +12,8 @@ public class SessionWatcher : BackgroundService
     private readonly IAuditEventSink _sink;
     private readonly CommandHandler _commandHandler;
     private readonly CredentialStore _credentialStore;
+    private readonly UserSessionInfo _userSessionInfo;
+    private readonly FocusIntervalSink _focusIntervalSink;
     private readonly ILogger<SessionWatcher> _logger;
 
     private volatile bool _isSessionActive = true;
@@ -23,11 +25,15 @@ public class SessionWatcher : BackgroundService
         IAuditEventSink sink,
         CommandHandler commandHandler,
         CredentialStore credentialStore,
+        UserSessionInfo userSessionInfo,
+        FocusIntervalSink focusIntervalSink,
         ILogger<SessionWatcher> logger)
     {
         _sink = sink;
         _commandHandler = commandHandler;
         _credentialStore = credentialStore;
+        _userSessionInfo = userSessionInfo;
+        _focusIntervalSink = focusIntervalSink;
         _logger = logger;
     }
 
@@ -88,11 +94,56 @@ public class SessionWatcher : BackgroundService
                     case SessionSwitchReason.SessionLogon:
                         _logger.LogInformation("Session LOGON");
                         _isSessionActive = true;
+
+                        // Invalidate cached username — new user session may be a different user
+                        _userSessionInfo.InvalidateCache();
+
                         _sink.Publish(new AuditEvent
                         {
                             EventType = "SESSION_LOGON",
                             Details = new Dictionary<string, object> { ["reason"] = "SessionLogon" }
                         });
+
+                        // Update FocusIntervalSink with new username
+                        {
+                            var newUsername = _userSessionInfo.GetCurrentUsername();
+                            _focusIntervalSink.SetUsername(newUsername);
+                            _logger.LogInformation("Session logon: username updated to {Username}", newUsername);
+                        }
+
+                        // Start recording for the new user session
+                        {
+                            var creds = _credentialStore.Load();
+                            var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";
+                            await _commandHandler.HandleSessionLogonAsync(baseUrl, CancellationToken.None);
+                        }
+                        break;
+
+                    case SessionSwitchReason.ConsoleConnect:
+                    case SessionSwitchReason.RemoteConnect:
+                        _logger.LogInformation("Session {Reason}", e.Reason);
+                        _isSessionActive = true;
+
+                        // Invalidate cached username for reconnect scenarios
+                        _userSessionInfo.InvalidateCache();
+
+                        _sink.Publish(new AuditEvent
+                        {
+                            EventType = e.Reason == SessionSwitchReason.ConsoleConnect
+                                ? "CONSOLE_CONNECT" : "REMOTE_CONNECT",
+                            Details = new Dictionary<string, object> { ["reason"] = e.Reason.ToString() }
+                        });
+
+                        // Update FocusIntervalSink username and resume if paused
+                        {
+                            var reconnectUsername = _userSessionInfo.GetCurrentUsername();
+                            _focusIntervalSink.SetUsername(reconnectUsername);
+                        }
+                        {
+                            var creds = _credentialStore.Load();
+                            var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";
+                            await _commandHandler.ResumeRecordingAsync(baseUrl, CancellationToken.None);
+                        }
                         break;
 
                     case SessionSwitchReason.SessionLogoff:

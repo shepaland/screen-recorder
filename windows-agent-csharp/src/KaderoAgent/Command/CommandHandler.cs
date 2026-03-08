@@ -79,6 +79,35 @@ public class CommandHandler
         await StartRecording(baseUrl, ct);
     }
 
+    /// <summary>
+    /// Handle user logon (new user session after logoff/switch).
+    /// Resets pause state, clears stale FFmpeg state, and auto-starts recording.
+    /// Unlike ResumeRecordingAsync, this always attempts to start (not gated by _isPausedByLock).
+    /// </summary>
+    public async Task HandleSessionLogonAsync(string baseUrl, CancellationToken ct)
+    {
+        _logger.LogInformation("Handling session logon: resetting state and auto-starting");
+
+        // Reset pause flag (Logoff sets _isPausedByLock = true via PauseRecordingAsync)
+        _isPausedByLock = false;
+
+        // Stop any stale recording state (FFmpeg from previous user session is dead)
+        if (_captureManager.IsRecording)
+        {
+            _logger.LogInformation("Clearing stale recording state from previous user session");
+            _captureManager.ResetAfterCrash();
+        }
+
+        // Reset consecutive failures for fresh start
+        _consecutiveFailures = 0;
+
+        // Small delay to let the new Windows session stabilize (desktop, DWM, explorer)
+        await Task.Delay(3000, ct);
+
+        // Auto-start recording for the new user
+        await AutoStartRecordingAsync(baseUrl, ct);
+    }
+
     public async Task HandleAsync(PendingCommand cmd, string baseUrl, CancellationToken ct)
     {
         _logger.LogInformation("Handling command: {Type} ({Id})", cmd.CommandType, cmd.Id);
