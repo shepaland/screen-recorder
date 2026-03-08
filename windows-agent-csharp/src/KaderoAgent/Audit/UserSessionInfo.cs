@@ -8,12 +8,14 @@ public class UserSessionInfo
 {
     // ── WTS P/Invoke ───────────────────────────────────────────────────────────
 
-    [DllImport("wtsapi32.dll", SetLastError = true)]
+    // CharSet.Unicode → вызывает W-версии: WTSEnumerateSessionsW / WTSQuerySessionInformationW
+    // ppBuffer у WTSQuerySessionInformationW содержит UTF-16LE строку → Marshal.PtrToStringUni
+    [DllImport("wtsapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool WTSEnumerateSessions(
         IntPtr hServer, uint reserved, uint version,
         out IntPtr ppSessionInfo, out uint pCount);
 
-    [DllImport("wtsapi32.dll", SetLastError = true)]
+    [DllImport("wtsapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool WTSQuerySessionInformation(
         IntPtr hServer, uint sessionId, WtsInfoClass wtsInfoClass,
         out IntPtr ppBuffer, out uint pBytesReturned);
@@ -21,11 +23,11 @@ public class UserSessionInfo
     [DllImport("wtsapi32.dll")]
     private static extern void WTSFreeMemory(IntPtr pMemory);
 
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct WTS_SESSION_INFO
     {
         public uint SessionID;
-        [MarshalAs(UnmanagedType.LPTStr)]
+        [MarshalAs(UnmanagedType.LPWStr)]
         public string? WinStationName;
         public int State; // WTS_CONNECTSTATE_CLASS
     }
