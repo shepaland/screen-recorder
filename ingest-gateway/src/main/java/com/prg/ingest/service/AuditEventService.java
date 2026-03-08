@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,10 +30,17 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AuditEventService {
 
+    private static final Pattern HTML_TAG_PATTERN = Pattern.compile("<[^>]+>");
+
     private final DeviceAuditEventRepository auditEventRepository;
     private final DeviceRepository deviceRepository;
     private final DeviceUserSessionRepository userSessionRepository;
     private final EntityManager entityManager;
+
+    private static String sanitize(String input) {
+        if (input == null) return null;
+        return HTML_TAG_PATTERN.matcher(input).replaceAll("");
+    }
 
     @Transactional
     public SubmitAuditEventsResponse submitEvents(
@@ -83,7 +91,7 @@ public class AuditEventService {
                     .eventTs(item.getEventTs())
                     .details(item.getDetails() != null ? item.getDetails() : Map.of())
                     .correlationId(correlationId)
-                    .username(request.getUsername())
+                    .username(sanitize(request.getUsername()))
                     .build();
 
             entityManager.persist(entity);

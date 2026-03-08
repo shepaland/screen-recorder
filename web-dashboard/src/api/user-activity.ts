@@ -35,10 +35,9 @@ export async function getUserActivity(
   to: string,
   deviceId?: string,
 ): Promise<UserActivityResponse> {
-  const { data } = await ingestApiClient.get<UserActivityResponse>(
-    `/users/${encodeURIComponent(username)}/activity`,
-    { params: { from, to, device_id: deviceId } },
-  );
+  const { data } = await ingestApiClient.get<UserActivityResponse>('/users/activity', {
+    params: { username, from, to, device_id: deviceId },
+  });
   return data;
 }
 
@@ -48,18 +47,16 @@ export async function getUserApps(
   to: string,
   params?: { page?: number; size?: number; deviceId?: string },
 ): Promise<AppsReportResponse> {
-  const { data } = await ingestApiClient.get<AppsReportResponse>(
-    `/users/${encodeURIComponent(username)}/apps`,
-    {
-      params: {
-        from,
-        to,
-        page: params?.page,
-        size: params?.size,
-        device_id: params?.deviceId,
-      },
+  const { data } = await ingestApiClient.get<AppsReportResponse>('/users/apps', {
+    params: {
+      username,
+      from,
+      to,
+      page: params?.page,
+      size: params?.size,
+      device_id: params?.deviceId,
     },
-  );
+  });
   return data;
 }
 
@@ -69,18 +66,16 @@ export async function getUserDomains(
   to: string,
   params?: { page?: number; size?: number; deviceId?: string },
 ): Promise<DomainsReportResponse> {
-  const { data } = await ingestApiClient.get<DomainsReportResponse>(
-    `/users/${encodeURIComponent(username)}/domains`,
-    {
-      params: {
-        from,
-        to,
-        page: params?.page,
-        size: params?.size,
-        device_id: params?.deviceId,
-      },
+  const { data } = await ingestApiClient.get<DomainsReportResponse>('/users/domains', {
+    params: {
+      username,
+      from,
+      to,
+      page: params?.page,
+      size: params?.size,
+      device_id: params?.deviceId,
     },
-  );
+  });
   return data;
 }
 
@@ -91,10 +86,9 @@ export async function getUserWorktime(
   timezone = 'Europe/Moscow',
   deviceId?: string,
 ): Promise<WorktimeResponse> {
-  const { data } = await ingestApiClient.get<WorktimeResponse>(
-    `/users/${encodeURIComponent(username)}/worktime`,
-    { params: { from, to, timezone, device_id: deviceId } },
-  );
+  const { data } = await ingestApiClient.get<WorktimeResponse>('/users/worktime', {
+    params: { username, from, to, timezone, device_id: deviceId },
+  });
   return data;
 }
 
@@ -108,17 +102,15 @@ export async function getUserTimesheet(
     deviceId?: string;
   },
 ): Promise<TimesheetResponse> {
-  const { data } = await ingestApiClient.get<TimesheetResponse>(
-    `/users/${encodeURIComponent(username)}/timesheet`,
-    {
-      params: {
-        month,
-        work_start: params?.workStart,
-        work_end: params?.workEnd,
-        timezone: params?.timezone ?? 'Europe/Moscow',
-        device_id: params?.deviceId,
-      },
+  const { data } = await ingestApiClient.get<TimesheetResponse>('/users/timesheet', {
+    params: {
+      username,
+      month,
+      work_start: params?.workStart,
+      work_end: params?.workEnd,
+      timezone: params?.timezone ?? 'Europe/Moscow',
+      device_id: params?.deviceId,
     },
-  );
+  });
   return data;
 }

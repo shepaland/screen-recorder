@@ -106,8 +106,8 @@ public class FocusIntervalService {
             entityManager.flush();
         }
 
-        log.info("FOCUS_INTERVALS_SUBMITTED: device_id={}, username={}, accepted={}, duplicates={}, tenant_id={}, correlation_id={}",
-                request.getDeviceId(), request.getUsername(), accepted, duplicates, principal.getTenantId(), correlationId);
+        log.info("FOCUS_INTERVALS_SUBMITTED: device_id={}, accepted={}, duplicates={}, tenant_id={}, correlation_id={}",
+                request.getDeviceId(), accepted, duplicates, principal.getTenantId(), correlationId);
 
         return FocusIntervalsResponse.builder()
                 .accepted(accepted)
