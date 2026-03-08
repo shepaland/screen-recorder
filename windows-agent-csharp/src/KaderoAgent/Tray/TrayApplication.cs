@@ -18,6 +18,7 @@ public class TrayApplication : ApplicationContext
 {
     private readonly NotifyIcon _trayIcon;
     private readonly PipeClient _pipeClient;
+    private readonly TrayWindowTracker _windowTracker;
     private StatusWindow? _statusWindow;
     private AboutDialog? _aboutDialog;
     private System.Threading.Timer? _statusTimer;
@@ -33,7 +34,8 @@ public class TrayApplication : ApplicationContext
 
     public TrayApplication()
     {
-        _pipeClient = new PipeClient();
+        _pipeClient    = new PipeClient();
+        _windowTracker = new TrayWindowTracker();
 
         // Create hidden control on STA thread for marshaling UI calls
         _invokeControl = new Control();
@@ -51,6 +53,9 @@ public class TrayApplication : ApplicationContext
 
         // Start background status polling on thread pool
         StartStatusPolling();
+
+        // Start active window tracking (runs in interactive session — GetForegroundWindow works here)
+        _windowTracker.Start();
     }
 
     private ContextMenuStrip CreateContextMenu()
@@ -269,6 +274,7 @@ public class TrayApplication : ApplicationContext
     private void OnExit(object? sender, EventArgs e)
     {
         _statusTimer?.Dispose();
+        _windowTracker.Dispose();
         _statusWindow?.Close();
         _aboutDialog?.Close();
         _pipeClient.Dispose();

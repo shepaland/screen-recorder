@@ -8,8 +8,24 @@ public static class PipeProtocol
 
 public class PipeRequest
 {
-    public string Command { get; set; } = ""; // "get_status", "reconnect", "update_settings"
+    public string Command { get; set; } = ""; // "get_status", "reconnect", "report_focus_intervals"
     public Dictionary<string, string>? Params { get; set; }
+    public List<FocusIntervalData>? FocusIntervals { get; set; }
+}
+
+/// <summary>Focus interval DTO for tray→service pipe transport.</summary>
+public class FocusIntervalData
+{
+    public string Id { get; set; } = "";
+    public string ProcessName { get; set; } = "";
+    public string WindowTitle { get; set; } = "";
+    public bool IsBrowser { get; set; }
+    public string? BrowserName { get; set; }
+    public string? Domain { get; set; }
+    public string StartedAt { get; set; } = "";
+    public string? EndedAt { get; set; }
+    public int DurationMs { get; set; }
+    public string? SessionId { get; set; }
 }
 
 public class PipeResponse

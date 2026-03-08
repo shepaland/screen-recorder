@@ -154,11 +154,12 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<AuditEventSink>())
 builder.Services.AddHostedService(sp => sp.GetRequiredService<SessionWatcher>());
 builder.Services.AddHostedService<ProcessWatcher>();
 
-// Activity tracking: user session info, focus interval sink, active window tracker
+// Activity tracking: user session info, focus interval sink
+// NOTE: ActiveWindowTracker is NOT registered here — GetForegroundWindow() returns 0 in Session 0
+//       (Windows Service context). Window tracking runs in TrayWindowTracker (tray process) instead.
 builder.Services.AddSingleton<UserSessionInfo>();
 builder.Services.AddSingleton<FocusIntervalSink>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<FocusIntervalSink>());
-builder.Services.AddHostedService<ActiveWindowTracker>();
 
 // IPC: status provider and command executor (available in all modes)
 builder.Services.AddSingleton<AgentStatusProvider>();

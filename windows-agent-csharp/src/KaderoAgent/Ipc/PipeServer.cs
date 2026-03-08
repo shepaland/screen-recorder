@@ -4,25 +4,32 @@ using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using KaderoAgent.Audit;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// Named Pipe server running inside Windows Service.
 /// Accepts connections from Tray app, responds with agent status,
-/// handles reconnect/update_settings commands.
+/// handles reconnect/update_settings/report_focus_intervals commands.
 /// </summary>
 public class PipeServer : BackgroundService
 {
     private readonly IStatusProvider _statusProvider;
     private readonly ICommandExecutor _commandExecutor;
+    private readonly FocusIntervalSink _focusIntervalSink;
     private readonly ILogger<PipeServer> _logger;
     private readonly JsonSerializerOptions _jsonOptions;
 
-    public PipeServer(IStatusProvider statusProvider, ICommandExecutor commandExecutor, ILogger<PipeServer> logger)
+    public PipeServer(
+        IStatusProvider statusProvider,
+        ICommandExecutor commandExecutor,
+        FocusIntervalSink focusIntervalSink,
+        ILogger<PipeServer> logger)
     {
         _statusProvider = statusProvider;
         _commandExecutor = commandExecutor;
+        _focusIntervalSink = focusIntervalSink;
         _logger = logger;
         _jsonOptions = new JsonSerializerOptions
         {
@@ -138,6 +145,9 @@ public class PipeServer : BackgroundService
                 var result = await _commandExecutor.ReconnectAsync(serverUrl, token, ct);
                 return new PipeResponse { Success = result, Status = _statusProvider.GetCurrentStatus() };
 
+            case "report_focus_intervals":
+                return HandleFocusIntervals(request);
+
             case "restart_service":
                 // Removed: restart via pipe is a DoS risk. Use sc.exe with UAC elevation instead.
                 return new PipeResponse { Success = false, Error = "Restart service via sc.exe (requires elevation)" };
@@ -145,5 +155,34 @@ public class PipeServer : BackgroundService
             default:
                 return new PipeResponse { Success = false, Error = $"Unknown command: {request.Command}" };
         }
+    }
+
+    private PipeResponse HandleFocusIntervals(PipeRequest request)
+    {
+        var intervals = request.FocusIntervals;
+        if (intervals == null || intervals.Count == 0)
+            return new PipeResponse { Success = true };
+
+        foreach (var data in intervals)
+        {
+            _focusIntervalSink.Enqueue(new FocusInterval
+            {
+                Id = string.IsNullOrEmpty(data.Id) ? Guid.NewGuid().ToString() : data.Id,
+                ProcessName = data.ProcessName,
+                WindowTitle = data.WindowTitle,
+                IsBrowser = data.IsBrowser,
+                BrowserName = data.BrowserName,
+                Domain = data.Domain,
+                StartedAt = DateTime.TryParse(data.StartedAt, null,
+                    System.Globalization.DateTimeStyles.RoundtripKind, out var s) ? s : DateTime.UtcNow,
+                EndedAt = data.EndedAt != null && DateTime.TryParse(data.EndedAt, null,
+                    System.Globalization.DateTimeStyles.RoundtripKind, out var e) ? e : null,
+                DurationMs = data.DurationMs,
+                SessionId = data.SessionId
+            });
+        }
+
+        _logger.LogDebug("Enqueued {Count} focus intervals from tray", intervals.Count);
+        return new PipeResponse { Success = true };
     }
 }
