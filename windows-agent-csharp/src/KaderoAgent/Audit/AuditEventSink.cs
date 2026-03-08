@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Text.Json;
 using KaderoAgent.Auth;
 using KaderoAgent.Storage;
 using KaderoAgent.Util;
@@ -14,9 +13,9 @@ public class AuditEventSink : BackgroundService, IAuditEventSink
     private readonly LocalDatabase _db;
     private readonly ApiClient _apiClient;
     private readonly AuthManager _authManager;
+    private readonly UserSessionInfo _userSessionInfo;
     private readonly ILogger<AuditEventSink> _logger;
 
-    private const int FlushThreshold = 50;
     private const int FlushIntervalSeconds = 30;
     private const int MaxBatchSize = 100;
 
@@ -26,11 +25,13 @@ public class AuditEventSink : BackgroundService, IAuditEventSink
         LocalDatabase db,
         ApiClient apiClient,
         AuthManager authManager,
+        UserSessionInfo userSessionInfo,
         ILogger<AuditEventSink> logger)
     {
         _db = db;
         _apiClient = apiClient;
         _authManager = authManager;
+        _userSessionInfo = userSessionInfo;
         _logger = logger;
     }
 
@@ -128,9 +129,13 @@ public class AuditEventSink : BackgroundService, IAuditEventSink
 
         var url = $"{baseUrl}/audit-events";
 
+        // Get current username (WTS API works from Session 0 / Windows Service)
+        var username = _userSessionInfo.GetCurrentUsername();
+
         var body = new
         {
             device_id = deviceId,
+            username = username,
             events = events.Select(e => new
             {
                 id = e.Id,
