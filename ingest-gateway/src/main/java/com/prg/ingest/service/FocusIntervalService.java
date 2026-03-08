@@ -117,7 +117,7 @@ public class FocusIntervalService {
     }
 
     private void upsertUserSession(UUID tenantId, UUID deviceId, String username) {
-        // Parse DOMAIN\user format
+        // Parse DOMAIN\\user format
         String windowsDomain = null;
         String parsedUsername = username;
         if (username.contains("\\")) {
