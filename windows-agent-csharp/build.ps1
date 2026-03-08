@@ -169,6 +169,28 @@ if ($SkipInstaller) {
 }
 
 # ---------------------------------------------------------------------------
+# Step 5: Copy installer to C:\kadero_install (clean directory)
+# ---------------------------------------------------------------------------
+if (-not $SkipInstaller) {
+    $DeployDir = "C:\kadero_install"
+    $OutputExe = Join-Path $InstallerDir "Output\KaderoAgentSetup.exe"
+
+    if (Test-Path $OutputExe) {
+        Write-Host "[5/5] Deploying installer to $DeployDir..." -ForegroundColor Green
+
+        # Clean the directory — only the installer should be there
+        if (Test-Path $DeployDir) {
+            Remove-Item -Recurse -Force "$DeployDir\*"
+        } else {
+            New-Item -ItemType Directory -Path $DeployDir -Force | Out-Null
+        }
+
+        Copy-Item -Force $OutputExe $DeployDir
+        Write-Host "  Copied: $DeployDir\KaderoAgentSetup.exe" -ForegroundColor Gray
+    }
+}
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 Write-Host ""
@@ -178,7 +200,7 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Publish dir:  $PublishDir" -ForegroundColor Gray
 if (-not $SkipInstaller) {
-    Write-Host "  Installer:    $(Join-Path $InstallerDir 'Output\KaderoAgentSetup.exe')" -ForegroundColor Gray
+    Write-Host "  Installer:    C:\kadero_install\KaderoAgentSetup.exe" -ForegroundColor Gray
     Write-Host ""
     Write-Host "  Silent install example:" -ForegroundColor Gray
     Write-Host "    KaderoAgentSetup.exe /VERYSILENT /SERVERURL=https://server.example.com /REGTOKEN=drt_abc123" -ForegroundColor DarkGray
