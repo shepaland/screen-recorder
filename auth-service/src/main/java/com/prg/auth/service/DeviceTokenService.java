@@ -8,6 +8,7 @@ import com.prg.auth.entity.Device;
 import com.prg.auth.entity.DeviceRegistrationToken;
 import com.prg.auth.entity.Tenant;
 import com.prg.auth.entity.User;
+import com.prg.auth.exception.ConflictException;
 import com.prg.auth.exception.ResourceNotFoundException;
 import com.prg.auth.repository.DeviceRegistrationTokenRepository;
 import com.prg.auth.repository.DeviceRepository;
@@ -37,6 +38,7 @@ public class DeviceTokenService {
     private final TenantRepository tenantRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
+    private final TokenEncryptionService tokenEncryptionService;
 
     @Transactional
     public DeviceTokenResponse createToken(CreateDeviceTokenRequest request, UserPrincipal principal,
@@ -49,6 +51,7 @@ public class DeviceTokenService {
 
         String rawToken = "drt_" + UUID.randomUUID().toString().replace("-", "");
         String tokenHash = AuthService.sha256(rawToken);
+        String encryptedToken = tokenEncryptionService.encrypt(rawToken);
 
         DeviceRegistrationToken token = DeviceRegistrationToken.builder()
                 .tenant(tenant)
@@ -59,6 +62,7 @@ public class DeviceTokenService {
                 .expiresAt(request.getExpiresAt())
                 .isActive(true)
                 .createdBy(createdBy)
+                .encryptedToken(encryptedToken)
                 .build();
         token = tokenRepository.save(token);
 
@@ -163,6 +167,56 @@ public class DeviceTokenService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public DeviceTokenResponse revealToken(UUID tokenId, UserPrincipal principal,
+                                            String ipAddress, String userAgent) {
+        DeviceRegistrationToken token = tokenRepository.findByIdAndTenantId(tokenId, principal.getTenantId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Device registration token not found", "TOKEN_NOT_FOUND"));
+
+        if (token.getEncryptedToken() == null) {
+            throw new ConflictException(
+                    "Token was created before reveal support. Please create a new token.",
+                    "TOKEN_REVEAL_NOT_AVAILABLE");
+        }
+
+        String rawToken = tokenEncryptionService.decrypt(token.getEncryptedToken());
+
+        auditService.logAction(principal.getTenantId(), principal.getUserId(),
+                "DEVICE_TOKEN_REVEALED", "DEVICE_TOKENS", tokenId,
+                Map.of("name", token.getName()),
+                ipAddress, userAgent, getCorrelationId());
+
+        log.info("Device registration token revealed: id={}, tenant_id={}, by_user={}",
+                tokenId, principal.getTenantId(), principal.getUserId());
+
+        return DeviceTokenResponse.builder()
+                .id(token.getId())
+                .token(rawToken)
+                .name(token.getName())
+                .build();
+    }
+
+    @Transactional
+    public void hardDeleteToken(UUID tokenId, UserPrincipal principal,
+                                String ipAddress, String userAgent) {
+        DeviceRegistrationToken token = tokenRepository.findByIdAndTenantId(tokenId, principal.getTenantId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Device registration token not found", "TOKEN_NOT_FOUND"));
+
+        // Detach devices from this token
+        deviceRepository.detachFromToken(tokenId, principal.getTenantId());
+
+        auditService.logAction(principal.getTenantId(), principal.getUserId(),
+                "DEVICE_TOKEN_HARD_DELETED", "DEVICE_TOKENS", tokenId,
+                Map.of("name", token.getName()),
+                ipAddress, userAgent, getCorrelationId());
+
+        tokenRepository.delete(token);
+
+        log.info("Device registration token hard deleted: id={}, tenant_id={}", tokenId, principal.getTenantId());
+    }
+
     private Map<UUID, Long> getActiveDeviceCounts(List<UUID> tokenIds, UUID tenantId) {
         if (tokenIds.isEmpty()) return Map.of();
         List<Object[]> rows = deviceRepository.countActiveDevicesByTokenIds(tokenIds, tenantId);
@@ -184,7 +238,7 @@ public class DeviceTokenService {
                 .deviceCount(deviceCount)
                 .expiresAt(token.getExpiresAt())
                 .isActive(token.getIsActive())
-                .createdByUsername(token.getCreatedBy().getUsername())
+                .createdByUsername(token.getCreatedBy() != null ? token.getCreatedBy().getUsername() : null)
                 .createdTs(token.getCreatedTs())
                 .build();
     }

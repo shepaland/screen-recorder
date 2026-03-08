@@ -4,6 +4,7 @@ import com.prg.auth.entity.Device;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -28,4 +29,8 @@ public interface DeviceRepository extends JpaRepository<Device, UUID> {
            "AND d.isDeleted = false GROUP BY d.registrationToken.id")
     List<Object[]> countActiveDevicesByTokenIds(@Param("tokenIds") List<UUID> tokenIds,
                                                  @Param("tenantId") UUID tenantId);
+
+    @Modifying
+    @Query("UPDATE Device d SET d.registrationToken = null WHERE d.registrationToken.id = :tokenId AND d.tenant.id = :tenantId")
+    void detachFromToken(@Param("tokenId") UUID tokenId, @Param("tenantId") UUID tenantId);
 }

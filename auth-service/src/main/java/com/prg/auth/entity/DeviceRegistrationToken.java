@@ -40,8 +40,11 @@ public class DeviceRegistrationToken {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
 
+    @Column(name = "encrypted_token")
+    private String encryptedToken;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by", nullable = false)
+    @JoinColumn(name = "created_by")
     private User createdBy;
 
     @Column(name = "created_ts", nullable = false, updatable = false)

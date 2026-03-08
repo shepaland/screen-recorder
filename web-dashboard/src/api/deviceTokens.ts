@@ -50,3 +50,12 @@ export async function getTokenDevices(tokenId: string): Promise<TokenDevicesResp
   const response = await apiClient.get<TokenDevicesResponse>(`/device-tokens/${tokenId}/devices`);
   return response.data;
 }
+
+export async function revealDeviceToken(id: string): Promise<DeviceTokenResponse> {
+  const response = await apiClient.post<DeviceTokenResponse>(`/device-tokens/${id}/reveal`);
+  return response.data;
+}
+
+export async function hardDeleteDeviceToken(id: string): Promise<void> {
+  await apiClient.delete(`/device-tokens/${id}`, { params: { hard: true } });
+}

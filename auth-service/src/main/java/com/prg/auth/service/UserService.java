@@ -12,6 +12,7 @@ import com.prg.auth.entity.Role;
 import com.prg.auth.entity.Tenant;
 import com.prg.auth.entity.User;
 import com.prg.auth.exception.AccessDeniedException;
+import com.prg.auth.exception.ConflictException;
 import com.prg.auth.exception.DuplicateResourceException;
 import com.prg.auth.exception.InvalidCredentialsException;
 import com.prg.auth.exception.ResourceNotFoundException;
@@ -261,6 +262,56 @@ public class UserService {
                 .settings(user.getSettings())
                 .tenantMaxSessionTtlDays(tenantMaxDays)
                 .build();
+    }
+
+    @Transactional
+    public void hardDeleteUser(UUID userId, UUID tenantId, UserPrincipal principal,
+                                String ipAddress, String userAgent) {
+        User user = userRepository.findByIdAndTenantId(userId, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found", "USER_NOT_FOUND"));
+
+        // Cannot delete yourself
+        if (principal.getUserId().equals(userId)) {
+            throw new ConflictException(
+                    "Cannot delete your own account", "CANNOT_DELETE_SELF");
+        }
+
+        // Cannot delete the last OWNER of a tenant
+        boolean isOwner = user.getRoles().stream().anyMatch(r -> "OWNER".equals(r.getCode()));
+        if (isOwner) {
+            long ownerCount = userRepository.countByTenantIdAndRoleCode(tenantId, "OWNER");
+            if (ownerCount <= 1) {
+                throw new ConflictException(
+                        "Cannot delete the last owner of the tenant", "CANNOT_DELETE_LAST_OWNER");
+            }
+        }
+
+        // Only SUPER_ADMIN can delete another SUPER_ADMIN
+        boolean targetIsSuperAdmin = user.getRoles().stream().anyMatch(r -> "SUPER_ADMIN".equals(r.getCode()));
+        if (targetIsSuperAdmin && !principal.hasRole("SUPER_ADMIN")) {
+            throw new AccessDeniedException(
+                    "Only SUPER_ADMIN can delete another SUPER_ADMIN");
+        }
+
+        // Audit BEFORE delete
+        auditService.logAction(tenantId, principal.getUserId(),
+                "USER_HARD_DELETED", "USERS", userId,
+                Map.of("username", user.getUsername(),
+                        "roles", user.getRoles().stream().map(Role::getCode).toList()),
+                ipAddress, userAgent, null);
+
+        // Cascade: SET NULL for FK references
+        userRepository.nullifyDevicesUser(userId);
+        userRepository.nullifyRecordingSessionsUser(userId);
+        userRepository.nullifyDeviceCommandsCreatedBy(userId);
+        userRepository.nullifyDeviceTokensCreatedBy(userId);
+
+        // Delete user roles and refresh tokens explicitly
+        userRepository.deleteUserRoles(userId);
+        userRepository.deleteRefreshTokens(userId);
+        userRepository.deleteById(userId);
+
+        log.info("User hard deleted: id={}, username={}, tenant_id={}", userId, user.getUsername(), tenantId);
     }
 
     private UserResponse toResponse(User user) {

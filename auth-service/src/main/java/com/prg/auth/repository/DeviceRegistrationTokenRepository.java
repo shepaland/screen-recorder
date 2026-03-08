@@ -24,7 +24,7 @@ public interface DeviceRegistrationTokenRepository extends JpaRepository<DeviceR
 
     Page<DeviceRegistrationToken> findByTenantId(UUID tenantId, Pageable pageable);
 
-    @Query("SELECT t FROM DeviceRegistrationToken t JOIN FETCH t.createdBy " +
+    @Query("SELECT t FROM DeviceRegistrationToken t LEFT JOIN FETCH t.createdBy " +
            "WHERE t.tenant.id = :tenantId " +
            "AND (:search IS NULL OR :search = '' " +
            "OR LOWER(t.name) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))) " +

@@ -62,14 +62,33 @@ public class DeviceTokenController {
         return ResponseEntity.ok(response);
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deactivateToken(
+    @PostMapping("/{id}/reveal")
+    public ResponseEntity<DeviceTokenResponse> revealToken(
             @PathVariable UUID id,
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest httpRequest) {
-        requirePermission(principal, "DEVICE_TOKENS:DELETE");
-        deviceTokenService.deactivateToken(id, principal,
+        requirePermission(principal, "DEVICE_TOKENS:REVEAL");
+        DeviceTokenResponse response = deviceTokenService.revealToken(
+                id, principal,
                 getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteToken(
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "false") boolean hard,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest httpRequest) {
+        if (hard) {
+            requirePermission(principal, "DEVICE_TOKENS:HARD_DELETE");
+            deviceTokenService.hardDeleteToken(id, principal,
+                    getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
+        } else {
+            requirePermission(principal, "DEVICE_TOKENS:DELETE");
+            deviceTokenService.deactivateToken(id, principal,
+                    getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
+        }
         return ResponseEntity.noContent().build();
     }
 

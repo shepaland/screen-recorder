@@ -2,16 +2,19 @@ import { Fragment, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dialog, Transition } from '@headlessui/react';
 import { PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/20/solid';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ClipboardIcon } from '@heroicons/react/24/outline';
 import DataTable, { type Column } from '../components/DataTable';
 import StatusBadge from '../components/StatusBadge';
 import PermissionGate from '../components/PermissionGate';
+import AdminGate from '../components/AdminGate';
 import ConfirmDialog from '../components/ConfirmDialog';
 import LoadingSpinner from '../components/LoadingSpinner';
 import {
   getDeviceTokens,
   deleteDeviceToken,
   getTokenDevices,
+  revealDeviceToken,
+  hardDeleteDeviceToken,
   type DeviceTokensListParams,
   type TokenDeviceItem,
   type TokenDevicesResponse,
@@ -44,6 +47,14 @@ export default function DeviceTokensListPage() {
   const [selectedTokenForDevices, setSelectedTokenForDevices] = useState<DeviceTokenResponse | null>(null);
   const [tokenDevicesData, setTokenDevicesData] = useState<TokenDevicesResponse | null>(null);
   const [loadingDevices, setLoadingDevices] = useState(false);
+
+  // Reveal modal
+  const [revealTarget, setRevealTarget] = useState<DeviceTokenResponse | null>(null);
+  const [revealedToken, setRevealedToken] = useState<string | null>(null);
+  const [isRevealing, setIsRevealing] = useState(false);
+
+  // Hard delete dialog
+  const [hardDeleteTarget, setHardDeleteTarget] = useState<DeviceTokenResponse | null>(null);
 
   // Debounce search input
   useEffect(() => {
@@ -101,6 +112,47 @@ export default function DeviceTokensListPage() {
       setShowDevicesModal(false);
     } finally {
       setLoadingDevices(false);
+    }
+  };
+
+  const handleReveal = async (token: DeviceTokenResponse) => {
+    setRevealTarget(token);
+    setIsRevealing(true);
+    setRevealedToken(null);
+    try {
+      const data = await revealDeviceToken(token.id);
+      setRevealedToken(data.token || null);
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number; data?: { error?: string } } };
+      if (axiosErr.response?.status === 409) {
+        addToast('error', 'Токен создан до поддержки просмотра. Создайте новый токен.');
+      } else {
+        addToast('error', axiosErr.response?.data?.error || 'Не удалось показать токен');
+      }
+      setRevealTarget(null);
+    } finally {
+      setIsRevealing(false);
+    }
+  };
+
+  const handleHardDelete = async () => {
+    if (!hardDeleteTarget) return;
+    try {
+      await hardDeleteDeviceToken(hardDeleteTarget.id);
+      addToast('success', 'Токен удален');
+      fetchTokens();
+    } catch {
+      addToast('error', 'Не удалось удалить токен');
+    }
+    setHardDeleteTarget(null);
+  };
+
+  const handleCopyToken = async (token: string) => {
+    try {
+      await navigator.clipboard.writeText(token);
+      addToast('success', 'Токен скопирован');
+    } catch {
+      addToast('error', 'Не удалось скопировать');
     }
   };
 
@@ -178,6 +230,19 @@ export default function DeviceTokensListPage() {
           >
             Устройства ({token.device_count})
           </button>
+          <AdminGate>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleReveal(token);
+              }}
+              className="text-sm text-indigo-600 hover:text-indigo-800"
+              title="Показать токен"
+            >
+              Показать
+            </button>
+          </AdminGate>
           <PermissionGate permission="DEVICE_TOKENS:DELETE">
             {token.is_active && (
               <button
@@ -186,12 +251,25 @@ export default function DeviceTokensListPage() {
                   e.stopPropagation();
                   setDeactivateTarget(token);
                 }}
-                className="text-sm text-red-600 hover:text-red-800"
+                className="text-sm text-yellow-600 hover:text-yellow-800"
               >
                 Деактивировать
               </button>
             )}
           </PermissionGate>
+          <AdminGate>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setHardDeleteTarget(token);
+              }}
+              className="text-sm text-red-600 hover:text-red-800"
+              title="Удалить навсегда"
+            >
+              Удалить
+            </button>
+          </AdminGate>
         </div>
       ),
     },
@@ -285,6 +363,88 @@ export default function DeviceTokensListPage() {
         cancelText="Отмена"
         onConfirm={handleDeactivate}
         onCancel={() => setDeactivateTarget(null)}
+      />
+
+      {/* Token reveal modal */}
+      <Transition.Root show={!!revealTarget} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={() => { setRevealTarget(null); setRevealedToken(null); }}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
+          </Transition.Child>
+          <div className="fixed inset-0 z-10 w-screen overflow-y-auto">
+            <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                enterTo="opacity-100 translate-y-0 sm:scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 translate-y-0 sm:scale-100"
+                leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+              >
+                <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
+                  <div>
+                    <Dialog.Title as="h3" className="text-base font-semibold leading-6 text-gray-900">
+                      Токен: {revealTarget?.name}
+                    </Dialog.Title>
+                    <div className="mt-4">
+                      {isRevealing ? (
+                        <LoadingSpinner size="md" className="py-8" />
+                      ) : revealedToken ? (
+                        <>
+                          <div className="flex items-center gap-2 rounded-lg bg-gray-50 p-4">
+                            <code className="flex-1 break-all text-sm font-mono text-gray-800">
+                              {revealedToken}
+                            </code>
+                            <button
+                              type="button"
+                              onClick={() => revealedToken && handleCopyToken(revealedToken)}
+                              className="shrink-0 rounded-md p-2 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+                              title="Копировать"
+                            >
+                              <ClipboardIcon className="h-5 w-5" />
+                            </button>
+                          </div>
+                          <p className="mt-2 text-xs text-gray-500">
+                            Храните токен в надежном месте. Он используется для регистрации агентов.
+                          </p>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="mt-5 flex justify-end">
+                    <button
+                      type="button"
+                      className="inline-flex justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                      onClick={() => { setRevealTarget(null); setRevealedToken(null); }}
+                    >
+                      Закрыть
+                    </button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition.Root>
+
+      {/* Hard delete confirmation dialog */}
+      <ConfirmDialog
+        open={!!hardDeleteTarget}
+        title="Удалить токен"
+        message={`Вы уверены, что хотите навсегда удалить токен "${hardDeleteTarget?.name}"? Это действие необратимо. Привязанные устройства будут отвязаны от токена.`}
+        confirmText="Удалить навсегда"
+        cancelText="Отмена"
+        onConfirm={handleHardDelete}
+        onCancel={() => setHardDeleteTarget(null)}
       />
 
       {/* Token devices modal */}

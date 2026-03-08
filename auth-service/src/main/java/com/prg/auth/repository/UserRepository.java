@@ -61,4 +61,31 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Modifying
     @Query("UPDATE User u SET u.lastLoginTs = :loginTs WHERE u.id = :userId")
     void updateLastLoginTs(@Param("userId") UUID userId, @Param("loginTs") Instant loginTs);
+
+    @Modifying
+    @Query(value = "UPDATE devices SET user_id = NULL WHERE user_id = :userId", nativeQuery = true)
+    void nullifyDevicesUser(@Param("userId") UUID userId);
+
+    @Modifying
+    @Query(value = "UPDATE recording_sessions SET user_id = NULL WHERE user_id = :userId", nativeQuery = true)
+    void nullifyRecordingSessionsUser(@Param("userId") UUID userId);
+
+    @Modifying
+    @Query(value = "UPDATE device_commands SET created_by = NULL WHERE created_by = :userId", nativeQuery = true)
+    void nullifyDeviceCommandsCreatedBy(@Param("userId") UUID userId);
+
+    @Modifying
+    @Query(value = "UPDATE device_registration_tokens SET created_by = NULL WHERE created_by = :userId", nativeQuery = true)
+    void nullifyDeviceTokensCreatedBy(@Param("userId") UUID userId);
+
+    @Modifying
+    @Query(value = "DELETE FROM user_roles WHERE user_id = :userId", nativeQuery = true)
+    void deleteUserRoles(@Param("userId") UUID userId);
+
+    @Modifying
+    @Query(value = "DELETE FROM refresh_tokens WHERE user_id = :userId", nativeQuery = true)
+    void deleteRefreshTokens(@Param("userId") UUID userId);
+
+    @Query("SELECT COUNT(u) FROM User u JOIN u.roles r WHERE u.tenant.id = :tenantId AND r.code = :roleCode")
+    long countByTenantIdAndRoleCode(@Param("tenantId") UUID tenantId, @Param("roleCode") String roleCode);
 }

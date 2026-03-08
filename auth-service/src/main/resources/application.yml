@@ -57,6 +57,9 @@ spring:
       fail-on-unknown-properties: false
     default-property-inclusion: non_null
 
+app:
+  token-encryption-key: ${TOKEN_ENCRYPTION_KEY:}
+
 prg:
   jwt:
     secret: ${JWT_SECRET}

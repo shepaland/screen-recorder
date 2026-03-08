@@ -89,11 +89,18 @@ public class UserController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(
             @PathVariable UUID id,
+            @RequestParam(defaultValue = "false") boolean hard,
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest httpRequest) {
-        requirePermission(principal, "USERS:DELETE");
-        userService.deactivateUser(id, principal.getTenantId(), principal,
-                getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
+        if (hard) {
+            requirePermission(principal, "USERS:HARD_DELETE");
+            userService.hardDeleteUser(id, principal.getTenantId(), principal,
+                    getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
+        } else {
+            requirePermission(principal, "USERS:DELETE");
+            userService.deactivateUser(id, principal.getTenantId(), principal,
+                    getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
+        }
         return ResponseEntity.noContent().build();
     }
 

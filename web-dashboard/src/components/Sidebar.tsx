@@ -13,8 +13,9 @@ import {
   ChevronRightIcon,
   ArrowDownTrayIcon,
   AdjustmentsHorizontalIcon,
-  ArchiveBoxIcon,
   UserGroupIcon,
+  ChartBarIcon,
+  UserCircleIcon,
 } from '@heroicons/react/24/outline';
 import PermissionGate from './PermissionGate';
 import TenantSwitcher from './TenantSwitcher';
@@ -31,32 +32,26 @@ interface NavItem {
   permission?: string;
 }
 
-/** Full navigation for superadmin (password auth, SUPER_ADMIN role). */
-const superAdminNavigation: NavItem[] = [
-  { name: 'Dashboard', href: '/', icon: HomeIcon, permission: 'DASHBOARD:VIEW' },
-  { name: 'Users', href: '/users', icon: UsersIcon, permission: 'USERS:READ' },
-  { name: 'Roles', href: '/roles', icon: ShieldCheckIcon, permission: 'ROLES:READ' },
-  { name: 'Устройства', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
-  { name: 'Настройки записи', href: '/recording-settings', icon: AdjustmentsHorizontalIcon, permission: 'DEVICES:READ' },
-  { name: 'Токены регистрации', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
-  { name: 'Audit Log', href: '/audit', icon: DocumentTextIcon, permission: 'AUDIT:READ' },
-  { name: 'Скачать клиент', href: '/download', icon: ArrowDownTrayIcon },
-  { name: 'Tenants', href: '/tenants', icon: BuildingOfficeIcon, permission: 'TENANTS:READ' },
-];
-
 const archiveSubmenu: NavItem[] = [
   { name: 'Устройства', href: '/archive/devices', icon: ComputerDesktopIcon },
   { name: 'Пользователи', href: '/archive/users', icon: UserGroupIcon },
 ];
 
-/** Tenant-scoped items under the company name. */
-const tenantScopedNavigation: NavItem[] = [
-  { name: 'Контрольная панель', href: '/', icon: HomeIcon, permission: 'DASHBOARD:VIEW' },
-  { name: 'Токены регистрации', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
+/** Settings submenu for tenant users. */
+const tenantSettingsSubmenu: NavItem[] = [
+  { name: 'Устройства', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
+  { name: 'Пользователи', href: '/users', icon: UsersIcon, permission: 'USERS:READ' },
+  { name: 'Токены', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
+  { name: 'Настройки записи', href: '/recording-settings', icon: AdjustmentsHorizontalIcon, permission: 'DEVICES:READ' },
+];
+
+/** Settings submenu for superadmin. */
+const superAdminSettingsSubmenu: NavItem[] = [
+  { name: 'Users', href: '/users', icon: UsersIcon, permission: 'USERS:READ' },
+  { name: 'Roles', href: '/roles', icon: ShieldCheckIcon, permission: 'ROLES:READ' },
   { name: 'Устройства', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
   { name: 'Настройки записи', href: '/recording-settings', icon: AdjustmentsHorizontalIcon, permission: 'DEVICES:READ' },
-  { name: 'Пользователи', href: '/users', icon: UsersIcon, permission: 'USERS:READ' },
-  { name: 'Скачать клиент', href: '/download', icon: ArrowDownTrayIcon },
+  { name: 'Токены регистрации', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
 ];
 
 /** Global items outside the company scope. */
@@ -108,6 +103,13 @@ export default function Sidebar({ onClose }: SidebarProps) {
   const [isArchiveExpanded, setIsArchiveExpanded] = useState(
     location.pathname.startsWith('/archive') || location.pathname.startsWith('/recordings'),
   );
+  const [isSettingsExpanded, setIsSettingsExpanded] = useState(
+    location.pathname.startsWith('/devices') ||
+    location.pathname.startsWith('/users') ||
+    location.pathname.startsWith('/device-tokens') ||
+    location.pathname.startsWith('/recording-settings') ||
+    location.pathname.startsWith('/roles'),
+  );
 
   const handleClick = () => {
     onClose?.();
@@ -115,6 +117,12 @@ export default function Sidebar({ onClose }: SidebarProps) {
 
   const isSuperAdmin = user?.roles?.includes('SUPER_ADMIN');
   const isArchiveActive = location.pathname.startsWith('/archive') || location.pathname.startsWith('/recordings');
+  const isSettingsActive =
+    location.pathname.startsWith('/devices') ||
+    location.pathname.startsWith('/users') ||
+    location.pathname.startsWith('/device-tokens') ||
+    location.pathname.startsWith('/recording-settings') ||
+    location.pathname.startsWith('/roles');
 
   return (
     <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-gray-950 px-6 pb-4">
@@ -126,11 +134,31 @@ export default function Sidebar({ onClose }: SidebarProps) {
       <nav className="flex flex-1 flex-col">
         <ul role="list" className="flex flex-1 flex-col gap-y-7">
           {isSuperAdmin ? (
-            /* ---- SuperAdmin: flat list + archive submenu ---- */
+            /* ---- SuperAdmin layout ---- */
             <li>
-              <NavList items={superAdminNavigation} onClick={handleClick} />
-              {/* Archive submenu */}
-              <ul role="list" className="-mx-2 mt-1 space-y-1">
+              {/* Dashboard */}
+              <ul role="list" className="-mx-2 space-y-1">
+                <PermissionGate permission="DASHBOARD:VIEW">
+                  <li>
+                    <NavLink
+                      to="/"
+                      end
+                      onClick={handleClick}
+                      className={({ isActive }) =>
+                        `group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 ${
+                          isActive
+                            ? 'bg-red-700 text-white'
+                            : 'text-gray-300 hover:bg-red-700 hover:text-white'
+                        }`
+                      }
+                    >
+                      <HomeIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
+                      Dashboard
+                    </NavLink>
+                  </li>
+                </PermissionGate>
+
+                {/* Analytics submenu */}
                 <li>
                   <button
                     type="button"
@@ -141,8 +169,8 @@ export default function Sidebar({ onClose }: SidebarProps) {
                         : 'text-gray-300 hover:bg-red-700 hover:text-white'
                     }`}
                   >
-                    <ArchiveBoxIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
-                    Архив
+                    <ChartBarIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
+                    Аналитика
                     {isArchiveExpanded ? (
                       <ChevronDownIcon className="ml-auto h-4 w-4" />
                     ) : (
@@ -153,6 +181,70 @@ export default function Sidebar({ onClose }: SidebarProps) {
                     <NavList items={archiveSubmenu} onClick={handleClick} indent />
                   )}
                 </li>
+
+                {/* Settings submenu */}
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setIsSettingsExpanded(!isSettingsExpanded)}
+                    className={`group flex w-full items-center gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 ${
+                      isSettingsActive
+                        ? 'bg-red-700 text-white'
+                        : 'text-gray-300 hover:bg-red-700 hover:text-white'
+                    }`}
+                  >
+                    <Cog6ToothIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
+                    Настройки
+                    {isSettingsExpanded ? (
+                      <ChevronDownIcon className="ml-auto h-4 w-4" />
+                    ) : (
+                      <ChevronRightIcon className="ml-auto h-4 w-4" />
+                    )}
+                  </button>
+                  {isSettingsExpanded && (
+                    <NavList items={superAdminSettingsSubmenu} onClick={handleClick} indent />
+                  )}
+                </li>
+
+                {/* Audit Log */}
+                <PermissionGate permission="AUDIT:READ">
+                  <li>
+                    <NavLink
+                      to="/audit"
+                      onClick={handleClick}
+                      className={({ isActive }) =>
+                        `group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 ${
+                          isActive
+                            ? 'bg-red-700 text-white'
+                            : 'text-gray-300 hover:bg-red-700 hover:text-white'
+                        }`
+                      }
+                    >
+                      <DocumentTextIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
+                      Audit Log
+                    </NavLink>
+                  </li>
+                </PermissionGate>
+
+                {/* Tenants */}
+                <PermissionGate permission="TENANTS:READ">
+                  <li>
+                    <NavLink
+                      to="/tenants"
+                      onClick={handleClick}
+                      className={({ isActive }) =>
+                        `group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 ${
+                          isActive
+                            ? 'bg-red-700 text-white'
+                            : 'text-gray-300 hover:bg-red-700 hover:text-white'
+                        }`
+                      }
+                    >
+                      <BuildingOfficeIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
+                      Tenants
+                    </NavLink>
+                  </li>
+                </PermissionGate>
               </ul>
             </li>
           ) : (
@@ -179,9 +271,29 @@ export default function Sidebar({ onClose }: SidebarProps) {
                 </div>
                 {isTenantMenuExpanded && (
                   <>
-                    <NavList items={tenantScopedNavigation} onClick={handleClick} indent />
-                    {/* Archive submenu */}
-                    <ul role="list" className="ml-4 mt-1 space-y-1">
+                    {/* Dashboard */}
+                    <ul role="list" className="ml-4 space-y-1">
+                      <PermissionGate permission="DASHBOARD:VIEW">
+                        <li>
+                          <NavLink
+                            to="/"
+                            end
+                            onClick={handleClick}
+                            className={({ isActive }) =>
+                              `group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 ${
+                                isActive
+                                  ? 'bg-red-700 text-white'
+                                  : 'text-gray-300 hover:bg-red-700 hover:text-white'
+                              }`
+                            }
+                          >
+                            <HomeIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
+                            Контрольная панель
+                          </NavLink>
+                        </li>
+                      </PermissionGate>
+
+                      {/* Analytics submenu */}
                       <li>
                         <button
                           type="button"
@@ -192,8 +304,8 @@ export default function Sidebar({ onClose }: SidebarProps) {
                               : 'text-gray-300 hover:bg-red-700 hover:text-white'
                           }`}
                         >
-                          <ArchiveBoxIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
-                          Архив
+                          <ChartBarIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
+                          Аналитика
                           {isArchiveExpanded ? (
                             <ChevronDownIcon className="ml-auto h-4 w-4" />
                           ) : (
@@ -202,6 +314,30 @@ export default function Sidebar({ onClose }: SidebarProps) {
                         </button>
                         {isArchiveExpanded && (
                           <NavList items={archiveSubmenu} onClick={handleClick} indent />
+                        )}
+                      </li>
+
+                      {/* Settings submenu */}
+                      <li>
+                        <button
+                          type="button"
+                          onClick={() => setIsSettingsExpanded(!isSettingsExpanded)}
+                          className={`group flex w-full items-center gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 ${
+                            isSettingsActive
+                              ? 'bg-red-700 text-white'
+                              : 'text-gray-300 hover:bg-red-700 hover:text-white'
+                          }`}
+                        >
+                          <Cog6ToothIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
+                          Настройки
+                          {isSettingsExpanded ? (
+                            <ChevronDownIcon className="ml-auto h-4 w-4" />
+                          ) : (
+                            <ChevronRightIcon className="ml-auto h-4 w-4" />
+                          )}
+                        </button>
+                        {isSettingsExpanded && (
+                          <NavList items={tenantSettingsSubmenu} onClick={handleClick} indent />
                         )}
                       </li>
                     </ul>
@@ -221,9 +357,25 @@ export default function Sidebar({ onClose }: SidebarProps) {
             </>
           )}
 
-          {/* Bottom: Settings */}
+          {/* Bottom: Download + Profile */}
           <li className="mt-auto">
             <ul role="list" className="-mx-2 space-y-1">
+              <li>
+                <NavLink
+                  to="/download"
+                  onClick={handleClick}
+                  className={({ isActive }) =>
+                    `group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 ${
+                      isActive
+                        ? 'bg-red-700 text-white'
+                        : 'text-gray-300 hover:bg-red-700 hover:text-white'
+                    }`
+                  }
+                >
+                  <ArrowDownTrayIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
+                  Скачать клиент
+                </NavLink>
+              </li>
               <li>
                 <NavLink
                   to="/settings"
@@ -236,8 +388,8 @@ export default function Sidebar({ onClose }: SidebarProps) {
                     }`
                   }
                 >
-                  <Cog6ToothIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
-                  Настройки
+                  <UserCircleIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
+                  Мой профиль
                 </NavLink>
               </li>
             </ul>

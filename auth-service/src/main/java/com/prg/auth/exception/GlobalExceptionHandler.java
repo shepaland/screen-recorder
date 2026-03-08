@@ -78,6 +78,16 @@ public class GlobalExceptionHandler {
                         .build());
     }
 
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ErrorResponse> handleConflict(ConflictException ex) {
+        log.warn("Conflict: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ErrorResponse.builder()
+                        .error(ex.getMessage())
+                        .code(ex.getCode())
+                        .build());
+    }
+
     @ExceptionHandler(DeviceDeactivatedException.class)
     public ResponseEntity<ErrorResponse> handleDeviceDeactivated(DeviceDeactivatedException ex) {
         log.warn("Device deactivated: {}", ex.getMessage());

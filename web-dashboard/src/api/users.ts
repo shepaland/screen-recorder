@@ -43,3 +43,7 @@ export async function deleteUser(id: string): Promise<void> {
 export async function changePassword(id: string, data: ChangePasswordRequest): Promise<void> {
   await apiClient.put(`/users/${id}/password`, data);
 }
+
+export async function hardDeleteUser(id: string): Promise<void> {
+  await apiClient.delete(`/users/${id}`, { params: { hard: true } });
+}
