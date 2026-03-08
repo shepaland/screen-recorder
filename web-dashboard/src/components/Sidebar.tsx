@@ -16,6 +16,8 @@ import {
   UserGroupIcon,
   ChartBarIcon,
   UserCircleIcon,
+  RectangleGroupIcon,
+  GlobeAltIcon,
 } from '@heroicons/react/24/outline';
 import PermissionGate from './PermissionGate';
 import TenantSwitcher from './TenantSwitcher';
@@ -43,6 +45,8 @@ const tenantSettingsSubmenu: NavItem[] = [
   { name: 'Пользователи', href: '/users', icon: UsersIcon, permission: 'USERS:READ' },
   { name: 'Токены', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
   { name: 'Настройки записи', href: '/recording-settings', icon: AdjustmentsHorizontalIcon, permission: 'DEVICES:READ' },
+  { name: 'Группы приложений', href: '/catalogs/apps', icon: RectangleGroupIcon, permission: 'CATALOGS:READ' },
+  { name: 'Группы сайтов', href: '/catalogs/sites', icon: GlobeAltIcon, permission: 'CATALOGS:READ' },
 ];
 
 /** Settings submenu for superadmin. */
@@ -52,6 +56,8 @@ const superAdminSettingsSubmenu: NavItem[] = [
   { name: 'Устройства', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
   { name: 'Настройки записи', href: '/recording-settings', icon: AdjustmentsHorizontalIcon, permission: 'DEVICES:READ' },
   { name: 'Токены регистрации', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
+  { name: 'Группы приложений', href: '/catalogs/apps', icon: RectangleGroupIcon, permission: 'CATALOGS:READ' },
+  { name: 'Группы сайтов', href: '/catalogs/sites', icon: GlobeAltIcon, permission: 'CATALOGS:READ' },
 ];
 
 /** Global items outside the company scope. */
@@ -108,7 +114,8 @@ export default function Sidebar({ onClose }: SidebarProps) {
     location.pathname.startsWith('/users') ||
     location.pathname.startsWith('/device-tokens') ||
     location.pathname.startsWith('/recording-settings') ||
-    location.pathname.startsWith('/roles'),
+    location.pathname.startsWith('/roles') ||
+    location.pathname.startsWith('/catalogs'),
   );
 
   const handleClick = () => {
@@ -122,7 +129,8 @@ export default function Sidebar({ onClose }: SidebarProps) {
     location.pathname.startsWith('/users') ||
     location.pathname.startsWith('/device-tokens') ||
     location.pathname.startsWith('/recording-settings') ||
-    location.pathname.startsWith('/roles');
+    location.pathname.startsWith('/roles') ||
+    location.pathname.startsWith('/catalogs');
 
   return (
     <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-gray-950 px-6 pb-4">
@@ -153,7 +161,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
                       }
                     >
                       <HomeIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
-                      Dashboard
+                      Дашборд
                     </NavLink>
                   </li>
                 </PermissionGate>
@@ -288,7 +296,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
                             }
                           >
                             <HomeIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
-                            Контрольная панель
+                            Дашборд
                           </NavLink>
                         </li>
                       </PermissionGate>

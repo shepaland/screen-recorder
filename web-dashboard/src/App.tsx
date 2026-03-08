@@ -28,6 +28,8 @@ import UserListPage from './pages/UserListPage';
 import UserReportsPage from './pages/UserReportsPage';
 import DownloadPage from './pages/DownloadPage';
 import RecordingSettingsPage from './pages/RecordingSettingsPage';
+import AppGroupsPage from './pages/AppGroupsPage';
+import SiteGroupsPage from './pages/SiteGroupsPage';
 
 function App() {
   return (
@@ -147,6 +149,24 @@ function App() {
           element={
             <ProtectedRoute permission="DEVICES:READ">
               <RecordingSettingsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Catalogs */}
+        <Route
+          path="/catalogs/apps"
+          element={
+            <ProtectedRoute permission="CATALOGS:READ">
+              <AppGroupsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/catalogs/sites"
+          element={
+            <ProtectedRoute permission="CATALOGS:READ">
+              <SiteGroupsPage />
             </ProtectedRoute>
           }
         />
