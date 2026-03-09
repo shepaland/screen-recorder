@@ -49,13 +49,14 @@ Name: "{commonappdata}\Kadero\segments"; Permissions: admins-full system-full
 Name: "{commonappdata}\Kadero\db"; Permissions: admins-full system-full
 
 ; ---------------------------------------------------------------------------
-; Registry: tray auto-start + uninstall cleanup
+; Registry: cleanup legacy HKLM auto-start (moved to HKCU via AutoStartHelper)
 ; ---------------------------------------------------------------------------
 [Registry]
+; Remove legacy HKLM auto-start entry from previous versions.
+; Tray auto-start is now managed via HKCU\Run by AutoStartHelper.cs (per-user, toggle in menu).
+; This prevents duplicate tray icons when both HKLM and HKCU entries fire at login.
 Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"; \
-  ValueType: string; ValueName: "KaderoTray"; \
-  ValueData: """{app}\KaderoAgent.exe"" --tray"; \
-  Flags: uninsdeletevalue
+  ValueName: "KaderoTray"; Flags: deletevalue uninsdeletevalue
 
 ; ---------------------------------------------------------------------------
 ; Start Menu shortcuts

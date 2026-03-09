@@ -12,6 +12,7 @@ public class SessionWatcher : BackgroundService
     private readonly IAuditEventSink _sink;
     private readonly CommandHandler _commandHandler;
     private readonly CredentialStore _credentialStore;
+    private readonly AuthManager _authManager;
     private readonly UserSessionInfo _userSessionInfo;
     private readonly FocusIntervalSink _focusIntervalSink;
     private readonly ILogger<SessionWatcher> _logger;
@@ -25,6 +26,7 @@ public class SessionWatcher : BackgroundService
         IAuditEventSink sink,
         CommandHandler commandHandler,
         CredentialStore credentialStore,
+        AuthManager authManager,
         UserSessionInfo userSessionInfo,
         FocusIntervalSink focusIntervalSink,
         ILogger<SessionWatcher> logger)
@@ -32,6 +34,7 @@ public class SessionWatcher : BackgroundService
         _sink = sink;
         _commandHandler = commandHandler;
         _credentialStore = credentialStore;
+        _authManager = authManager;
         _userSessionInfo = userSessionInfo;
         _focusIntervalSink = focusIntervalSink;
         _logger = logger;
@@ -111,6 +114,24 @@ public class SessionWatcher : BackgroundService
                             var newUsername = _userSessionInfo.GetCurrentUsername();
                             _focusIntervalSink.SetUsername(newUsername);
                             _logger.LogInformation("Session logon: username updated to {Username}", newUsername);
+                        }
+
+                        // Wait for AuthManager to be ready before starting recording.
+                        // After system reboot, AgentService may still be retrying auth (network not ready).
+                        // Without this wait, HandleSessionLogonAsync would fail because ServerConfig is null.
+                        {
+                            var waited = 0;
+                            while (!_authManager.IsAuthenticated && waited < 60)
+                            {
+                                _logger.LogDebug("SessionLogon: waiting for AuthManager ({Waited}s)...", waited);
+                                await Task.Delay(2000);
+                                waited += 2;
+                            }
+                            if (!_authManager.IsAuthenticated)
+                            {
+                                _logger.LogWarning("SessionLogon: AuthManager not ready after 60s, skipping auto-start. AgentService will handle it.");
+                                break;
+                            }
                         }
 
                         // Start recording for the new user session

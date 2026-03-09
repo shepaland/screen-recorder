@@ -96,6 +96,16 @@ if (args.Contains("--test-ui"))
 // Must run on STA thread — ContextMenuStrip requires STA for COM message pump.
 if (args.Contains("--tray"))
 {
+    // Single-instance check: only one tray process per user session.
+    // Uses Local\ prefix (not Global\) so multiple RDP users can each have one tray.
+    // HKLM\Run + HKCU\Run can both fire at login — Mutex prevents duplicate icons.
+    using var trayMutex = new Mutex(false, @"Local\KaderoAgentTray", out var isFirstTray);
+    if (!isFirstTray)
+    {
+        // Another tray is already running in this user session — exit silently
+        return;
+    }
+
     var staThread = new Thread(() =>
     {
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);

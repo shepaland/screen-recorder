@@ -131,7 +131,10 @@ public class TrayApplication : ApplicationContext
         {
             if (!_pipeClient.IsConnected)
             {
-                var connected = _pipeClient.ConnectAsync(1000).GetAwaiter().GetResult();
+                // Allow more time for Service to start PipeServer after system reboot.
+                // First attempt uses 5s timeout; subsequent reconnects use 1s.
+                var timeout = _lastConnectionStatus == "" ? 5000 : 1000;
+                var connected = _pipeClient.ConnectAsync(timeout).GetAwaiter().GetResult();
                 if (!connected)
                 {
                     MarshalUpdateTrayIcon("disconnected", "stopped");

@@ -38,13 +38,29 @@ public class AgentService : BackgroundService
     {
         _logger.LogInformation("KaderoAgent service starting...");
 
-        // Initialize auth
-        var ok = await _authManager.InitializeAsync();
-        if (!ok)
+        // Initialize auth with retry — network may not be ready after system reboot.
+        // Exponential backoff: 5, 10, 20, 40, 80, 120, 120... (max 10 attempts, ~10 min total)
+        var authAttempt = 0;
+        const int maxAuthAttempts = 10;
+        while (!ct.IsCancellationRequested)
         {
-            _logger.LogWarning("No valid credentials. Please run setup.");
-            return;
+            var ok = await _authManager.InitializeAsync();
+            if (ok) break;
+
+            authAttempt++;
+            if (authAttempt >= maxAuthAttempts)
+            {
+                _logger.LogError("Auth failed after {Attempts} attempts. No valid credentials — please run setup or check network.", authAttempt);
+                return;
+            }
+
+            var delaySec = Math.Min(5 * (1 << Math.Min(authAttempt - 1, 4)), 120);
+            _logger.LogWarning("Auth attempt {Attempt}/{Max} failed, retrying in {Delay}s...",
+                authAttempt, maxAuthAttempts, delaySec);
+            try { await Task.Delay(TimeSpan.FromSeconds(delaySec), ct); }
+            catch (OperationCanceledException) { return; }
         }
+        if (ct.IsCancellationRequested) return;
 
         _logger.LogInformation("Authenticated as device {DeviceId}", _authManager.DeviceId);
 
