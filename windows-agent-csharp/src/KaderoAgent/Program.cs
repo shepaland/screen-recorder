@@ -323,11 +323,35 @@ if (!args.Contains("--service"))
 
 // Ensure only one agent host runs at a time (Windows Service OR standalone).
 // If service is already running, this process should not start another host.
-using var hostMutex = new Mutex(false, @"Global\KaderoAgentHost", out var isFirstInstance);
+// NOTE: When the service runs as LocalSystem, it creates the Global Mutex with
+// restricted ACL. A regular-user process cannot even open it — catching
+// UnauthorizedAccessException and treating it as "service already running".
+Mutex? hostMutex = null;
+bool isFirstInstance = false;
+try
+{
+    hostMutex = new Mutex(false, @"Global\KaderoAgentHost", out isFirstInstance);
+}
+catch (UnauthorizedAccessException)
+{
+    // Global Mutex exists but is owned by SYSTEM (Windows Service).
+    // Treat as "another host is already running".
+    if (!args.Contains("--service"))
+        return;
+    throw; // --service should always run as SYSTEM — propagate if not
+}
 if (!isFirstInstance && !args.Contains("--service"))
 {
+    hostMutex?.Dispose();
     // Service already running. Tray was launched above. Exit gracefully.
     return;
 }
 
-await host.RunAsync();
+try
+{
+    await host.RunAsync();
+}
+finally
+{
+    hostMutex?.Dispose();
+}

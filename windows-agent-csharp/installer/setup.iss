@@ -80,6 +80,17 @@ Filename: "icacls.exe"; \
   Parameters: """{commonappdata}\Kadero\segments"" /inheritance:r /grant:r ""*S-1-5-18:(OI)(CI)F"" /grant:r ""*S-1-5-32-544:(OI)(CI)F"""; \
   Flags: runhidden
 
+; Remove legacy scheduled task from older installer versions (ignore errors)
+Filename: "schtasks.exe"; \
+  Parameters: "/delete /tn KaderoTrayStart /f"; \
+  Flags: runhidden; Check: not WizardSilent
+
+; Re-enable HKCU auto-start in case Windows disabled it due to prior crashes.
+; StartupApproved value 02=enabled (was set to 01/03=disabled by Windows crash handler).
+Filename: "reg.exe"; \
+  Parameters: "add HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run /v KaderoAgent /t REG_BINARY /d 020000000000000000000000 /f"; \
+  Flags: runhidden
+
 ; Register device with server (headless, saves config)
 Filename: "{app}\KaderoAgent.exe"; \
   Parameters: "--register --server-url={code:GetServerUrl} --token={code:GetRegToken}"; \
@@ -134,6 +145,11 @@ Filename: "sc.exe"; Parameters: "delete KaderoAgent"; \
 [InstallDelete]
 Type: files; Name: "{app}\unins*.exe"
 Type: files; Name: "{app}\unins*.dat"
+; Remove legacy Common Startup shortcut from old installer versions.
+; Old versions placed a --service shortcut in the all-users Startup folder,
+; which launched the agent host under the interactive user instead of SYSTEM,
+; crashing on Global\KaderoAgentHost Mutex (UnauthorizedAccessException).
+Type: files; Name: "{commonstartup}\Kadero Agent.lnk"
 
 ; ---------------------------------------------------------------------------
 ; Pascal Script: custom wizard page, validation, silent install support
