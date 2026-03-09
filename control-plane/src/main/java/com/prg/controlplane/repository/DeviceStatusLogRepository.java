@@ -14,18 +14,26 @@ import java.util.UUID;
 @Repository
 public interface DeviceStatusLogRepository extends JpaRepository<DeviceStatusLog, UUID> {
 
-    @Query("""
-            SELECT dsl FROM DeviceStatusLog dsl
-            WHERE dsl.deviceId = :deviceId
-              AND dsl.tenantId = :tenantId
-              AND (:from IS NULL OR dsl.changedTs >= :from)
-              AND (:to IS NULL OR dsl.changedTs <= :to)
-            ORDER BY dsl.changedTs DESC
-            """)
+    @Query(value = """
+            SELECT * FROM device_status_log dsl
+            WHERE dsl.device_id = :deviceId
+              AND dsl.tenant_id = :tenantId
+              AND (CAST(:fromTs AS timestamptz) IS NULL OR dsl.changed_ts >= CAST(:fromTs AS timestamptz))
+              AND (CAST(:toTs AS timestamptz) IS NULL OR dsl.changed_ts <= CAST(:toTs AS timestamptz))
+            ORDER BY dsl.changed_ts DESC
+            """,
+            countQuery = """
+            SELECT count(*) FROM device_status_log dsl
+            WHERE dsl.device_id = :deviceId
+              AND dsl.tenant_id = :tenantId
+              AND (CAST(:fromTs AS timestamptz) IS NULL OR dsl.changed_ts >= CAST(:fromTs AS timestamptz))
+              AND (CAST(:toTs AS timestamptz) IS NULL OR dsl.changed_ts <= CAST(:toTs AS timestamptz))
+            """,
+            nativeQuery = true)
     Page<DeviceStatusLog> findByDeviceIdAndTenantIdWithDateRange(
             @Param("deviceId") UUID deviceId,
             @Param("tenantId") UUID tenantId,
-            @Param("from") Instant from,
-            @Param("to") Instant to,
+            @Param("fromTs") Instant from,
+            @Param("toTs") Instant to,
             Pageable pageable);
 }
