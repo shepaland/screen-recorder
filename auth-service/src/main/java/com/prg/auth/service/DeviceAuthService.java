@@ -198,12 +198,25 @@ public class DeviceAuthService {
                 auditAction = "DEVICE_RELOGIN";
             }
 
-            // 8. Token accounting: handle registration token change on existing device
+            // 8. Token accounting: handle registration token link on existing device
             DeviceRegistrationToken previousToken = device.getRegistrationToken();
-            boolean tokenChanged = previousToken != null && !previousToken.getId().equals(regToken.getId());
 
-            if (tokenChanged) {
-                // Decrement old token, increment new token
+            if (previousToken == null) {
+                // Device has no linked token (created before token tracking or lost link)
+                // Link the current token and increment its counter
+                device.setRegistrationToken(regToken);
+                registrationTokenRepository.incrementCurrentUses(regToken.getId());
+
+                log.info("DEVICE_TOKEN_LINKED: device_id={}, token={}, tenant_id={} (previously unlinked)",
+                        device.getId(), regToken.getId(), tenantId);
+
+                auditService.logAction(tenantId, user.getId(), "DEVICE_TOKEN_LINKED", "DEVICES", device.getId(),
+                        Map.of("token_id", regToken.getId().toString(),
+                                "token_name", regToken.getName() != null ? regToken.getName() : "",
+                                "reason", "previously_unlinked"),
+                        ipAddress, userAgent, getCorrelationId());
+            } else if (!previousToken.getId().equals(regToken.getId())) {
+                // Token changed: decrement old, increment new
                 registrationTokenRepository.decrementCurrentUses(previousToken.getId());
                 registrationTokenRepository.incrementCurrentUses(regToken.getId());
                 device.setRegistrationToken(regToken);
@@ -218,6 +231,7 @@ public class DeviceAuthService {
                                 "new_token_name", regToken.getName() != null ? regToken.getName() : ""),
                         ipAddress, userAgent, getCorrelationId());
             }
+            // else: same token, no changes needed
 
             // 6. Update existing device
             device.setHostname(deviceInfo.getHostname());
