@@ -5,6 +5,8 @@ import type { GroupType, TopUsersUngroupedResponse } from '../../types/catalogs'
 interface TopUsersUngroupedTableProps {
   itemType: GroupType;
   title: string;
+  from: string;
+  to: string;
 }
 
 function formatDuration(ms: number): string {
@@ -15,7 +17,7 @@ function formatDuration(ms: number): string {
   return min > 0 ? `${hours}ч ${min}м` : `${hours}ч`;
 }
 
-export default function TopUsersUngroupedTable({ itemType, title }: TopUsersUngroupedTableProps) {
+export default function TopUsersUngroupedTable({ itemType, title, from, to }: TopUsersUngroupedTableProps) {
   const [data, setData] = useState<TopUsersUngroupedResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +26,7 @@ export default function TopUsersUngroupedTable({ itemType, title }: TopUsersUngr
     setLoading(true);
     setError(null);
     try {
-      const resp = await catalogsApi.getTopUsersUngrouped(itemType, undefined, undefined, 10);
+      const resp = await catalogsApi.getTopUsersUngrouped(itemType, from, to, 10);
       setData(resp);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load data';
@@ -36,7 +38,7 @@ export default function TopUsersUngroupedTable({ itemType, title }: TopUsersUngr
 
   useEffect(() => {
     load();
-  }, [itemType]);
+  }, [itemType, from, to]);
 
   if (error) {
     return (

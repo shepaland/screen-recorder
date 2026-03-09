@@ -7,6 +7,8 @@ import AssignGroupDropdown from '../catalogs/AssignGroupDropdown';
 interface TopUngroupedTableProps {
   itemType: GroupType;
   title: string;
+  from: string;
+  to: string;
 }
 
 function formatDuration(ms: number): string {
@@ -17,7 +19,7 @@ function formatDuration(ms: number): string {
   return min > 0 ? `${hours}ч ${min}м` : `${hours}ч`;
 }
 
-export default function TopUngroupedTable({ itemType, title }: TopUngroupedTableProps) {
+export default function TopUngroupedTable({ itemType, title, from, to }: TopUngroupedTableProps) {
   const [data, setData] = useState<TopUngroupedResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +31,7 @@ export default function TopUngroupedTable({ itemType, title }: TopUngroupedTable
     setError(null);
     try {
       const [ungrouped, groupsResp] = await Promise.all([
-        catalogsApi.getTopUngrouped(itemType, undefined, undefined, 10),
+        catalogsApi.getTopUngrouped(itemType, from, to, 10),
         catalogsApi.getGroups(itemType),
       ]);
       setData(ungrouped);
@@ -44,7 +46,7 @@ export default function TopUngroupedTable({ itemType, title }: TopUngroupedTable
 
   useEffect(() => {
     load();
-  }, [itemType]);
+  }, [itemType, from, to]);
 
   const handleAssign = async (groupId: string, pattern: string) => {
     try {

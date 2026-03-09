@@ -88,11 +88,15 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <TopUngroupedTable
           itemType="APP"
-          title="Неразмеченные приложения (24ч)"
+          from={from}
+          to={to}
+          title="Неразмеченные приложения"
         />
         <TopUngroupedTable
           itemType="SITE"
-          title="Неразмеченные сайты (24ч)"
+          from={from}
+          to={to}
+          title="Неразмеченные сайты"
         />
       </div>
 
@@ -100,10 +104,14 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <TopUsersUngroupedTable
           itemType="APP"
+          from={from}
+          to={to}
           title="Пользователи: неразмеч. приложения"
         />
         <TopUsersUngroupedTable
           itemType="SITE"
+          from={from}
+          to={to}
           title="Пользователи: неразмеч. сайты"
         />
       </div>
