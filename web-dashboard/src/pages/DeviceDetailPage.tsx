@@ -9,9 +9,11 @@ import {
   TrashIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
-import { getDevice, deleteDevice, restoreDevice, sendCommand, updateDeviceSettings } from '../api/devices';
-import type { DeviceDetailResponse, DeviceSettings, CreateCommandRequest } from '../types';
+import { getDevice, deleteDevice, restoreDevice, sendCommand, updateDeviceSettings, getDeviceStatusLog } from '../api/devices';
+import type { DeviceDetailResponse, DeviceSettings, DeviceStatusLogEntry, CreateCommandRequest } from '../types';
+import type { PageResponse } from '../types/common';
 import DeviceStatusBadge from '../components/DeviceStatusBadge';
 import StatusBadge from '../components/StatusBadge';
 import PermissionGate from '../components/PermissionGate';
@@ -38,6 +40,14 @@ const commandTypeLabels: Record<string, string> = {
   UNREGISTER: 'Отменить регистрацию',
 };
 
+const triggerLabels: Record<string, string> = {
+  heartbeat: 'Heartbeat',
+  command: 'Команда',
+  session_event: 'Сессия',
+  system: 'Система',
+  admin: 'Администратор',
+};
+
 export default function DeviceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -53,6 +63,26 @@ export default function DeviceDetailPage() {
 
   // Recording settings section -- auto-expand if URL hash is #settings
   const [showSettings, setShowSettings] = useState(location.hash === '#settings');
+
+  // Status log section
+  const [showStatusLog, setShowStatusLog] = useState(false);
+  const [statusLog, setStatusLog] = useState<PageResponse<DeviceStatusLogEntry> | null>(null);
+  const [statusLogPage, setStatusLogPage] = useState(0);
+  const [statusLogLoading, setStatusLogLoading] = useState(false);
+
+  const fetchStatusLog = useCallback(async (page: number = 0) => {
+    if (!id) return;
+    setStatusLogLoading(true);
+    try {
+      const data = await getDeviceStatusLog(id, { page, size: 20 });
+      setStatusLog(data);
+      setStatusLogPage(page);
+    } catch {
+      addToast('error', 'Не удалось загрузить журнал статусов');
+    } finally {
+      setStatusLogLoading(false);
+    }
+  }, [id, addToast]);
 
   const fetchDevice = useCallback(async () => {
     if (!id) return;
@@ -484,6 +514,107 @@ export default function DeviceDetailPage() {
           </dl>
         </div>
       )}
+
+      {/* Status log section */}
+      <div className="card mt-6">
+        <button
+          type="button"
+          onClick={() => {
+            const next = !showStatusLog;
+            setShowStatusLog(next);
+            if (next && !statusLog) {
+              fetchStatusLog(0);
+            }
+          }}
+          className="flex w-full items-center justify-between text-left"
+        >
+          <div className="flex items-center gap-2">
+            <ClockIcon className="h-5 w-5 text-gray-500" />
+            <h2 className="text-lg font-semibold text-gray-900">Журнал статусов</h2>
+          </div>
+          {showStatusLog ? (
+            <ChevronDownIcon className="h-5 w-5 text-gray-400" />
+          ) : (
+            <ChevronRightIcon className="h-5 w-5 text-gray-400" />
+          )}
+        </button>
+        {showStatusLog && (
+          <div className="mt-4 border-t border-gray-200 pt-4">
+            {statusLogLoading && !statusLog ? (
+              <LoadingSpinner size="md" className="py-4" />
+            ) : !statusLog || statusLog.content.length === 0 ? (
+              <p className="text-sm text-gray-500">Записей нет</p>
+            ) : (
+              <>
+                <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-300">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Время</th>
+                        <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Предыдущий</th>
+                        <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+                        <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Новый</th>
+                        <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Источник</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {statusLog.content.map((entry) => (
+                        <tr key={entry.id}>
+                          <td className="whitespace-nowrap px-3 py-3 text-sm text-gray-500">
+                            {formatDateTime(entry.changed_ts)}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-3 text-sm">
+                            {entry.previous_status ? (
+                              <DeviceStatusBadge status={entry.previous_status} size="sm" />
+                            ) : (
+                              <span className="text-gray-400">--</span>
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-1 text-sm text-gray-400 text-center">
+                            &rarr;
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-3 text-sm">
+                            <DeviceStatusBadge status={entry.new_status} size="sm" />
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-3 text-sm text-gray-500">
+                            {triggerLabels[entry.trigger] || entry.trigger}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Pagination */}
+                {statusLog.total_pages > 1 && (
+                  <div className="mt-3 flex items-center justify-between">
+                    <p className="text-sm text-gray-500">
+                      Показано {statusLogPage * 20 + 1}–{Math.min((statusLogPage + 1) * 20, statusLog.total_elements)} из {statusLog.total_elements}
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={statusLogPage === 0 || statusLogLoading}
+                        onClick={() => fetchStatusLog(statusLogPage - 1)}
+                        className="inline-flex items-center rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Назад
+                      </button>
+                      <button
+                        type="button"
+                        disabled={statusLogPage >= statusLog.total_pages - 1 || statusLogLoading}
+                        onClick={() => fetchStatusLog(statusLogPage + 1)}
+                        className="inline-flex items-center rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Вперёд
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Delete confirmation dialog */}
       <ConfirmDialog

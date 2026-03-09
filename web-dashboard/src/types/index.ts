@@ -44,6 +44,8 @@ export type {
 export type {
   DeviceTokenResponse,
   CreateDeviceTokenRequest,
+  DeviceStatus,
+  DeviceStatusLogEntry,
   DeviceResponse,
   DeviceDetailResponse,
   DeviceCommandResponse,
