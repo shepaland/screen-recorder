@@ -225,8 +225,10 @@ public class DeviceAuthService {
             auditAction = "DEVICE_REGISTERED";
         }
 
-        // 8. Increment current_uses
-        registrationTokenRepository.incrementCurrentUses(regToken.getId());
+        // 8. Increment current_uses only for genuinely new device registrations
+        if ("DEVICE_REGISTERED".equals(auditAction)) {
+            registrationTokenRepository.incrementCurrentUses(regToken.getId());
+        }
 
         // 9. Generate JWT with device_id claim
         List<String> roles = user.getRoles().stream().map(Role::getCode).toList();
