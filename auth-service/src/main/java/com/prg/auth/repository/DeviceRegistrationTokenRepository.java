@@ -38,4 +38,8 @@ public interface DeviceRegistrationTokenRepository extends JpaRepository<DeviceR
     @Modifying
     @Query("UPDATE DeviceRegistrationToken t SET t.currentUses = t.currentUses + 1 WHERE t.id = :id")
     void incrementCurrentUses(@Param("id") UUID id);
+
+    @Modifying
+    @Query("UPDATE DeviceRegistrationToken t SET t.currentUses = GREATEST(t.currentUses - 1, 0) WHERE t.id = :id")
+    void decrementCurrentUses(@Param("id") UUID id);
 }

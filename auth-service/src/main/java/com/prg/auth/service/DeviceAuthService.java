@@ -198,6 +198,27 @@ public class DeviceAuthService {
                 auditAction = "DEVICE_RELOGIN";
             }
 
+            // 8. Token accounting: handle registration token change on existing device
+            DeviceRegistrationToken previousToken = device.getRegistrationToken();
+            boolean tokenChanged = previousToken != null && !previousToken.getId().equals(regToken.getId());
+
+            if (tokenChanged) {
+                // Decrement old token, increment new token
+                registrationTokenRepository.decrementCurrentUses(previousToken.getId());
+                registrationTokenRepository.incrementCurrentUses(regToken.getId());
+                device.setRegistrationToken(regToken);
+
+                log.info("DEVICE_TOKEN_CHANGED: device_id={}, old_token={}, new_token={}, tenant_id={}",
+                        device.getId(), previousToken.getId(), regToken.getId(), tenantId);
+
+                auditService.logAction(tenantId, user.getId(), "DEVICE_TOKEN_CHANGED", "DEVICES", device.getId(),
+                        Map.of("old_token_id", previousToken.getId().toString(),
+                                "old_token_name", previousToken.getName() != null ? previousToken.getName() : "",
+                                "new_token_id", regToken.getId().toString(),
+                                "new_token_name", regToken.getName() != null ? regToken.getName() : ""),
+                        ipAddress, userAgent, getCorrelationId());
+            }
+
             // 6. Update existing device
             device.setHostname(deviceInfo.getHostname());
             device.setOsVersion(deviceInfo.getOsVersion());
@@ -223,10 +244,8 @@ public class DeviceAuthService {
                     .build();
             device = deviceRepository.save(device);
             auditAction = "DEVICE_REGISTERED";
-        }
 
-        // 8. Increment current_uses only for genuinely new device registrations
-        if ("DEVICE_REGISTERED".equals(auditAction)) {
+            // 8. Increment current_uses only for genuinely new device registrations
             registrationTokenRepository.incrementCurrentUses(regToken.getId());
         }
 
