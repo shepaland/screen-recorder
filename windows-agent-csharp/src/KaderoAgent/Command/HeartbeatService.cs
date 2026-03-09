@@ -91,7 +91,17 @@ public class HeartbeatService : BackgroundService
                 // Apply device_settings from heartbeat response
                 if (response?.DeviceSettings is { Count: > 0 } ds)
                 {
+                    var oldFps = _authManager.ServerConfig?.CaptureFps ?? 0;
                     ApplyDeviceSettings(ds);
+                    var newFps = _authManager.ServerConfig?.CaptureFps ?? 0;
+
+                    // Hot-restart recording if FPS changed while actively recording
+                    if (oldFps != newFps && newFps > 0 && _captureManager.IsRecording)
+                    {
+                        _logger.LogInformation("FPS changed {OldFps} → {NewFps} via heartbeat, restarting recording",
+                            oldFps, newFps);
+                        await _commandHandler.RestartRecordingAsync(baseUrl, ct);
+                    }
                 }
 
                 // Process pending commands

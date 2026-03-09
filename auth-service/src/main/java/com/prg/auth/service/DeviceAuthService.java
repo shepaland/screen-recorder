@@ -47,7 +47,7 @@ public class DeviceAuthService {
     @Value("${prg.device.segment-duration-sec:10}")
     private int segmentDurationSec;
 
-    @Value("${prg.device.capture-fps:5}")
+    @Value("${prg.device.capture-fps:1}")
     private int captureFps;
 
     @Value("${prg.device.quality:medium}")
@@ -317,12 +317,20 @@ public class DeviceAuthService {
                 ? toInteger(deviceSettings.get("session_max_duration_hours")) : defaultSessionMaxHours;
         Boolean autoStart = deviceSettings.containsKey("auto_start")
                 ? toBoolean(deviceSettings.get("auto_start")) : defaultAutoStart;
+        int effectiveCaptureFps = deviceSettings.containsKey("capture_fps")
+                ? Optional.ofNullable(toInteger(deviceSettings.get("capture_fps"))).orElse(captureFps) : captureFps;
+        String effectiveQuality = deviceSettings.containsKey("quality")
+                ? String.valueOf(deviceSettings.get("quality")) : quality;
+        int effectiveSegmentDuration = deviceSettings.containsKey("segment_duration_sec")
+                ? Optional.ofNullable(toInteger(deviceSettings.get("segment_duration_sec"))).orElse(segmentDurationSec) : segmentDurationSec;
+        int effectiveHeartbeatInterval = deviceSettings.containsKey("heartbeat_interval_sec")
+                ? Optional.ofNullable(toInteger(deviceSettings.get("heartbeat_interval_sec"))).orElse(heartbeatIntervalSec) : heartbeatIntervalSec;
 
         DeviceLoginResponse.ServerConfig serverConfig = DeviceLoginResponse.ServerConfig.builder()
-                .heartbeatIntervalSec(heartbeatIntervalSec)
-                .segmentDurationSec(segmentDurationSec)
-                .captureFps(captureFps)
-                .quality(quality)
+                .heartbeatIntervalSec(effectiveHeartbeatInterval)
+                .segmentDurationSec(effectiveSegmentDuration)
+                .captureFps(effectiveCaptureFps)
+                .quality(effectiveQuality)
                 .ingestBaseUrl(ingestBaseUrl)
                 .controlPlaneBaseUrl(controlPlaneBaseUrl)
                 .resolution(resolution)

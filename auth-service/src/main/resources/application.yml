@@ -74,7 +74,7 @@ prg:
   device:
     heartbeat-interval-sec: ${DEVICE_HEARTBEAT_INTERVAL:30}
     segment-duration-sec: ${DEVICE_SEGMENT_DURATION:10}
-    capture-fps: ${DEVICE_CAPTURE_FPS:5}
+    capture-fps: ${DEVICE_CAPTURE_FPS:1}
     quality: ${DEVICE_QUALITY:medium}
     ingest-base-url: ${INGEST_BASE_URL:}
     control-plane-base-url: ${CONTROL_PLANE_BASE_URL:}
