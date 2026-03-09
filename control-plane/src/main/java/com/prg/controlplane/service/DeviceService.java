@@ -5,10 +5,12 @@ import com.prg.controlplane.dto.request.UpdateDeviceRequest;
 import com.prg.controlplane.dto.response.*;
 import com.prg.controlplane.entity.Device;
 import com.prg.controlplane.entity.DeviceCommand;
+import com.prg.controlplane.entity.DeviceStatusLog;
 import com.prg.controlplane.exception.AccessDeniedException;
 import com.prg.controlplane.exception.ResourceNotFoundException;
 import com.prg.controlplane.repository.DeviceCommandRepository;
 import com.prg.controlplane.repository.DeviceRepository;
+import com.prg.controlplane.repository.DeviceStatusLogRepository;
 import com.prg.controlplane.repository.RecordingSessionRepository;
 import com.prg.controlplane.security.DevicePrincipal;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -32,6 +35,7 @@ public class DeviceService {
     private final DeviceRepository deviceRepository;
     private final DeviceCommandRepository deviceCommandRepository;
     private final RecordingSessionRepository recordingSessionRepository;
+    private final DeviceStatusLogRepository deviceStatusLogRepository;
 
     @Value("${prg.device.default-heartbeat-interval-sec:30}")
     private int defaultHeartbeatIntervalSec;
@@ -165,6 +169,10 @@ public class DeviceService {
                     deviceId, principal.getTenantId());
         }
 
+        // Track status change for device_status_log
+        String previousStatus = device.getStatus();
+        boolean statusChanged = !request.getStatus().equals(previousStatus);
+
         // Update device fields
         device.setStatus(request.getStatus());
         device.setLastHeartbeatTs(Instant.now());
@@ -183,6 +191,31 @@ public class DeviceService {
         }
 
         deviceRepository.save(device);
+
+        // Log status transition when status actually changed
+        if (statusChanged) {
+            Map<String, Object> details = new HashMap<>();
+            if (request.getAgentVersion() != null) {
+                details.put("agent_version", request.getAgentVersion());
+            }
+            if (request.getSessionLocked() != null) {
+                details.put("session_locked", request.getSessionLocked());
+            }
+
+            DeviceStatusLog statusLog = DeviceStatusLog.builder()
+                    .tenantId(principal.getTenantId())
+                    .deviceId(deviceId)
+                    .previousStatus(previousStatus)
+                    .newStatus(request.getStatus())
+                    .changedTs(Instant.now())
+                    .trigger("heartbeat")
+                    .details(details.isEmpty() ? null : details)
+                    .build();
+            deviceStatusLogRepository.save(statusLog);
+
+            log.info("Device status changed: device_id={}, {} -> {}, trigger=heartbeat",
+                    deviceId, previousStatus, request.getStatus());
+        }
 
         // Find and deliver pending commands
         List<DeviceCommand> pendingCommands = deviceCommandRepository
@@ -211,6 +244,38 @@ public class DeviceService {
                 .pendingCommands(pendingCommands.stream().map(this::toCommandResponse).toList())
                 .nextHeartbeatSec(defaultHeartbeatIntervalSec)
                 .deviceSettings(deviceSettings)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<DeviceStatusLogResponse> getDeviceStatusLog(UUID deviceId, UUID tenantId,
+                                                                      Instant from, Instant to,
+                                                                      int page, int size) {
+        // Verify device exists and belongs to tenant
+        findDeviceByIdAndTenant(deviceId, tenantId);
+
+        PageRequest pageRequest = PageRequest.of(page, Math.min(size, 200));
+        Page<DeviceStatusLog> logPage = deviceStatusLogRepository
+                .findByDeviceIdAndTenantIdWithDateRange(deviceId, tenantId, from, to, pageRequest);
+
+        return PageResponse.<DeviceStatusLogResponse>builder()
+                .content(logPage.getContent().stream().map(this::toStatusLogResponse).toList())
+                .page(logPage.getNumber())
+                .size(logPage.getSize())
+                .totalElements(logPage.getTotalElements())
+                .totalPages(logPage.getTotalPages())
+                .build();
+    }
+
+    private DeviceStatusLogResponse toStatusLogResponse(DeviceStatusLog log) {
+        return DeviceStatusLogResponse.builder()
+                .id(log.getId())
+                .deviceId(log.getDeviceId())
+                .previousStatus(log.getPreviousStatus())
+                .newStatus(log.getNewStatus())
+                .changedTs(log.getChangedTs())
+                .trigger(log.getTrigger())
+                .details(log.getDetails())
                 .build();
     }
 

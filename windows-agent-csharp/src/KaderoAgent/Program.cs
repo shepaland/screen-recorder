@@ -178,8 +178,10 @@ builder.Services.AddSingleton<AgentCommandExecutor>();
 builder.Services.AddSingleton<KaderoAgent.Ipc.ICommandExecutor>(sp => sp.GetRequiredService<AgentCommandExecutor>());
 
 // Background services
+// AgentService must be Singleton so HeartbeatService can inject it for AgentState access
+builder.Services.AddSingleton<AgentService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<AgentService>());
 builder.Services.AddHostedService<HeartbeatService>();
-builder.Services.AddHostedService<AgentService>();
 
 // Named Pipe server — always start so --tray UI can connect
 builder.Services.AddHostedService<PipeServer>();
@@ -311,6 +313,14 @@ if (!args.Contains("--service"))
     var apiClient = host.Services.GetRequiredService<ApiClient>();
     var authManager = host.Services.GetRequiredService<AuthManager>();
     apiClient.SetTokenRefreshCallback(() => authManager.RefreshTokenAsync());
+}
+
+// Wire up CommandHandler -> AgentService reference for state transitions
+// (avoids circular DI: AgentService depends on CommandHandler, CommandHandler needs AgentService for state)
+{
+    var commandHandler = host.Services.GetRequiredService<CommandHandler>();
+    var agentService = host.Services.GetRequiredService<AgentService>();
+    commandHandler.SetAgentService(agentService);
 }
 
 // Initialize FocusIntervalSink with current username

@@ -144,7 +144,13 @@ public class TrayApplication : ApplicationContext
 
             var status = _pipeClient.GetStatusAsync().GetAwaiter().GetResult();
             if (status != null)
-                MarshalUpdateTrayIcon(status.ConnectionStatus, status.RecordingStatus);
+            {
+                // Use AgentStateName for richer tray icon states; fallback to RecordingStatus
+                var effectiveState = !string.IsNullOrEmpty(status.AgentStateName)
+                    ? status.AgentStateName
+                    : status.RecordingStatus;
+                MarshalUpdateTrayIcon(status.ConnectionStatus, effectiveState);
+            }
             else
                 MarshalUpdateTrayIcon("disconnected", "stopped");
         }
@@ -172,46 +178,91 @@ public class TrayApplication : ApplicationContext
         catch (InvalidOperationException) { }
     }
 
-    private void UpdateTrayIcon(string connectionStatus, string recordingStatus)
+    /// <summary>
+    /// Update tray icon and tooltip based on connection status and agent state.
+    /// The agentState parameter can be: "starting", "configuring", "awaiting_user",
+    /// "online", "recording", "idle", "error", "stopped", or legacy "stopped"/"recording".
+    /// </summary>
+    private void UpdateTrayIcon(string connectionStatus, string agentState)
     {
-        if (connectionStatus == _lastConnectionStatus && recordingStatus == _lastRecordingStatus)
+        if (connectionStatus == _lastConnectionStatus && agentState == _lastRecordingStatus)
             return;
         _lastConnectionStatus = connectionStatus;
-        _lastRecordingStatus = recordingStatus;
+        _lastRecordingStatus = agentState;
 
         Icon newIcon;
         string tooltip;
         string statusText;
 
-        if (connectionStatus == "connected" && recordingStatus == "recording")
+        if (connectionStatus != "connected" && connectionStatus != "")
         {
-            newIcon = TrayIcons.Recording;
-            tooltip = "Кадеро Agent — Запись";
-            statusText = "Статус: Запись";
-        }
-        else if (connectionStatus == "connected")
-        {
-            newIcon = TrayIcons.Idle;
-            tooltip = "Кадеро Agent — Подключен";
-            statusText = "Статус: Подключен";
-        }
-        else if (connectionStatus == "reconnecting")
-        {
-            newIcon = TrayIcons.Reconnecting;
-            tooltip = "Кадеро Agent — Переподключение...";
-            statusText = "Статус: Переподключение";
-        }
-        else if (connectionStatus == "error")
-        {
-            newIcon = TrayIcons.Disconnected;
-            tooltip = "Кадеро Agent — Ошибка подключения";
-            statusText = "Статус: Ошибка";
+            // Disconnected/error states take priority
+            if (connectionStatus == "reconnecting")
+            {
+                newIcon = TrayIcons.Reconnecting;
+                tooltip = "Кадеро Agent — Переподключение...";
+                statusText = "Статус: Переподключение";
+            }
+            else if (connectionStatus == "error")
+            {
+                newIcon = TrayIcons.Disconnected;
+                tooltip = "Кадеро Agent — Ошибка подключения";
+                statusText = "Статус: Ошибка";
+            }
+            else
+            {
+                newIcon = TrayIcons.Unknown;
+                tooltip = "Кадеро Agent — Нет связи с сервисом";
+                statusText = "Статус: Нет связи";
+            }
         }
         else
         {
-            newIcon = TrayIcons.Unknown;
-            tooltip = "Кадеро Agent — Нет связи с сервисом";
-            statusText = "Статус: Нет связи";
+            // Connected: use agent state for icon/text
+            switch (agentState)
+            {
+                case "recording":
+                    newIcon = TrayIcons.Recording;
+                    tooltip = "Кадеро Agent — Запись";
+                    statusText = "Статус: Запись";
+                    break;
+                case "online":
+                    newIcon = TrayIcons.Idle;
+                    tooltip = "Кадеро Agent — Онлайн";
+                    statusText = "Статус: Онлайн";
+                    break;
+                case "idle":
+                    newIcon = TrayIcons.Idle;
+                    tooltip = "Кадеро Agent — Неактивен";
+                    statusText = "Статус: Неактивен";
+                    break;
+                case "awaiting_user":
+                    newIcon = TrayIcons.Idle;
+                    tooltip = "Кадеро Agent — Ожидание входа";
+                    statusText = "Статус: Ожидание входа";
+                    break;
+                case "configuring":
+                case "starting":
+                    newIcon = TrayIcons.Reconnecting;
+                    tooltip = "Кадеро Agent — Запуск...";
+                    statusText = "Статус: Запуск";
+                    break;
+                case "error":
+                    newIcon = TrayIcons.Disconnected;
+                    tooltip = "Кадеро Agent — Ошибка";
+                    statusText = "Статус: Ошибка";
+                    break;
+                case "stopped":
+                    newIcon = TrayIcons.Unknown;
+                    tooltip = "Кадеро Agent — Остановлен";
+                    statusText = "Статус: Остановлен";
+                    break;
+                default:
+                    newIcon = TrayIcons.Idle;
+                    tooltip = "Кадеро Agent — Подключен";
+                    statusText = "Статус: Подключен";
+                    break;
+            }
         }
 
         _trayIcon.Icon = newIcon;

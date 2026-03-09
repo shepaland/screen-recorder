@@ -94,6 +94,9 @@ public class AuthManager
         _tokenStore.AccessToken = response.AccessToken;
         _tokenStore.RefreshToken = response.RefreshToken;
         _tokenStore.AccessTokenExpiry = DateTime.UtcNow.AddSeconds(response.ExpiresIn);
+        // Mark that this config came from a real server response
+        if (response.ServerConfig != null)
+            response.ServerConfig.ConfigReceivedFromServer = true;
         _serverConfig = response.ServerConfig;
         SyncDeviceId();
 
@@ -265,6 +268,9 @@ public class AuthManager
             _tokenStore.AccessToken = response.AccessToken;
             _tokenStore.RefreshToken = response.RefreshToken;
             _tokenStore.AccessTokenExpiry = DateTime.UtcNow.AddSeconds(response.ExpiresIn);
+            // Mark incoming config as server-confirmed
+            if (response.ServerConfig != null)
+                response.ServerConfig.ConfigReceivedFromServer = true;
             _serverConfig = MergeServerConfigs(_serverConfig, response.ServerConfig);
             SyncDeviceId();
 
@@ -308,12 +314,15 @@ public class AuthManager
             SegmentDurationSec = existing.SegmentDurationSec > 0 ? existing.SegmentDurationSec : incoming.SegmentDurationSec,
             HeartbeatIntervalSec = existing.HeartbeatIntervalSec > 0 ? existing.HeartbeatIntervalSec : incoming.HeartbeatIntervalSec,
             SessionMaxDurationHours = existing.SessionMaxDurationHours ?? incoming.SessionMaxDurationHours,
+            SessionMaxDurationMin = existing.SessionMaxDurationMin ?? incoming.SessionMaxDurationMin,
             AutoStart = existing.AutoStart ?? incoming.AutoStart,
+            // If either config was received from server, the merged result is also server-confirmed
+            ConfigReceivedFromServer = existing.ConfigReceivedFromServer || incoming.ConfigReceivedFromServer,
         };
 
         _logger.LogInformation(
-            "ServerConfig merged on re-auth: fps={Fps} (was={OldFps}, server={NewFps}), quality={Quality}",
-            merged.CaptureFps, existing.CaptureFps, incoming.CaptureFps, merged.Quality);
+            "ServerConfig merged on re-auth: fps={Fps} (was={OldFps}, server={NewFps}), quality={Quality}, configFromServer={FromServer}",
+            merged.CaptureFps, existing.CaptureFps, incoming.CaptureFps, merged.Quality, merged.ConfigReceivedFromServer);
 
         return merged;
     }

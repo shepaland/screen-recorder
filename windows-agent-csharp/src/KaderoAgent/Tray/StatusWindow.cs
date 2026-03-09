@@ -458,19 +458,43 @@ public class StatusWindow : Form
         }
         _connectionIndicator.Invalidate();
 
-        // Recording
-        switch (status.RecordingStatus)
+        // Recording / Agent State — use AgentStateDisplay if available, fallback to RecordingStatus
+        var stateDisplay = !string.IsNullOrEmpty(status.AgentStateDisplay) ? status.AgentStateDisplay : null;
+        var stateName = !string.IsNullOrEmpty(status.AgentStateName) ? status.AgentStateName : status.RecordingStatus;
+
+        switch (stateName)
         {
             case "recording":
-                _recordingStatusLabel.Text = "Запись идёт";
+                _recordingStatusLabel.Text = stateDisplay ?? "Запись идёт";
                 _recordingIndicator.BackColor = GlassHelper.StatusGreen;
                 break;
-            case "starting":
-                _recordingStatusLabel.Text = "Запуск записи...";
+            case "online":
+                _recordingStatusLabel.Text = stateDisplay ?? "Онлайн";
+                _recordingIndicator.BackColor = GlassHelper.StatusGreen;
+                break;
+            case "idle":
+                _recordingStatusLabel.Text = stateDisplay ?? "Пользователь неактивен";
                 _recordingIndicator.BackColor = GlassHelper.StatusYellow;
                 break;
+            case "awaiting_user":
+                _recordingStatusLabel.Text = stateDisplay ?? "Ожидание входа пользователя";
+                _recordingIndicator.BackColor = GlassHelper.StatusYellow;
+                break;
+            case "configuring":
+            case "starting":
+                _recordingStatusLabel.Text = stateDisplay ?? "Запуск...";
+                _recordingIndicator.BackColor = GlassHelper.StatusYellow;
+                break;
+            case "error":
+                _recordingStatusLabel.Text = stateDisplay ?? "Ошибка записи";
+                _recordingIndicator.BackColor = GlassHelper.StatusRed;
+                break;
+            case "stopped":
+                _recordingStatusLabel.Text = stateDisplay ?? "Остановка...";
+                _recordingIndicator.BackColor = GlassHelper.StatusGray;
+                break;
             default:
-                _recordingStatusLabel.Text = "Остановлена";
+                _recordingStatusLabel.Text = stateDisplay ?? "Остановлена";
                 _recordingIndicator.BackColor = GlassHelper.StatusGray;
                 break;
         }
@@ -492,7 +516,13 @@ public class StatusWindow : Form
         _segmentValue.Text = status.SegmentDurationSec > 0 ? $"{status.SegmentDurationSec} сек" : "—";
         _heartbeatValue.Text = status.HeartbeatIntervalSec > 0 ? $"{status.HeartbeatIntervalSec} сек" : "—";
         _autoStartValue.Text = status.AutoStart ? "Да" : "Нет";
-        _maxSessionValue.Text = status.SessionMaxDurationHours > 0 ? $"{status.SessionMaxDurationHours} ч" : "—";
+        // Prefer SessionMaxDurationMin; fallback to Hours for backward compat
+        if (status.SessionMaxDurationMin > 0)
+            _maxSessionValue.Text = $"{status.SessionMaxDurationMin} мин";
+        else if (status.SessionMaxDurationHours > 0)
+            _maxSessionValue.Text = $"{status.SessionMaxDurationHours} ч";
+        else
+            _maxSessionValue.Text = "---";
 
         _cpuValue.Text = $"{status.CpuPercent:F1}%";
         _memoryValue.Text = $"{status.MemoryMb:F0} МБ";

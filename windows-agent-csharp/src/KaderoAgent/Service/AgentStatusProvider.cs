@@ -19,6 +19,10 @@ public class AgentStatusProvider : IStatusProvider
     private readonly IAuditEventSink _auditSink;
     private readonly IOptions<AgentConfig> _config;
 
+    // AgentService is resolved lazily to avoid circular DI
+    private readonly IServiceProvider _serviceProvider;
+    private AgentService? _agentService;
+
     private readonly object _lock = new();
     private string _connectionStatus = "disconnected";
     private string? _lastError;
@@ -27,7 +31,8 @@ public class AgentStatusProvider : IStatusProvider
     public AgentStatusProvider(AuthManager authManager, CredentialStore credentialStore,
         ScreenCaptureManager captureManager, UploadQueue uploadQueue,
         MetricsCollector metrics, SessionWatcher sessionWatcher,
-        IAuditEventSink auditSink, IOptions<AgentConfig> config)
+        IAuditEventSink auditSink, IOptions<AgentConfig> config,
+        IServiceProvider serviceProvider)
     {
         _authManager = authManager;
         _credentialStore = credentialStore;
@@ -37,6 +42,18 @@ public class AgentStatusProvider : IStatusProvider
         _sessionWatcher = sessionWatcher;
         _auditSink = auditSink;
         _config = config;
+        _serviceProvider = serviceProvider;
+    }
+
+    /// <summary>Lazy-resolve AgentService to avoid circular DI.</summary>
+    private AgentService? GetAgentService()
+    {
+        if (_agentService == null)
+        {
+            try { _agentService = _serviceProvider.GetService(typeof(AgentService)) as AgentService; }
+            catch { /* non-fatal */ }
+        }
+        return _agentService;
     }
 
     public void SetConnectionStatus(string status) { lock (_lock) _connectionStatus = status; }
@@ -58,10 +75,22 @@ public class AgentStatusProvider : IStatusProvider
             lastHb = _lastHeartbeatTs;
         }
 
+        var agentState = GetAgentService()?.CurrentState ?? AgentState.Starting;
+
+        // Map AgentState to recording status for backward compat with tray
+        var recordingStatus = agentState switch
+        {
+            AgentState.Recording => "recording",
+            AgentState.Configuring or AgentState.Starting => "starting",
+            _ => "stopped"
+        };
+
         return new AgentStatus
         {
             ConnectionStatus = _authManager.IsAuthenticated ? connStatus : "disconnected",
-            RecordingStatus = _captureManager.IsRecording ? "recording" : "stopped",
+            RecordingStatus = recordingStatus,
+            AgentStateDisplay = agentState.ToDisplayMessage(),
+            AgentStateName = agentState.ToHeartbeatStatus(),
             DeviceId = _authManager.DeviceId,
             ServerUrl = creds?.ServerUrl,
             CaptureFps = serverConfig?.CaptureFps > 0 ? serverConfig.CaptureFps : _config.Value.CaptureFps,
@@ -70,6 +99,8 @@ public class AgentStatusProvider : IStatusProvider
             HeartbeatIntervalSec = serverConfig?.HeartbeatIntervalSec > 0 ? serverConfig.HeartbeatIntervalSec : _config.Value.HeartbeatIntervalSec,
             Resolution = !string.IsNullOrEmpty(serverConfig?.Resolution) ? serverConfig.Resolution : _config.Value.Resolution,
             SessionMaxDurationHours = serverConfig?.SessionMaxDurationHours ?? _config.Value.SessionMaxDurationHours,
+            SessionMaxDurationMin = serverConfig?.GetEffectiveSessionMaxDurationMin(_config.Value.SessionMaxDurationMin)
+                                    ?? _config.Value.SessionMaxDurationMin,
             AutoStart = serverConfig?.AutoStart ?? _config.Value.AutoStart,
             CpuPercent = _metrics.GetCpuUsage(),
             MemoryMb = _metrics.GetMemoryUsageMb(),

@@ -44,13 +44,13 @@ public class DeviceAuthService {
     @Value("${prg.device.heartbeat-interval-sec:30}")
     private int heartbeatIntervalSec;
 
-    @Value("${prg.device.segment-duration-sec:10}")
+    @Value("${prg.device.segment-duration-sec:60}")
     private int segmentDurationSec;
 
     @Value("${prg.device.capture-fps:1}")
     private int captureFps;
 
-    @Value("${prg.device.quality:medium}")
+    @Value("${prg.device.quality:low}")
     private String quality;
 
     @Value("${prg.device.ingest-base-url:}")
@@ -62,10 +62,13 @@ public class DeviceAuthService {
     @Value("${prg.device.default-resolution:720p}")
     private String defaultResolution;
 
-    @Value("${prg.device.default-session-max-hours:24}")
+    @Value("${prg.device.default-session-max-min:60}")
+    private int defaultSessionMaxMin;
+
+    @Value("${prg.device.default-session-max-hours:0}")
     private int defaultSessionMaxHours;
 
-    @Value("${prg.device.default-auto-start:true}")
+    @Value("${prg.device.default-auto-start:false}")
     private boolean defaultAutoStart;
 
     private final ConcurrentHashMap<String, List<Long>> loginAttempts = new ConcurrentHashMap<>();
@@ -313,8 +316,12 @@ public class DeviceAuthService {
 
         String resolution = deviceSettings.containsKey("resolution")
                 ? String.valueOf(deviceSettings.get("resolution")) : defaultResolution;
+        Integer sessionMaxDurationMin = deviceSettings.containsKey("session_max_duration_min")
+                ? toInteger(deviceSettings.get("session_max_duration_min")) : defaultSessionMaxMin;
+        // Deprecated: kept for backward compatibility with older agents
         Integer sessionMaxDurationHours = deviceSettings.containsKey("session_max_duration_hours")
-                ? toInteger(deviceSettings.get("session_max_duration_hours")) : defaultSessionMaxHours;
+                ? toInteger(deviceSettings.get("session_max_duration_hours"))
+                : (defaultSessionMaxHours > 0 ? defaultSessionMaxHours : null);
         Boolean autoStart = deviceSettings.containsKey("auto_start")
                 ? toBoolean(deviceSettings.get("auto_start")) : defaultAutoStart;
         int effectiveCaptureFps = deviceSettings.containsKey("capture_fps")
@@ -334,6 +341,7 @@ public class DeviceAuthService {
                 .ingestBaseUrl(ingestBaseUrl)
                 .controlPlaneBaseUrl(controlPlaneBaseUrl)
                 .resolution(resolution)
+                .sessionMaxDurationMin(sessionMaxDurationMin)
                 .sessionMaxDurationHours(sessionMaxDurationHours)
                 .autoStart(autoStart)
                 .build();
