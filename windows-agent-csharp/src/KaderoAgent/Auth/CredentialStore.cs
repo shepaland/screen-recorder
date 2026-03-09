@@ -118,6 +118,7 @@ public class StoredCredentials
     public string DeviceId { get; set; } = "";
     public string RefreshToken { get; set; } = "";
     public string AccessToken { get; set; } = "";
+    public string RegistrationToken { get; set; } = "";
     public ServerConfig? ServerConfig { get; set; }
 }
 

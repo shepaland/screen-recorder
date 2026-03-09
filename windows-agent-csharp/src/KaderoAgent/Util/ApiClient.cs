@@ -79,6 +79,28 @@ public class ApiClient
         return JsonSerializer.Deserialize<T>(json, JsonOptions);
     }
 
+    /// <summary>
+    /// POST to a public endpoint without Authorization header and without 401-retry logic.
+    /// Used for auth endpoints (device-login, device-refresh) to avoid recursive refresh and deadlocks.
+    /// </summary>
+    public async Task<T?> PostPublicAsync<T>(string url, object? body = null, CancellationToken ct = default)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, url);
+        if (body != null)
+        {
+            request.Content = new StringContent(
+                JsonSerializer.Serialize(body, JsonOptions), Encoding.UTF8, "application/json");
+        }
+        // No auth header, no device ID — this is a public endpoint
+        _logger.LogDebug("HTTP POST (public) {Url}", url);
+        var response = await _http.SendAsync(request, ct);
+        _logger.LogDebug("HTTP POST (public) {Url} → {StatusCode}", url, (int)response.StatusCode);
+        await EnsureSuccessWithLogging(response, HttpMethod.Post, url, ct);
+        var json = await response.Content.ReadAsStringAsync(ct);
+        if (string.IsNullOrWhiteSpace(json)) return default;
+        return JsonSerializer.Deserialize<T>(json, JsonOptions);
+    }
+
     public async Task<HttpResponseMessage> PutBinaryAsync(string url, byte[] data, string contentType, CancellationToken ct = default)
     {
         var request = new HttpRequestMessage(HttpMethod.Put, url);

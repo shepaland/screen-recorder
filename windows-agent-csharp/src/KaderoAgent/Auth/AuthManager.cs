@@ -13,6 +13,7 @@ public class AuthManager
     private readonly ApiClient _apiClient;
     private readonly IOptions<AgentConfig> _config;
     private readonly ILogger<AuthManager> _logger;
+    private readonly SemaphoreSlim _authLock = new(1, 1);
     private ServerConfig? _serverConfig;
     private string? _deviceId;
 
@@ -61,7 +62,7 @@ public class AuthManager
         _tokenStore.AccessToken = creds.AccessToken;
         SyncDeviceId();
 
-        // Try refresh
+        // Try refresh (with re-auth fallback)
         return await RefreshTokenAsync();
     }
 
@@ -86,7 +87,7 @@ public class AuthManager
         var url = $"{serverUrl.TrimEnd('/')}/api/v1/auth/device-login";
         _logger.LogInformation("Registering device at {Url}", url);
 
-        var response = await _apiClient.PostAsync<DeviceLoginResponse>(url, body);
+        var response = await _apiClient.PostPublicAsync<DeviceLoginResponse>(url, body);
         if (response == null) throw new Exception("Empty response from server");
 
         _deviceId = response.DeviceId;
@@ -96,13 +97,14 @@ public class AuthManager
         _serverConfig = response.ServerConfig;
         SyncDeviceId();
 
-        // Save credentials
+        // Save credentials including registration token for future re-authentication
         _credentialStore.Save(new StoredCredentials
         {
             ServerUrl = serverUrl,
             DeviceId = response.DeviceId ?? "",
             RefreshToken = response.RefreshToken ?? "",
             AccessToken = response.AccessToken ?? "",
+            RegistrationToken = registrationToken,
             ServerConfig = response.ServerConfig
         });
 
@@ -121,7 +123,7 @@ public class AuthManager
 
         try
         {
-            var response = await _apiClient.PostAsync<ValidateTokenResponse>(url, body);
+            var response = await _apiClient.PostPublicAsync<ValidateTokenResponse>(url, body);
             return response ?? new ValidateTokenResponse { Valid = false, Reason = "Empty response from server" };
         }
         catch (HttpRequestException ex)
@@ -136,7 +138,48 @@ public class AuthManager
         }
     }
 
+    /// <summary>
+    /// Refreshes the access token using the stored refresh token.
+    /// If refresh fails, falls back to re-authentication via device-login with stored registration token.
+    /// Thread-safe: uses _authLock to prevent concurrent refresh race conditions that can
+    /// trigger refresh-token-reuse detection and revoke all user tokens on the backend.
+    /// </summary>
     public async Task<bool> RefreshTokenAsync()
+    {
+        // Acquire lock to prevent concurrent refresh calls (race condition → token revocation)
+        if (!await _authLock.WaitAsync(TimeSpan.FromSeconds(30)))
+        {
+            _logger.LogWarning("Auth lock timeout — another refresh is in progress");
+            return false;
+        }
+
+        try
+        {
+            // Double-check: token may have been refreshed by another caller while we waited
+            if (!_tokenStore.IsAccessTokenExpired())
+            {
+                _logger.LogDebug("Token already refreshed by another caller");
+                return true;
+            }
+
+            // Step 1: Try normal refresh via device-refresh endpoint
+            var refreshed = await TryRefreshTokenInternalAsync();
+            if (refreshed) return true;
+
+            // Step 2: Refresh failed — try re-authentication via device-login
+            _logger.LogWarning("Token refresh failed, attempting re-authentication via device-login...");
+            return await TryReauthenticateAsync();
+        }
+        finally
+        {
+            _authLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Internal refresh — calls device-refresh endpoint using PostPublicAsync (no auth header, no 401 retry).
+    /// </summary>
+    private async Task<bool> TryRefreshTokenInternalAsync()
     {
         try
         {
@@ -150,7 +193,8 @@ public class AuthManager
                 device_id = _deviceId
             };
 
-            var response = await _apiClient.PostAsync<DeviceRefreshResponse>(url, body);
+            // Use PostPublicAsync to avoid recursive 401-refresh and deadlocks
+            var response = await _apiClient.PostPublicAsync<DeviceRefreshResponse>(url, body);
             if (response == null) return false;
 
             _tokenStore.AccessToken = response.AccessToken;
@@ -162,16 +206,89 @@ public class AuthManager
             creds.RefreshToken = response.RefreshToken ?? "";
             _credentialStore.Save(creds);
 
-            _logger.LogDebug("Token refreshed successfully");
+            _logger.LogDebug("Token refreshed successfully via device-refresh");
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Token refresh failed");
+            _logger.LogWarning(ex, "Token refresh via device-refresh failed");
             return false;
         }
     }
 
+    /// <summary>
+    /// Re-authenticate via device-login using stored registration token.
+    /// This is the fallback when refresh token is expired/revoked.
+    /// Uses PostPublicAsync (no auth header needed for device-login).
+    /// </summary>
+    private async Task<bool> TryReauthenticateAsync()
+    {
+        try
+        {
+            var creds = _credentialStore.Load();
+            if (creds == null) return false;
+
+            if (string.IsNullOrEmpty(creds.RegistrationToken))
+            {
+                _logger.LogWarning("No registration token stored — cannot re-authenticate. " +
+                                   "Agent needs manual re-registration.");
+                return false;
+            }
+
+            var hwId = HardwareId.Generate();
+            var hostname = Environment.MachineName;
+            var osVersion = Environment.OSVersion.ToString();
+
+            var url = $"{creds.ServerUrl.TrimEnd('/')}/api/v1/auth/device-login";
+            var body = new
+            {
+                registration_token = creds.RegistrationToken,
+                device_info = new
+                {
+                    hostname,
+                    os_version = osVersion,
+                    agent_version = "1.0.0",
+                    hardware_id = hwId
+                }
+            };
+
+            _logger.LogInformation("Re-authenticating device via device-login at {Url}", url);
+            var response = await _apiClient.PostPublicAsync<DeviceLoginResponse>(url, body);
+            if (response == null)
+            {
+                _logger.LogError("Re-authentication failed: empty response");
+                return false;
+            }
+
+            // Update tokens and device info
+            _deviceId = response.DeviceId;
+            _tokenStore.AccessToken = response.AccessToken;
+            _tokenStore.RefreshToken = response.RefreshToken;
+            _tokenStore.AccessTokenExpiry = DateTime.UtcNow.AddSeconds(response.ExpiresIn);
+            _serverConfig = response.ServerConfig;
+            SyncDeviceId();
+
+            // Persist updated credentials (preserve registration token)
+            creds.DeviceId = response.DeviceId ?? creds.DeviceId;
+            creds.RefreshToken = response.RefreshToken ?? "";
+            creds.AccessToken = response.AccessToken ?? "";
+            creds.ServerConfig = response.ServerConfig ?? creds.ServerConfig;
+            _credentialStore.Save(creds);
+
+            _logger.LogInformation("Re-authentication successful: device_id={DeviceId}", _deviceId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Re-authentication via device-login failed");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Ensures the access token is valid. If expired, refreshes (with re-auth fallback).
+    /// Thread-safe via _authLock inside RefreshTokenAsync.
+    /// </summary>
     public async Task EnsureValidTokenAsync()
     {
         if (_tokenStore.IsAccessTokenExpired())
