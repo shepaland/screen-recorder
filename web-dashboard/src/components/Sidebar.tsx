@@ -18,6 +18,7 @@ import {
   UserCircleIcon,
   RectangleGroupIcon,
   GlobeAltIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
 import PermissionGate from './PermissionGate';
 import TenantSwitcher from './TenantSwitcher';
@@ -37,6 +38,7 @@ interface NavItem {
 const archiveSubmenu: NavItem[] = [
   { name: 'Устройства', href: '/archive/devices', icon: ComputerDesktopIcon },
   { name: 'Пользователи', href: '/archive/users', icon: UserGroupIcon },
+  { name: 'Таймлайны', href: '/archive/timelines', icon: ClockIcon },
 ];
 
 /** Settings submenu for tenant users. */
@@ -76,7 +78,7 @@ function NavList({
   indent?: boolean;
 }) {
   return (
-    <ul role="list" className={`${indent ? 'ml-4' : '-mx-2'} space-y-1`}>
+    <ul role="list" className={`${indent ? 'ml-4 mt-1' : '-mx-2'} space-y-1`}>
       {items.map((item) => (
         <PermissionGate key={item.name} permission={item.permission}>
           <li>

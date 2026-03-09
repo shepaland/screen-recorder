@@ -4,6 +4,7 @@ import com.prg.ingest.dto.response.*;
 import com.prg.ingest.exception.AccessDeniedException;
 import com.prg.ingest.filter.JwtValidationFilter;
 import com.prg.ingest.security.DevicePrincipal;
+import com.prg.ingest.service.TimelineService;
 import com.prg.ingest.service.UserActivityService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class UserActivityController {
     private static final String PERMISSION_RECORDINGS_READ = "RECORDINGS:READ";
 
     private final UserActivityService userActivityService;
+    private final TimelineService timelineService;
 
     /**
      * GET /api/v1/ingest/users — paginated list of users (by tenant).
@@ -157,6 +159,28 @@ public class UserActivityController {
 
         TimesheetResponse response = userActivityService.getUserTimesheet(
                 tenantId, username, month, workStart, workEnd, timezone, deviceId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/v1/ingest/users/timeline?date=2026-03-09&timezone=Europe/Moscow
+     * Returns a full-day timeline for all users in the tenant, broken down by hour,
+     * with app/site groups and recording session mapping.
+     * Requires RECORDINGS:READ permission.
+     */
+    @GetMapping("/timeline")
+    public ResponseEntity<TimelineResponse> getTimeline(
+            @RequestParam String date,
+            @RequestParam(defaultValue = "Europe/Moscow") String timezone,
+            @RequestParam(name = "tenant_id", required = false) UUID tenantIdParam,
+            HttpServletRequest httpRequest) {
+
+        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_RECORDINGS_READ);
+        UUID tenantId = resolveEffectiveTenantId(principal, tenantIdParam);
+
+        log.debug("Getting timeline: tenant={} date={} tz={}", tenantId, date, timezone);
+
+        TimelineResponse response = timelineService.getTimeline(tenantId, date, timezone);
         return ResponseEntity.ok(response);
     }
 

@@ -90,15 +90,6 @@ prg:
       token-url: https://oauth.yandex.ru/token
       user-info-url: https://login.yandex.ru/info?format=json
       callback-url: ${YANDEX_OAUTH_CALLBACK_URL:}
-    mailru:
-      client-id: ${MAILRU_OAUTH_CLIENT_ID:}
-      client-secret: ${MAILRU_OAUTH_CLIENT_SECRET:}
-      authorize-url: https://oauth.mail.ru/login
-      token-url: https://oauth.mail.ru/token
-      user-info-url: https://oauth.mail.ru/userinfo
-      callback-url: ${MAILRU_OAUTH_CALLBACK_URL:}
-      scope: userinfo
-      enabled: ${MAILRU_OAUTH_ENABLED:false}
     intermediate-token-ttl: 600
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:3000}

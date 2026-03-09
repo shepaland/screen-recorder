@@ -18,10 +18,8 @@ export interface AppGroup {
   updated_at: string;
 }
 
-export interface GroupListResponse {
-  groups: AppGroup[];
-  total: number;
-}
+// Backend returns List<GroupResponse> — a plain JSON array, NOT a wrapper object.
+export type GroupListResponse = AppGroup[];
 
 export interface CreateGroupRequest {
   group_type: GroupType;
@@ -49,21 +47,16 @@ export interface GroupItem {
   created_at: string;
 }
 
-export interface GroupItemsResponse {
-  items: GroupItem[];
-  total: number;
-}
+// Backend returns List<GroupItemResponse> — a plain JSON array, NOT a wrapper object.
+export type GroupItemsResponse = GroupItem[];
 
 export interface AddItemRequest {
   pattern: string;
   match_type?: MatchType;
 }
 
-export interface BatchAddItemsResponse {
-  created: number;
-  skipped: number;
-  items: GroupItem[];
-}
+// Backend POST /groups/{id}/items/batch returns List<GroupItemResponse> — a plain JSON array.
+export type BatchAddItemsResponse = GroupItem[];
 
 // ---- Aliases ----
 

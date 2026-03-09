@@ -7,6 +7,7 @@ import type {
   WorktimeResponse,
   TimesheetResponse,
 } from '../types/user-activity';
+import type { TimelineResponse } from '../types/timeline';
 
 export async function getUsers(params?: {
   page?: number;
@@ -111,6 +112,16 @@ export async function getUserTimesheet(
       timezone: params?.timezone ?? 'Europe/Moscow',
       device_id: params?.deviceId,
     },
+  });
+  return data;
+}
+
+export async function getTimeline(
+  date: string,
+  timezone?: string,
+): Promise<TimelineResponse> {
+  const { data } = await ingestApiClient.get<TimelineResponse>('/users/timeline', {
+    params: { date, timezone: timezone ?? 'Europe/Moscow' },
   });
   return data;
 }

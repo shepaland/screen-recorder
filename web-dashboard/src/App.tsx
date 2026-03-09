@@ -30,6 +30,7 @@ import DownloadPage from './pages/DownloadPage';
 import RecordingSettingsPage from './pages/RecordingSettingsPage';
 import AppGroupsPage from './pages/AppGroupsPage';
 import SiteGroupsPage from './pages/SiteGroupsPage';
+import TimelinesPage from './pages/TimelinesPage';
 
 function App() {
   return (
@@ -63,6 +64,7 @@ function App() {
         {/* Recordings Archive */}
         <Route path="/archive/devices" element={<DeviceGridPage />} />
         <Route path="/archive/devices/:deviceId" element={<DeviceRecordingsPage />} />
+        <Route path="/archive/timelines" element={<TimelinesPage />} />
         <Route path="/archive/users" element={<UserListPage />} />
         <Route path="/archive/users/:username" element={<UserReportsPage />} />
         {/* Legacy redirects */}

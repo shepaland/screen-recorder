@@ -1,7 +1,6 @@
 package com.prg.auth.service;
 
 import com.prg.auth.config.FrontendConfig;
-import com.prg.auth.config.MailruOAuthConfig;
 import com.prg.auth.config.YandexOAuthConfig;
 import com.prg.auth.dto.response.LoginResponse;
 import com.prg.auth.dto.response.OAuthCallbackResponse;
@@ -36,20 +35,17 @@ import java.util.*;
 public class OAuthService {
 
     private final YandexOAuthClient yandexClient;
-    private final MailruOAuthClient mailruClient;
     private final OAuthIdentityRepository oauthIdentityRepository;
     private final UserOAuthLinkRepository userOAuthLinkRepository;
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final YandexOAuthConfig oauthConfig;
-    private final MailruOAuthConfig mailruOAuthConfig;
     private final FrontendConfig frontendConfig;
     private final AuditService auditService;
     private final OAuthStateStore stateStore;
 
     public static final String PROVIDER_YANDEX = "yandex";
-    public static final String PROVIDER_MAILRU = "mailru";
 
     // ======================== Authorization URLs ========================
 
@@ -64,21 +60,6 @@ public class OAuthService {
                 + "?response_type=code"
                 + "&client_id=" + oauthConfig.getClientId()
                 + "&redirect_uri=" + urlEncode(oauthConfig.getCallbackUrl())
-                + "&state=" + state;
-    }
-
-    /**
-     * Build Mail.ru authorization URL for redirect.
-     * State parameter is stored server-side for CSRF validation on callback.
-     * redirect_uri is URL-encoded. Scope=userinfo is included.
-     */
-    public String getMailruAuthorizationUrl() {
-        String state = stateStore.generateAndStore();
-        return mailruOAuthConfig.getAuthorizeUrl()
-                + "?response_type=code"
-                + "&client_id=" + mailruOAuthConfig.getClientId()
-                + "&redirect_uri=" + urlEncode(mailruOAuthConfig.getCallbackUrl())
-                + "&scope=" + mailruOAuthConfig.getScope()
                 + "&state=" + state;
     }
 
@@ -114,39 +95,6 @@ public class OAuthService {
 
         return processOAuthCallback(PROVIDER_YANDEX, yandexId, email, displayName, avatarUrl,
                 yandexUserInfo, ipAddress, userAgent);
-    }
-
-    /**
-     * Handle Mail.ru OAuth callback: validate state, exchange code, get user info, determine next step.
-     */
-    @Transactional
-    public OAuthCallbackResult handleMailruCallback(String code, String state, String ipAddress, String userAgent) {
-        // Validate state parameter (CSRF protection)
-        validateState(state);
-
-        // 1. Exchange code for Mail.ru access token
-        String mailruAccessToken = mailruClient.exchangeCodeForToken(code);
-
-        // 2. Get user info from Mail.ru
-        Map<String, Object> mailruUserInfo = mailruClient.getUserInfo(mailruAccessToken);
-
-        String mailruId = String.valueOf(mailruUserInfo.get("id"));
-        String email = (String) mailruUserInfo.get("email");
-        String displayName = (String) mailruUserInfo.get("name");
-        String firstName = (String) mailruUserInfo.get("first_name");
-        String lastName = (String) mailruUserInfo.get("last_name");
-        String avatarUrl = (String) mailruUserInfo.get("image");
-
-        // Fallback for display name
-        if (displayName == null || displayName.isBlank()) {
-            displayName = (firstName != null ? firstName : "") + (lastName != null ? " " + lastName : "");
-            displayName = displayName.trim();
-        }
-
-        log.info("OAuth callback: provider=mailru, mailru_id={}, email={}", mailruId, email);
-
-        return processOAuthCallback(PROVIDER_MAILRU, mailruId, email, displayName, avatarUrl,
-                mailruUserInfo, ipAddress, userAgent);
     }
 
     // ======================== Common OAuth callback processing ========================
