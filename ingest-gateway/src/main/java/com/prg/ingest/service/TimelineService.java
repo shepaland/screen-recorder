@@ -31,8 +31,19 @@ public class TimelineService {
 
     @Transactional(readOnly = true)
     public TimelineResponse getTimeline(UUID tenantId, String date, String timezone) {
+        // Validate date format early (T-156: return 400 instead of 500)
+        try {
+            LocalDate.parse(date);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid date format: " + date + ". Expected: yyyy-MM-dd");
+        }
+
         // Validate timezone early
-        ZoneId.of(timezone);
+        try {
+            ZoneId.of(timezone);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid timezone: " + timezone);
+        }
 
         log.debug("Building timeline: tenant={}, date={}, tz={}", tenantId, date, timezone);
 
@@ -67,6 +78,7 @@ public class TimelineService {
                   AND started_at < (CAST(:date AS date) + INTERVAL '1 day') AT TIME ZONE :tz
                 GROUP BY username, hour, process_name, is_browser, domain
                 ORDER BY username, hour, total_duration_ms DESC
+                LIMIT 50000
                 """;
 
         @SuppressWarnings("unchecked")
@@ -94,6 +106,7 @@ public class TimelineService {
                 FROM device_user_sessions
                 WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId)
                   AND is_active = true
+                LIMIT 10000
                 """;
 
         @SuppressWarnings("unchecked")

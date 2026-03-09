@@ -257,6 +257,9 @@ public class CatalogController {
 
     private UUID resolveEffectiveTenantId(DevicePrincipal principal, UUID tenantIdParam) {
         if (principal.hasScope("global")) {
+            if (tenantIdParam == null) {
+                throw new IllegalArgumentException("tenant_id is required for global scope. Specify tenant_id query parameter.");
+            }
             return tenantIdParam;
         }
         return principal.getTenantId();
