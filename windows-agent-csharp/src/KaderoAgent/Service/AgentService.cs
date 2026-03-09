@@ -49,16 +49,19 @@ public class AgentService : BackgroundService
 
     /// <summary>
     /// Transition to a new agent state. Logs the transition with structured fields.
-    /// Thread-safe via volatile write.
+    /// Thread-safe via lock on _stateLock.
     /// </summary>
     public void SetState(AgentState newState)
     {
-        var oldState = _currentState;
-        if (oldState == newState) return;
+        lock (_stateLock)
+        {
+            var oldState = _currentState;
+            if (oldState == newState) return;
 
-        _currentState = newState;
-        _logger.LogInformation("Agent state transition: {OldState} -> {NewState}",
-            oldState.ToHeartbeatStatus(), newState.ToHeartbeatStatus());
+            _currentState = newState;
+            _logger.LogInformation("Agent state transition: {OldState} -> {NewState}",
+                oldState.ToHeartbeatStatus(), newState.ToHeartbeatStatus());
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
