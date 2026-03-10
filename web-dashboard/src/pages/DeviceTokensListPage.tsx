@@ -157,6 +157,11 @@ export default function DeviceTokensListPage() {
     }
   };
 
+  // Inline edit max_uses
+  const [editingMaxUses, setEditingMaxUses] = useState<string | null>(null); // token.id being edited
+  const [editMaxUsesValue, setEditMaxUsesValue] = useState<string>('');
+  const [savingMaxUses, setSavingMaxUses] = useState(false);
+
   // Track in-progress toggle updates
   const [togglingRecording, setTogglingRecording] = useState<Set<string>>(new Set());
 
@@ -181,6 +186,37 @@ export default function DeviceTokensListPage() {
     }
   };
 
+  const handleStartEditMaxUses = (token: DeviceTokenResponse) => {
+    setEditingMaxUses(token.id);
+    setEditMaxUsesValue(token.max_uses !== null ? String(token.max_uses) : '');
+  };
+
+  const handleCancelEditMaxUses = () => {
+    setEditingMaxUses(null);
+    setEditMaxUsesValue('');
+  };
+
+  const handleSaveMaxUses = async (tokenId: string) => {
+    const parsed = parseInt(editMaxUsesValue, 10);
+    if (isNaN(parsed) || parsed < 0) {
+      addToast('error', 'Укажите корректное число (>= 0)');
+      return;
+    }
+    setSavingMaxUses(true);
+    try {
+      await updateDeviceToken(tokenId, { max_uses: parsed });
+      setTokens((prev) =>
+        prev.map((t) => (t.id === tokenId ? { ...t, max_uses: parsed } : t))
+      );
+      addToast('success', 'Лимит использований обновлён');
+      setEditingMaxUses(null);
+    } catch {
+      addToast('error', 'Не удалось обновить лимит использований');
+    } finally {
+      setSavingMaxUses(false);
+    }
+  };
+
   const columns: Column<DeviceTokenResponse>[] = [
     {
       key: 'name',
@@ -201,12 +237,54 @@ export default function DeviceTokensListPage() {
     {
       key: 'current_uses',
       title: 'Использований',
-      render: (token) => (
-        <span className="text-gray-900">
-          {token.current_uses}
-          {token.max_uses !== null ? ` / ${token.max_uses}` : ''}
-        </span>
-      ),
+      render: (token) => {
+        if (editingMaxUses === token.id) {
+          return (
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              <span className="text-gray-900">{token.current_uses} /</span>
+              <input
+                type="number"
+                min={0}
+                autoFocus
+                disabled={savingMaxUses}
+                value={editMaxUsesValue}
+                onChange={(e) => setEditMaxUsesValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveMaxUses(token.id);
+                  if (e.key === 'Escape') handleCancelEditMaxUses();
+                }}
+                onBlur={() => {
+                  if (!savingMaxUses) handleSaveMaxUses(token.id);
+                }}
+                className="w-16 rounded border border-indigo-300 px-1.5 py-0.5 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+              />
+            </div>
+          );
+        }
+        return (
+          <span className="text-gray-900">
+            {token.current_uses}
+            {token.max_uses !== null ? (
+              <>
+                {' / '}
+                <PermissionGate permission="DEVICE_TOKENS:UPDATE" fallback={<span>{token.max_uses}</span>}>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleStartEditMaxUses(token);
+                    }}
+                    className="cursor-pointer border-b border-dashed border-gray-400 text-gray-900 hover:text-indigo-600 hover:border-indigo-400"
+                    title="Нажмите для редактирования"
+                  >
+                    {token.max_uses}
+                  </button>
+                </PermissionGate>
+              </>
+            ) : ''}
+          </span>
+        );
+      },
     },
     {
       key: 'expires_at',
@@ -235,35 +313,38 @@ export default function DeviceTokensListPage() {
     },
     {
       key: 'recording_enabled',
-      title: 'Запись',
+      title: 'Настройки',
       render: (token) => {
         const isToggling = togglingRecording.has(token.id);
         return (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={token.recording_enabled}
-              disabled={isToggling}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleToggleRecording(token);
-              }}
-              className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-                token.recording_enabled ? 'bg-indigo-600' : 'bg-gray-200'
-              }`}
-              title={token.recording_enabled ? 'Запись включена' : 'Запись отключена'}
-            >
-              <span
-                aria-hidden="true"
-                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  token.recording_enabled ? 'translate-x-4' : 'translate-x-0'
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={token.recording_enabled}
+                disabled={isToggling}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleRecording(token);
+                }}
+                className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  token.recording_enabled ? 'bg-indigo-600' : 'bg-gray-200'
                 }`}
-              />
-            </button>
-            <span className={`text-xs ${token.recording_enabled ? 'text-green-700' : 'text-gray-500'}`}>
-              {token.recording_enabled ? 'Вкл' : 'Выкл'}
-            </span>
+                title={token.recording_enabled ? 'Запись включена' : 'Запись отключена'}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    token.recording_enabled ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+              <span className={`text-xs ${token.recording_enabled ? 'text-green-700' : 'text-gray-500'}`}>
+                {token.recording_enabled ? 'Запись вкл' : 'Запись выкл'}
+              </span>
+            </div>
+            <span className="text-xs text-green-600">Активность: всегда вкл</span>
           </div>
         );
       },
