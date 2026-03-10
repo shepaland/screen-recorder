@@ -1,5 +1,6 @@
 package com.prg.ingest.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 
 import java.util.List;
@@ -15,7 +16,10 @@ public class TimelineAppGroup {
     private String groupName;
     private String color;
     private long durationMs;
+
+    @JsonProperty("is_browser_group")
     private boolean isBrowserGroup;
+
     private List<TimelineApp> apps;
     private List<TimelineSiteGroup> siteGroups;
 }

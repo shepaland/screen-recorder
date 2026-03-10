@@ -1,5 +1,6 @@
 package com.prg.ingest.dto.catalog;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,8 +21,13 @@ public class GroupResponse {
     private String description;
     private String color;
     private int sortOrder;
+
+    @JsonProperty("is_default")
     private boolean isDefault;
+
+    @JsonProperty("is_browser_group")
     private boolean isBrowserGroup;
+
     private int itemCount;
     private List<GroupItemResponse> items;
     private Instant createdAt;

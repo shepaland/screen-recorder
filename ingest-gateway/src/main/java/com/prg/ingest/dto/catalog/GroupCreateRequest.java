@@ -1,5 +1,6 @@
 package com.prg.ingest.dto.catalog;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -30,5 +31,6 @@ public class GroupCreateRequest {
 
     private Integer sortOrder;
 
+    @JsonProperty("is_browser_group")
     private Boolean isBrowserGroup;
 }
