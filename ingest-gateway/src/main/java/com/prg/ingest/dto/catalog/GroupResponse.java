@@ -21,6 +21,7 @@ public class GroupResponse {
     private String color;
     private int sortOrder;
     private boolean isDefault;
+    private boolean isBrowserGroup;
     private int itemCount;
     private List<GroupItemResponse> items;
     private Instant createdAt;

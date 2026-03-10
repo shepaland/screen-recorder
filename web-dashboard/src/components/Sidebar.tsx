@@ -19,6 +19,7 @@ import {
   RectangleGroupIcon,
   GlobeAltIcon,
   ClockIcon,
+  BookOpenIcon,
 } from '@heroicons/react/24/outline';
 import PermissionGate from './PermissionGate';
 import TenantSwitcher from './TenantSwitcher';
@@ -41,14 +42,18 @@ const archiveSubmenu: NavItem[] = [
   { name: 'Таймлайны', href: '/archive/timelines', icon: ClockIcon },
 ];
 
+/** Catalogs submenu — between Analytics and Settings. */
+const catalogsSubmenu: NavItem[] = [
+  { name: 'Группы приложений', href: '/catalogs/apps', icon: RectangleGroupIcon, permission: 'CATALOGS:READ' },
+  { name: 'Группы сайтов', href: '/catalogs/sites', icon: GlobeAltIcon, permission: 'CATALOGS:READ' },
+];
+
 /** Settings submenu for tenant users. */
 const tenantSettingsSubmenu: NavItem[] = [
   { name: 'Устройства', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
   { name: 'Пользователи', href: '/users', icon: UsersIcon, permission: 'USERS:READ' },
   { name: 'Токены', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
   { name: 'Настройки записи', href: '/recording-settings', icon: AdjustmentsHorizontalIcon, permission: 'DEVICES:READ' },
-  { name: 'Группы приложений', href: '/catalogs/apps', icon: RectangleGroupIcon, permission: 'CATALOGS:READ' },
-  { name: 'Группы сайтов', href: '/catalogs/sites', icon: GlobeAltIcon, permission: 'CATALOGS:READ' },
 ];
 
 /** Settings submenu for superadmin. */
@@ -58,8 +63,6 @@ const superAdminSettingsSubmenu: NavItem[] = [
   { name: 'Устройства', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
   { name: 'Настройки записи', href: '/recording-settings', icon: AdjustmentsHorizontalIcon, permission: 'DEVICES:READ' },
   { name: 'Токены регистрации', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
-  { name: 'Группы приложений', href: '/catalogs/apps', icon: RectangleGroupIcon, permission: 'CATALOGS:READ' },
-  { name: 'Группы сайтов', href: '/catalogs/sites', icon: GlobeAltIcon, permission: 'CATALOGS:READ' },
 ];
 
 /** Global items outside the company scope. */
@@ -111,13 +114,15 @@ export default function Sidebar({ onClose }: SidebarProps) {
   const [isArchiveExpanded, setIsArchiveExpanded] = useState(
     location.pathname.startsWith('/archive') || location.pathname.startsWith('/recordings'),
   );
+  const [isCatalogsExpanded, setIsCatalogsExpanded] = useState(
+    location.pathname.startsWith('/catalogs'),
+  );
   const [isSettingsExpanded, setIsSettingsExpanded] = useState(
     location.pathname.startsWith('/devices') ||
     location.pathname.startsWith('/users') ||
     location.pathname.startsWith('/device-tokens') ||
     location.pathname.startsWith('/recording-settings') ||
-    location.pathname.startsWith('/roles') ||
-    location.pathname.startsWith('/catalogs'),
+    location.pathname.startsWith('/roles'),
   );
 
   const handleClick = () => {
@@ -126,13 +131,13 @@ export default function Sidebar({ onClose }: SidebarProps) {
 
   const isSuperAdmin = user?.roles?.includes('SUPER_ADMIN');
   const isArchiveActive = location.pathname.startsWith('/archive') || location.pathname.startsWith('/recordings');
+  const isCatalogsActive = location.pathname.startsWith('/catalogs');
   const isSettingsActive =
     location.pathname.startsWith('/devices') ||
     location.pathname.startsWith('/users') ||
     location.pathname.startsWith('/device-tokens') ||
     location.pathname.startsWith('/recording-settings') ||
-    location.pathname.startsWith('/roles') ||
-    location.pathname.startsWith('/catalogs');
+    location.pathname.startsWith('/roles');
 
   return (
     <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-gray-950 px-6 pb-4">
@@ -189,6 +194,30 @@ export default function Sidebar({ onClose }: SidebarProps) {
                   </button>
                   {isArchiveExpanded && (
                     <NavList items={archiveSubmenu} onClick={handleClick} indent />
+                  )}
+                </li>
+
+                {/* Catalogs submenu */}
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setIsCatalogsExpanded(!isCatalogsExpanded)}
+                    className={`group flex w-full items-center gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 ${
+                      isCatalogsActive
+                        ? 'bg-red-700 text-white'
+                        : 'text-gray-300 hover:bg-red-700 hover:text-white'
+                    }`}
+                  >
+                    <BookOpenIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
+                    Справочники
+                    {isCatalogsExpanded ? (
+                      <ChevronDownIcon className="ml-auto h-4 w-4" />
+                    ) : (
+                      <ChevronRightIcon className="ml-auto h-4 w-4" />
+                    )}
+                  </button>
+                  {isCatalogsExpanded && (
+                    <NavList items={catalogsSubmenu} onClick={handleClick} indent />
                   )}
                 </li>
 
@@ -324,6 +353,30 @@ export default function Sidebar({ onClose }: SidebarProps) {
                         </button>
                         {isArchiveExpanded && (
                           <NavList items={archiveSubmenu} onClick={handleClick} indent />
+                        )}
+                      </li>
+
+                      {/* Catalogs submenu */}
+                      <li>
+                        <button
+                          type="button"
+                          onClick={() => setIsCatalogsExpanded(!isCatalogsExpanded)}
+                          className={`group flex w-full items-center gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 ${
+                            isCatalogsActive
+                              ? 'bg-red-700 text-white'
+                              : 'text-gray-300 hover:bg-red-700 hover:text-white'
+                          }`}
+                        >
+                          <BookOpenIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
+                          Справочники
+                          {isCatalogsExpanded ? (
+                            <ChevronDownIcon className="ml-auto h-4 w-4" />
+                          ) : (
+                            <ChevronRightIcon className="ml-auto h-4 w-4" />
+                          )}
+                        </button>
+                        {isCatalogsExpanded && (
+                          <NavList items={catalogsSubmenu} onClick={handleClick} indent />
                         )}
                       </li>
 

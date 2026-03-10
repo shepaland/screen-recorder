@@ -23,4 +23,6 @@ public class GroupUpdateRequest {
     private String color;
 
     private Integer sortOrder;
+
+    private Boolean isBrowserGroup;
 }

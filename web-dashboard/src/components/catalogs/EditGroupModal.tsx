@@ -7,7 +7,7 @@ interface EditGroupModalProps {
   group: AppGroup | null;
   onClose: () => void;
   onUpdated: () => void;
-  onUpdate: (groupId: string, data: { name?: string; description?: string; color?: string; sort_order?: number }) => Promise<void>;
+  onUpdate: (groupId: string, data: { name?: string; description?: string; color?: string; sort_order?: number; is_browser_group?: boolean }) => Promise<void>;
 }
 
 const DEFAULT_COLORS = [
@@ -20,6 +20,7 @@ export default function EditGroupModal({ open, group, onClose, onUpdated, onUpda
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('#3B82F6');
   const [sortOrder, setSortOrder] = useState(0);
+  const [isBrowserGroup, setIsBrowserGroup] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,6 +30,7 @@ export default function EditGroupModal({ open, group, onClose, onUpdated, onUpda
       setDescription(group.description || '');
       setColor(group.color || '#3B82F6');
       setSortOrder(group.sort_order);
+      setIsBrowserGroup(group.is_browser_group ?? false);
     }
   }, [group]);
 
@@ -44,6 +46,7 @@ export default function EditGroupModal({ open, group, onClose, onUpdated, onUpda
         description: description.trim() || undefined,
         color,
         sort_order: sortOrder,
+        is_browser_group: group.group_type === 'APP' ? isBrowserGroup : undefined,
       });
       onUpdated();
       onClose();
@@ -141,6 +144,22 @@ export default function EditGroupModal({ open, group, onClose, onUpdated, onUpda
                       min={0}
                     />
                   </div>
+
+                  {group?.group_type === 'APP' && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="edit_is_browser_group"
+                        checked={isBrowserGroup}
+                        onChange={(e) => setIsBrowserGroup(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                      />
+                      <label htmlFor="edit_is_browser_group" className="text-sm text-gray-700">
+                        Браузерная группа
+                      </label>
+                      <span className="text-xs text-gray-400">(показывает группы сайтов в таймлайне)</span>
+                    </div>
+                  )}
 
                   <div className="flex justify-end gap-3 pt-2">
                     <button type="button" onClick={onClose} className="btn-secondary">

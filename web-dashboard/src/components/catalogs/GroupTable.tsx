@@ -114,6 +114,12 @@ export default function GroupTable({ groups, groupType, allGroups, onRefresh }: 
                 </span>
               )}
 
+              {group.is_browser_group && (
+                <span className="inline-flex items-center rounded bg-orange-50 px-1.5 py-0.5 text-xs text-orange-600">
+                  браузер
+                </span>
+              )}
+
               {canManage && (
                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                   <button

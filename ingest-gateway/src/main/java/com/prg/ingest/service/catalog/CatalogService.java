@@ -67,6 +67,7 @@ public class CatalogService {
                 .description(request.getDescription())
                 .color(request.getColor())
                 .sortOrder(sortOrder)
+                .isBrowserGroup(request.getIsBrowserGroup() != null && request.getIsBrowserGroup())
                 .createdBy(userId)
                 .build();
         groupRepo.save(group);
@@ -91,6 +92,7 @@ public class CatalogService {
         if (request.getDescription() != null) group.setDescription(request.getDescription());
         if (request.getColor() != null) group.setColor(request.getColor());
         if (request.getSortOrder() != null) group.setSortOrder(request.getSortOrder());
+        if (request.getIsBrowserGroup() != null) group.setBrowserGroup(request.getIsBrowserGroup());
 
         groupRepo.save(group);
         log.info("Updated group: id={} tenant={}", groupId, tenantId);
@@ -304,6 +306,7 @@ public class CatalogService {
                 .color(group.getColor())
                 .sortOrder(group.getSortOrder())
                 .isDefault(group.isDefault())
+                .isBrowserGroup(group.isBrowserGroup())
                 .itemCount(itemCount)
                 .items(items)
                 .createdAt(group.getCreatedAt())

@@ -26,6 +26,62 @@ function formatDate(dateStr: string): string {
 
 const UNGROUPED_COLOR = '#9CA3AF';
 
+// Custom tooltip: sorted by percentage desc, compact line spacing
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color: string }>;
+  label?: string;
+  groups: Array<{ group_id: string; group_name: string; color: string }>;
+}
+
+function CustomTooltip({ active, payload, label, groups }: CustomTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  // Sort by value descending, filter out zero
+  const sorted = [...payload]
+    .filter((e) => typeof e.value === 'number' && e.value > 0)
+    .sort((a, b) => (b.value as number) - (a.value as number));
+
+  if (sorted.length === 0) return null;
+
+  return (
+    <div
+      style={{
+        backgroundColor: 'white',
+        border: '1px solid #e5e7eb',
+        borderRadius: '0.375rem',
+        fontSize: '12px',
+        padding: '6px 10px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        lineHeight: '1.2',
+      }}
+    >
+      <p style={{ margin: '0 0 3px', fontWeight: 600, color: '#374151', fontSize: '11px' }}>{label}</p>
+      {sorted.map((entry) => {
+        const group = groups.find((g) => g.group_id === entry.name);
+        const displayName = group ? group.group_name : entry.name === 'ungrouped' ? 'Неразмеченные' : entry.name;
+        return (
+          <div key={entry.name} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '1px 0' }}>
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                backgroundColor: entry.color,
+                flexShrink: 0,
+              }}
+            />
+            <span style={{ color: '#6b7280', whiteSpace: 'nowrap' }}>{displayName}</span>
+            <span style={{ marginLeft: 'auto', paddingLeft: 10, fontWeight: 500, color: '#111827' }}>
+              {typeof entry.value === 'number' ? entry.value.toFixed(1) : entry.value}%
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function GroupTimelineChart({ groupType, from, to, title }: GroupTimelineChartProps) {
   const [data, setData] = useState<GroupTimelineResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -118,22 +174,7 @@ export default function GroupTimelineChart({ groupType, from, to, title }: Group
             axisLine={{ stroke: '#e5e7eb' }}
             domain={[0, 100]}
           />
-          <Tooltip
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            formatter={(value: any, name: any) => {
-              const numValue = typeof value === 'number' ? value : Number(value);
-              const nameStr = String(name);
-              const group = data.groups.find((g) => g.group_id === nameStr);
-              const label = group ? group.group_name : (nameStr === 'ungrouped' ? 'Неразмеченные' : nameStr);
-              return [`${numValue.toFixed(1)}%`, label];
-            }}
-            contentStyle={{
-              backgroundColor: 'white',
-              border: '1px solid #e5e7eb',
-              borderRadius: '0.5rem',
-              fontSize: '12px',
-            }}
-          />
+          <Tooltip content={<CustomTooltip groups={data.groups} />} />
           <Legend
             formatter={(value: string) => {
               const group = data.groups.find((g) => g.group_id === value);

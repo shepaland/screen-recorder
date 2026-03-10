@@ -29,4 +29,6 @@ public class GroupCreateRequest {
     private String color;
 
     private Integer sortOrder;
+
+    private Boolean isBrowserGroup;
 }
