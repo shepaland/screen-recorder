@@ -46,7 +46,7 @@ prg:
     heartbeat-timeout-sec: ${HEARTBEAT_TIMEOUT:90}
     default-heartbeat-interval-sec: 30
     default-segment-duration-sec: 10
-    default-capture-fps: 5
+    default-capture-fps: 1
     default-quality: medium
 
 springdoc:

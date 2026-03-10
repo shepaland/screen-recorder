@@ -4,6 +4,7 @@ import com.prg.ingest.dto.response.*;
 import com.prg.ingest.exception.AccessDeniedException;
 import com.prg.ingest.filter.JwtValidationFilter;
 import com.prg.ingest.security.DevicePrincipal;
+import com.prg.ingest.service.TimelineService;
 import com.prg.ingest.service.UserActivityService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class UserActivityController {
     private static final String PERMISSION_RECORDINGS_READ = "RECORDINGS:READ";
 
     private final UserActivityService userActivityService;
+    private final TimelineService timelineService;
 
     /**
      * GET /api/v1/ingest/users — paginated list of users (by tenant).
@@ -160,6 +162,28 @@ public class UserActivityController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * GET /api/v1/ingest/users/timeline?date=2026-03-09&timezone=Europe/Moscow
+     * Returns a full-day timeline for all users in the tenant, broken down by hour,
+     * with app/site groups and recording session mapping.
+     * Requires RECORDINGS:READ permission.
+     */
+    @GetMapping("/timeline")
+    public ResponseEntity<TimelineResponse> getTimeline(
+            @RequestParam String date,
+            @RequestParam(defaultValue = "Europe/Moscow") String timezone,
+            @RequestParam(name = "tenant_id", required = false) UUID tenantIdParam,
+            HttpServletRequest httpRequest) {
+
+        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_RECORDINGS_READ);
+        UUID tenantId = resolveEffectiveTenantId(principal, tenantIdParam);
+
+        log.debug("Getting timeline: tenant={} date={} tz={}", tenantId, date, timezone);
+
+        TimelineResponse response = timelineService.getTimeline(tenantId, date, timezone);
+        return ResponseEntity.ok(response);
+    }
+
     private DevicePrincipal getPrincipal(HttpServletRequest request) {
         DevicePrincipal principal = (DevicePrincipal) request.getAttribute(
                 JwtValidationFilter.DEVICE_PRINCIPAL_ATTRIBUTE);
@@ -181,13 +205,17 @@ public class UserActivityController {
 
     /**
      * Resolve effective tenant_id for the query.
-     * Users with "global" scope (SUPER_ADMIN) can specify tenant_id as query param,
-     * or omit it to query all tenants (null = no tenant filter).
+     * Users with "global" scope (SUPER_ADMIN) must specify tenant_id explicitly.
      * Regular users always use their JWT tenant_id.
+     * Security: prevents cross-tenant data exposure and DoS from querying all tenants.
      */
     private UUID resolveEffectiveTenantId(DevicePrincipal principal, UUID tenantIdParam) {
         if (principal.hasScope("global")) {
-            return tenantIdParam; // null = all tenants, or specific tenant if provided
+            if (tenantIdParam == null) {
+                throw new IllegalArgumentException(
+                        "tenant_id is required for global scope. Specify tenant_id query parameter.");
+            }
+            return tenantIdParam;
         }
         return principal.getTenantId();
     }

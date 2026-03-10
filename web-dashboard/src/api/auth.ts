@@ -67,11 +67,6 @@ export function getOAuthLoginUrl(): string {
   return `${basePath}/api/v1/auth/oauth/yandex`;
 }
 
-export function getMailruOAuthLoginUrl(): string {
-  const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
-  return `${basePath}/api/v1/auth/oauth/mailru`;
-}
-
 export async function selectTenant(data: SwitchTenantRequest): Promise<LoginResponse> {
   const response = await apiClient.post<LoginResponse>('/auth/oauth/select-tenant', data);
   setAccessToken(response.data.access_token);

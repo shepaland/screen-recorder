@@ -35,7 +35,7 @@ export default function TopUngroupedTable({ itemType, title, from, to }: TopUngr
         catalogsApi.getGroups(itemType),
       ]);
       setData(ungrouped);
-      setGroups(groupsResp.groups);
+      setGroups(groupsResp);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load data';
       setError(msg);

@@ -30,7 +30,7 @@ export default function GroupItemsList({ groupId, groups, onAddItem, refreshTrig
       setLoading(true);
       try {
         const resp = await catalogsApi.getGroupItems(groupId);
-        if (!cancelled) setItems(resp.items);
+        if (!cancelled) setItems(resp);
       } catch {
         if (!cancelled) setItems([]);
       } finally {

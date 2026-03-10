@@ -94,6 +94,9 @@ public class AuthManager
         _tokenStore.AccessToken = response.AccessToken;
         _tokenStore.RefreshToken = response.RefreshToken;
         _tokenStore.AccessTokenExpiry = DateTime.UtcNow.AddSeconds(response.ExpiresIn);
+        // Mark that this config came from a real server response
+        if (response.ServerConfig != null)
+            response.ServerConfig.ConfigReceivedFromServer = true;
         _serverConfig = response.ServerConfig;
         SyncDeviceId();
 
@@ -265,7 +268,10 @@ public class AuthManager
             _tokenStore.AccessToken = response.AccessToken;
             _tokenStore.RefreshToken = response.RefreshToken;
             _tokenStore.AccessTokenExpiry = DateTime.UtcNow.AddSeconds(response.ExpiresIn);
-            _serverConfig = response.ServerConfig;
+            // Mark incoming config as server-confirmed
+            if (response.ServerConfig != null)
+                response.ServerConfig.ConfigReceivedFromServer = true;
+            _serverConfig = MergeServerConfigs(_serverConfig, response.ServerConfig);
             SyncDeviceId();
 
             // Persist updated credentials (preserve registration token)
@@ -283,6 +289,42 @@ public class AuthManager
             _logger.LogError(ex, "Re-authentication via device-login failed");
             return false;
         }
+    }
+
+    /// <summary>
+    /// Merge server configs during re-authentication: preserve admin-set recording parameters
+    /// from the existing config, take connection-related settings from the incoming config.
+    /// The next heartbeat device_settings will re-sync any stale values within 30 seconds.
+    /// </summary>
+    private ServerConfig MergeServerConfigs(ServerConfig? existing, ServerConfig? incoming)
+    {
+        if (incoming == null) return existing ?? new ServerConfig();
+        if (existing == null) return incoming;
+
+        // Always take connection-related settings from the new response
+        var merged = new ServerConfig
+        {
+            IngestBaseUrl = incoming.IngestBaseUrl,
+            ControlPlaneBaseUrl = incoming.ControlPlaneBaseUrl,
+            // For recording settings: prefer existing admin overrides (set via heartbeat device_settings)
+            // over server defaults from device-login. Next heartbeat will correct any stale values.
+            CaptureFps = existing.CaptureFps > 0 ? existing.CaptureFps : incoming.CaptureFps,
+            Quality = !string.IsNullOrEmpty(existing.Quality) ? existing.Quality : incoming.Quality,
+            Resolution = !string.IsNullOrEmpty(existing.Resolution) ? existing.Resolution : incoming.Resolution,
+            SegmentDurationSec = existing.SegmentDurationSec > 0 ? existing.SegmentDurationSec : incoming.SegmentDurationSec,
+            HeartbeatIntervalSec = existing.HeartbeatIntervalSec > 0 ? existing.HeartbeatIntervalSec : incoming.HeartbeatIntervalSec,
+            SessionMaxDurationHours = existing.SessionMaxDurationHours ?? incoming.SessionMaxDurationHours,
+            SessionMaxDurationMin = existing.SessionMaxDurationMin ?? incoming.SessionMaxDurationMin,
+            AutoStart = existing.AutoStart ?? incoming.AutoStart,
+            // If either config was received from server, the merged result is also server-confirmed
+            ConfigReceivedFromServer = existing.ConfigReceivedFromServer || incoming.ConfigReceivedFromServer,
+        };
+
+        _logger.LogInformation(
+            "ServerConfig merged on re-auth: fps={Fps} (was={OldFps}, server={NewFps}), quality={Quality}, configFromServer={FromServer}",
+            merged.CaptureFps, existing.CaptureFps, incoming.CaptureFps, merged.Quality, merged.ConfigReceivedFromServer);
+
+        return merged;
     }
 
     /// <summary>

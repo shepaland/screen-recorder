@@ -1,5 +1,7 @@
+using KaderoAgent.Capture;
 using KaderoAgent.Command;
 using KaderoAgent.Auth;
+using KaderoAgent.Service;
 using KaderoAgent.Storage;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -12,9 +14,15 @@ public class SessionWatcher : BackgroundService
     private readonly IAuditEventSink _sink;
     private readonly CommandHandler _commandHandler;
     private readonly CredentialStore _credentialStore;
+    private readonly AuthManager _authManager;
+    private readonly ScreenCaptureManager _captureManager;
     private readonly UserSessionInfo _userSessionInfo;
     private readonly FocusIntervalSink _focusIntervalSink;
     private readonly ILogger<SessionWatcher> _logger;
+
+    // AgentService is resolved lazily to avoid circular DI (SessionWatcher is injected into AgentService).
+    private readonly IServiceProvider _serviceProvider;
+    private AgentService? _agentService;
 
     private volatile bool _isSessionActive = true;
     private readonly SemaphoreSlim _lock = new(1, 1);
@@ -25,16 +33,41 @@ public class SessionWatcher : BackgroundService
         IAuditEventSink sink,
         CommandHandler commandHandler,
         CredentialStore credentialStore,
+        AuthManager authManager,
+        ScreenCaptureManager captureManager,
         UserSessionInfo userSessionInfo,
         FocusIntervalSink focusIntervalSink,
+        IServiceProvider serviceProvider,
         ILogger<SessionWatcher> logger)
     {
         _sink = sink;
         _commandHandler = commandHandler;
         _credentialStore = credentialStore;
+        _authManager = authManager;
+        _captureManager = captureManager;
         _userSessionInfo = userSessionInfo;
         _focusIntervalSink = focusIntervalSink;
+        _serviceProvider = serviceProvider;
         _logger = logger;
+    }
+
+    /// <summary>Lazy-resolve AgentService to avoid circular DI.</summary>
+    private AgentService? GetAgentService()
+    {
+        if (_agentService == null)
+        {
+            try
+            {
+                // AgentService is registered as a hosted service (BackgroundService),
+                // but also as a singleton in DI for state access
+                _agentService = _serviceProvider.GetService(typeof(AgentService)) as AgentService;
+            }
+            catch
+            {
+                // Non-fatal: state transitions will just not happen
+            }
+        }
+        return _agentService;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -76,6 +109,7 @@ public class SessionWatcher : BackgroundService
                             Details = new Dictionary<string, object> { ["reason"] = "SessionLock" }
                         });
                         await _commandHandler.PauseRecordingAsync(CancellationToken.None);
+                        GetAgentService()?.SetState(AgentState.Idle);
                         break;
 
                     case SessionSwitchReason.SessionUnlock:
@@ -90,6 +124,20 @@ public class SessionWatcher : BackgroundService
                             var creds = _credentialStore.Load();
                             var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";
                             await _commandHandler.ResumeRecordingAsync(baseUrl, CancellationToken.None);
+
+                            // Set state based on whether recording actually started
+                            var svc = GetAgentService();
+                            if (svc != null)
+                            {
+                                var serverCfg = _authManager.ServerConfig;
+                                var autoStart = serverCfg?.AutoStart ?? false;
+                                var configFromServer = serverCfg?.ConfigReceivedFromServer ?? false;
+
+                                if (autoStart && configFromServer && _captureManager.IsRecording)
+                                    svc.SetState(AgentState.Recording);
+                                else
+                                    svc.SetState(AgentState.Online);
+                            }
                         }
                         break;
 
@@ -97,7 +145,7 @@ public class SessionWatcher : BackgroundService
                         _logger.LogInformation("Session LOGON");
                         _isSessionActive = true;
 
-                        // Invalidate cached username — new user session may be a different user
+                        // Invalidate cached username -- new user session may be a different user
                         _userSessionInfo.InvalidateCache();
 
                         _sink.Publish(new AuditEvent
@@ -113,11 +161,53 @@ public class SessionWatcher : BackgroundService
                             _logger.LogInformation("Session logon: username updated to {Username}", newUsername);
                         }
 
-                        // Start recording for the new user session
+                        // Transition to Online first (user is present)
+                        GetAgentService()?.SetState(AgentState.Online);
+
+                        // Wait for AuthManager to be ready before starting recording.
+                        // After system reboot, AgentService may still be retrying auth (network not ready).
+                        // Without this wait, HandleSessionLogonAsync would fail because ServerConfig is null.
                         {
-                            var creds = _credentialStore.Load();
-                            var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";
-                            await _commandHandler.HandleSessionLogonAsync(baseUrl, CancellationToken.None);
+                            var waited = 0;
+                            while (!_authManager.IsAuthenticated && waited < 60)
+                            {
+                                _logger.LogDebug("SessionLogon: waiting for AuthManager ({Waited}s)...", waited);
+                                await Task.Delay(2000);
+                                waited += 2;
+                            }
+                            if (!_authManager.IsAuthenticated)
+                            {
+                                _logger.LogWarning("SessionLogon: AuthManager not ready after 60s, skipping auto-start. AgentService will handle it.");
+                                break;
+                            }
+                        }
+
+                        // Start recording for the new user session (if autostart + config from server)
+                        {
+                            var serverCfg = _authManager.ServerConfig;
+                            var configFromServer = serverCfg?.ConfigReceivedFromServer ?? false;
+
+                            if (!configFromServer)
+                            {
+                                _logger.LogInformation("SessionLogon: ServerConfig not confirmed by server, staying Online. " +
+                                    "Heartbeat will deliver config and trigger auto-start if needed.");
+                            }
+                            else
+                            {
+                                var creds = _credentialStore.Load();
+                                var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";
+                                await _commandHandler.HandleSessionLogonAsync(baseUrl, CancellationToken.None);
+
+                                // Update state based on result
+                                var svc = GetAgentService();
+                                if (svc != null)
+                                {
+                                    if (_captureManager.IsRecording)
+                                        svc.SetState(AgentState.Recording);
+                                    else
+                                        svc.SetState(AgentState.Online);
+                                }
+                            }
                         }
                         break;
 
@@ -145,6 +235,15 @@ public class SessionWatcher : BackgroundService
                             var creds = _credentialStore.Load();
                             var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";
                             await _commandHandler.ResumeRecordingAsync(baseUrl, CancellationToken.None);
+
+                            var svc = GetAgentService();
+                            if (svc != null)
+                            {
+                                if (_captureManager.IsRecording)
+                                    svc.SetState(AgentState.Recording);
+                                else
+                                    svc.SetState(AgentState.Online);
+                            }
                         }
                         break;
 
@@ -158,6 +257,7 @@ public class SessionWatcher : BackgroundService
                             Details = new Dictionary<string, object> { ["reason"] = "SessionLogoff" }
                         });
                         await _commandHandler.PauseRecordingAsync(CancellationToken.None);
+                        GetAgentService()?.SetState(AgentState.Idle);
                         break;
                 }
             }

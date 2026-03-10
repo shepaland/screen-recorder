@@ -1,6 +1,8 @@
+using System.Text.Json;
 using KaderoAgent.Auth;
 using KaderoAgent.Capture;
 using KaderoAgent.Configuration;
+using KaderoAgent.Service;
 using KaderoAgent.Upload;
 using KaderoAgent.Util;
 using Microsoft.Extensions.Logging;
@@ -17,6 +19,9 @@ public class CommandHandler
     private readonly ApiClient _apiClient;
     private readonly IOptions<AgentConfig> _config;
     private readonly ILogger<CommandHandler> _logger;
+
+    // AgentService is set after construction to avoid circular DI
+    private AgentService? _agentService;
 
     private DateTime? _sessionStartTime;
     private string _currentBaseUrl = "";
@@ -39,6 +44,9 @@ public class CommandHandler
         _config = config;
         _logger = logger;
     }
+
+    /// <summary>Set AgentService reference for state transitions. Called after DI resolution to avoid circular dependency.</summary>
+    public void SetAgentService(AgentService agentService) => _agentService = agentService;
 
     public string? CurrentSessionId => _sessionManager.CurrentSessionId;
     public bool IsPausedByLock => _isPausedByLock;
@@ -69,10 +77,18 @@ public class CommandHandler
 
         var serverCfg = _authManager.ServerConfig;
         var autoStart = serverCfg?.AutoStart ?? _config.Value.AutoStart;
+        var configFromServer = serverCfg?.ConfigReceivedFromServer ?? false;
 
         if (!autoStart)
         {
             _logger.LogInformation("AutoStart is disabled, not resuming after unlock");
+            return;
+        }
+
+        if (!configFromServer)
+        {
+            _logger.LogInformation("ServerConfig not confirmed by server, not resuming after unlock. " +
+                "Heartbeat will deliver config and trigger auto-start if needed.");
             return;
         }
 
@@ -119,9 +135,12 @@ public class CommandHandler
                 case "START_RECORDING":
                     _consecutiveFailures = 0; // Reset on explicit command
                     await StartRecording(baseUrl, ct);
+                    if (_captureManager.IsRecording)
+                        _agentService?.SetState(AgentState.Recording);
                     break;
                 case "STOP_RECORDING":
                     await StopRecording(ct);
+                    _agentService?.SetState(AgentState.Online);
                     break;
                 case "UPDATE_SETTINGS":
                     UpdateSettings(cmd.Payload);
@@ -206,18 +225,20 @@ public class CommandHandler
         }
     }
 
-    /// <summary>Check if session exceeded max duration and rotate.</summary>
+    /// <summary>Check if session exceeded max duration and rotate.
+    /// Uses SessionMaxDurationMin (priority) or SessionMaxDurationHours * 60 (fallback).</summary>
     public async Task CheckSessionRotationAsync(string baseUrl, CancellationToken ct)
     {
         if (!_captureManager.IsRecording || _sessionStartTime == null) return;
 
         var serverCfg = _authManager.ServerConfig;
-        var maxHours = serverCfg?.SessionMaxDurationHours ?? _config.Value.SessionMaxDurationHours;
+        var maxMinutes = serverCfg?.GetEffectiveSessionMaxDurationMin(_config.Value.SessionMaxDurationMin)
+                         ?? _config.Value.SessionMaxDurationMin;
         var elapsed = DateTime.UtcNow - _sessionStartTime.Value;
 
-        if (elapsed.TotalHours >= maxHours)
+        if (elapsed.TotalMinutes >= maxMinutes)
         {
-            _logger.LogInformation("Session max duration ({MaxH}h) reached, rotating...", maxHours);
+            _logger.LogInformation("Session max duration ({MaxMin}min) reached, rotating...", maxMinutes);
             await RotateSessionAsync(baseUrl, ct);
         }
     }
@@ -231,6 +252,7 @@ public class CommandHandler
         // Get settings: server overrides > local defaults
         var serverCfg = _authManager.ServerConfig;
         var fps = serverCfg?.CaptureFps > 0 ? serverCfg.CaptureFps : _config.Value.CaptureFps;
+        fps = Math.Max(fps, 1); // Safety floor: never allow FPS < 1
         var segDuration = serverCfg?.SegmentDurationSec > 0 ? serverCfg.SegmentDurationSec : _config.Value.SegmentDurationSec;
         var quality = !string.IsNullOrEmpty(serverCfg?.Quality) ? serverCfg.Quality : _config.Value.Quality;
         var resolution = !string.IsNullOrEmpty(serverCfg?.Resolution) ? serverCfg.Resolution : _config.Value.Resolution;
@@ -265,9 +287,32 @@ public class CommandHandler
         // Start watching for new segments
         _ = Task.Run(() => WatchSegments(sessionId, baseUrl, ct), ct);
 
-        _logger.LogInformation("Recording started: session={Session}, fps={Fps}, res={Res}, maxH={MaxH}",
-            sessionId, fps, resolution,
-            serverCfg?.SessionMaxDurationHours ?? _config.Value.SessionMaxDurationHours);
+        var maxMin = serverCfg?.GetEffectiveSessionMaxDurationMin(_config.Value.SessionMaxDurationMin)
+                     ?? _config.Value.SessionMaxDurationMin;
+        _logger.LogInformation("Recording started: session={Session}, fps={Fps}, res={Res}, maxMin={MaxMin}",
+            sessionId, fps, resolution, maxMin);
+    }
+
+    /// <summary>
+    /// Restart recording with updated settings (e.g., FPS changed via heartbeat device_settings).
+    /// Stops current FFmpeg, ends session, starts new recording with latest ServerConfig.
+    /// </summary>
+    public async Task RestartRecordingAsync(string baseUrl, CancellationToken ct)
+    {
+        if (!_captureManager.IsRecording)
+        {
+            _logger.LogDebug("RestartRecording: not recording, skipping");
+            return;
+        }
+
+        _logger.LogInformation("Restarting recording due to settings change");
+        _captureManager.Stop();
+        try { await _sessionManager.EndSessionAsync(ct); } catch { }
+        _uploadQueue.StopProcessing();
+        _sessionStartTime = null;
+
+        await Task.Delay(1000, ct);
+        await StartRecording(baseUrl, ct);
     }
 
     private async Task StopRecording(CancellationToken ct)
@@ -301,21 +346,60 @@ public class CommandHandler
 
         _logger.LogInformation("Updating settings from server command");
 
-        // Settings will take effect on next recording start
-        // (ServerConfig is the primary source, these are emergency overrides)
-        if (payload.TryGetValue("capture_fps", out var fpsObj) && fpsObj is int fps)
-            _config.Value.CaptureFps = fps;
-        if (payload.TryGetValue("resolution", out var resObj) && resObj is string res)
-            _config.Value.Resolution = res;
-        if (payload.TryGetValue("quality", out var qObj) && qObj is string q)
-            _config.Value.Quality = q;
-        if (payload.TryGetValue("segment_duration_sec", out var segObj) && segObj is int seg)
-            _config.Value.SegmentDurationSec = seg;
-        if (payload.TryGetValue("auto_start", out var autoObj) && autoObj is bool auto)
-            _config.Value.AutoStart = auto;
+        var serverCfg = _authManager.ServerConfig ?? new ServerConfig();
+        var changed = false;
 
-        _logger.LogInformation("Settings updated: fps={Fps}, res={Res}, quality={Quality}",
-            _config.Value.CaptureFps, _config.Value.Resolution, _config.Value.Quality);
+        // JSON deserialization produces JsonElement, not native types — must handle both
+        if (payload.TryGetValue("capture_fps", out var fpsObj))
+        {
+            if (fpsObj is JsonElement fpsEl && fpsEl.TryGetInt32(out var fps) && fps > 0)
+            { serverCfg.CaptureFps = fps; changed = true; }
+            else if (fpsObj is int fpsInt && fpsInt > 0)
+            { serverCfg.CaptureFps = fpsInt; changed = true; }
+        }
+        if (payload.TryGetValue("resolution", out var resObj))
+        {
+            var res = resObj is JsonElement resEl ? resEl.GetString() : resObj as string;
+            if (!string.IsNullOrEmpty(res))
+            { serverCfg.Resolution = res; changed = true; }
+        }
+        if (payload.TryGetValue("quality", out var qObj))
+        {
+            var q = qObj is JsonElement qEl ? qEl.GetString() : qObj as string;
+            if (!string.IsNullOrEmpty(q))
+            { serverCfg.Quality = q; changed = true; }
+        }
+        if (payload.TryGetValue("segment_duration_sec", out var segObj))
+        {
+            if (segObj is JsonElement segEl && segEl.TryGetInt32(out var seg) && seg > 0)
+            { serverCfg.SegmentDurationSec = seg; changed = true; }
+            else if (segObj is int segInt && segInt > 0)
+            { serverCfg.SegmentDurationSec = segInt; changed = true; }
+        }
+        if (payload.TryGetValue("auto_start", out var autoObj))
+        {
+            if (autoObj is JsonElement autoEl)
+            { serverCfg.AutoStart = autoEl.GetBoolean(); changed = true; }
+            else if (autoObj is bool autoBool)
+            { serverCfg.AutoStart = autoBool; changed = true; }
+        }
+        if (payload.TryGetValue("session_max_duration_min", out var maxMinObj))
+        {
+            if (maxMinObj is JsonElement maxMinEl && maxMinEl.TryGetInt32(out var maxMin) && maxMin > 0)
+            { serverCfg.SessionMaxDurationMin = maxMin; changed = true; }
+            else if (maxMinObj is int maxMinInt && maxMinInt > 0)
+            { serverCfg.SessionMaxDurationMin = maxMinInt; changed = true; }
+        }
+
+        if (changed)
+        {
+            serverCfg.ConfigReceivedFromServer = true;
+            _authManager.UpdateServerConfig(serverCfg);
+        }
+
+        _logger.LogInformation("Settings updated from command: fps={Fps}, res={Res}, quality={Quality}, sessionMaxMin={MaxMin}",
+            serverCfg.CaptureFps, serverCfg.Resolution, serverCfg.Quality,
+            serverCfg.GetEffectiveSessionMaxDurationMin(_config.Value.SessionMaxDurationMin));
     }
 
     private async Task WatchSegments(string sessionId, string baseUrl, CancellationToken ct)

@@ -3,6 +3,7 @@ import type {
   DeviceResponse,
   DeviceDetailResponse,
   DeviceCommandResponse,
+  DeviceStatusLogEntry,
   CreateCommandRequest,
   DeviceSettings,
 } from '../types/device';
@@ -57,6 +58,24 @@ export async function updateDeviceSettings(
   const response = await cpApiClient.put<DeviceResponse>(
     `/devices/${deviceId}`,
     { settings },
+  );
+  return response.data;
+}
+
+export interface StatusLogParams {
+  page?: number;
+  size?: number;
+  from?: string;
+  to?: string;
+}
+
+export async function getDeviceStatusLog(
+  deviceId: string,
+  params?: StatusLogParams,
+): Promise<PageResponse<DeviceStatusLogEntry>> {
+  const response = await cpApiClient.get<PageResponse<DeviceStatusLogEntry>>(
+    `/devices/${deviceId}/status-log`,
+    { params },
   );
   return response.data;
 }

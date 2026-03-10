@@ -22,13 +22,14 @@ public class HeartbeatService : BackgroundService
     private readonly UploadQueue _uploadQueue;
     private readonly MetricsCollector _metrics;
     private readonly IStatusProvider _statusProvider;
+    private readonly AgentService _agentService;
     private readonly IOptions<AgentConfig> _config;
     private readonly ILogger<HeartbeatService> _logger;
 
     public HeartbeatService(AuthManager authManager, ApiClient apiClient, CredentialStore credentialStore,
         CommandHandler commandHandler, ScreenCaptureManager captureManager, UploadQueue uploadQueue,
-        MetricsCollector metrics, IStatusProvider statusProvider, IOptions<AgentConfig> config,
-        ILogger<HeartbeatService> logger)
+        MetricsCollector metrics, IStatusProvider statusProvider, AgentService agentService,
+        IOptions<AgentConfig> config, ILogger<HeartbeatService> logger)
     {
         _authManager = authManager;
         _apiClient = apiClient;
@@ -38,6 +39,7 @@ public class HeartbeatService : BackgroundService
         _uploadQueue = uploadQueue;
         _metrics = metrics;
         _statusProvider = statusProvider;
+        _agentService = agentService;
         _config = config;
         _logger = logger;
     }
@@ -63,7 +65,8 @@ public class HeartbeatService : BackgroundService
                 var baseUrl = creds.ServerUrl.TrimEnd('/');
                 var url = $"{baseUrl}/api/cp/v1/devices/{_authManager.DeviceId}/heartbeat";
 
-                var status = _captureManager.IsRecording ? "recording" : (_commandHandler.IsPausedByLock ? "idle" : "online");
+                // Use AgentState for heartbeat status instead of computing from flags
+                var status = _agentService.CurrentState.ToHeartbeatStatus();
                 var body = new
                 {
                     status,
@@ -91,7 +94,34 @@ public class HeartbeatService : BackgroundService
                 // Apply device_settings from heartbeat response
                 if (response?.DeviceSettings is { Count: > 0 } ds)
                 {
+                    var oldFps = _authManager.ServerConfig?.CaptureFps ?? 0;
                     ApplyDeviceSettings(ds);
+                    var newFps = _authManager.ServerConfig?.CaptureFps ?? 0;
+
+                    // Hot-restart recording if FPS changed while actively recording
+                    if (oldFps != newFps && newFps > 0 && _captureManager.IsRecording)
+                    {
+                        _logger.LogInformation("FPS changed {OldFps} -> {NewFps} via heartbeat, restarting recording",
+                            oldFps, newFps);
+                        await _commandHandler.RestartRecordingAsync(baseUrl, ct);
+                    }
+
+                    // After first heartbeat with device_settings, auto-start if needed.
+                    // This handles the case where ConfigReceivedFromServer was false at boot,
+                    // but now we have confirmed config from server.
+                    if (_agentService.CurrentState == AgentState.Online)
+                    {
+                        var serverCfg = _authManager.ServerConfig;
+                        if (serverCfg is { ConfigReceivedFromServer: true, AutoStart: true })
+                        {
+                            _logger.LogInformation("Server confirmed auto_start=true via heartbeat, starting recording");
+                            await _commandHandler.AutoStartRecordingAsync(baseUrl, ct);
+                            if (_captureManager.IsRecording)
+                            {
+                                _agentService.SetState(AgentState.Recording);
+                            }
+                        }
+                    }
                 }
 
                 // Process pending commands
@@ -138,16 +168,23 @@ public class HeartbeatService : BackgroundService
             { cfg.SegmentDurationSec = seg; changed = true; }
             if (ds.TryGetValue("auto_start", out var autoEl))
             { cfg.AutoStart = autoEl.GetBoolean(); changed = true; }
-            if (ds.TryGetValue("session_max_duration_hours", out var maxEl) && maxEl.TryGetInt32(out var max) && max > 0)
-            { cfg.SessionMaxDurationHours = max; changed = true; }
+            if (ds.TryGetValue("session_max_duration_hours", out var maxHEl) && maxHEl.TryGetInt32(out var maxH) && maxH > 0)
+            { cfg.SessionMaxDurationHours = maxH; changed = true; }
+            if (ds.TryGetValue("session_max_duration_min", out var maxMEl) && maxMEl.TryGetInt32(out var maxM) && maxM > 0)
+            { cfg.SessionMaxDurationMin = maxM; changed = true; }
             if (ds.TryGetValue("heartbeat_interval_sec", out var hbEl) && hbEl.TryGetInt32(out var hb) && hb > 0)
             { cfg.HeartbeatIntervalSec = hb; changed = true; }
 
             if (changed)
             {
+                // Mark that we received config from the actual server
+                cfg.ConfigReceivedFromServer = true;
                 _authManager.UpdateServerConfig(cfg);
-                _logger.LogInformation("Device settings updated from heartbeat: fps={Fps}, res={Res}, quality={Quality}",
-                    cfg.CaptureFps, cfg.Resolution, cfg.Quality);
+                _logger.LogInformation(
+                    "Device settings updated from heartbeat: fps={Fps}, res={Res}, quality={Quality}, " +
+                    "autoStart={AutoStart}, sessionMaxMin={SessionMaxMin}",
+                    cfg.CaptureFps, cfg.Resolution, cfg.Quality,
+                    cfg.AutoStart, cfg.SessionMaxDurationMin);
             }
         }
         catch (Exception ex)

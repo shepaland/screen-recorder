@@ -23,7 +23,7 @@ export default function AppGroupsPage() {
     setError(null);
     try {
       const resp = await catalogsApi.getGroups(GROUP_TYPE);
-      setGroups(resp.groups);
+      setGroups(resp);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load groups';
       setError(msg);

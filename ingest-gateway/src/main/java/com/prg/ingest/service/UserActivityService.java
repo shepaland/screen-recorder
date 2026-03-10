@@ -504,8 +504,8 @@ public class UserActivityService {
                        SUM(duration_ms)
                 FROM app_focus_intervals
                 WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId) AND username = :username
-                  AND started_at >= CAST(:from AS date) AT TIME ZONE :tz
-                  AND started_at < (CAST(:to AS date) + INTERVAL '1 day') AT TIME ZONE :tz
+                  AND started_at >= CAST(:from AS timestamp) AT TIME ZONE :tz
+                  AND started_at < (CAST(:to AS timestamp) + INTERVAL '1 day') AT TIME ZONE :tz
                 """);
         if (deviceId != null) dailySql.append(" AND device_id = :deviceId");
         dailySql.append(" GROUP BY d ORDER BY d");

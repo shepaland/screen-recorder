@@ -18,13 +18,34 @@ export interface CreateDeviceTokenRequest {
   expires_at?: string | null;
 }
 
+export type DeviceStatus =
+  | 'offline'
+  | 'online'
+  | 'recording'
+  | 'error'
+  | 'starting'
+  | 'configuring'
+  | 'awaiting_user'
+  | 'idle'
+  | 'stopped';
+
+export interface DeviceStatusLogEntry {
+  id: string;
+  device_id: string;
+  previous_status: DeviceStatus | null;
+  new_status: DeviceStatus;
+  changed_ts: string;
+  trigger: 'heartbeat' | 'command' | 'session_event' | 'system' | 'admin';
+  details: Record<string, unknown> | null;
+}
+
 export interface DeviceResponse {
   id: string;
   hostname: string;
   os_version: string;
   os_type: string | null;
   agent_version: string;
-  status: 'offline' | 'online' | 'recording' | 'error';
+  status: DeviceStatus;
   last_heartbeat_ts: string | null;
   last_recording_ts: string | null;
   ip_address: string | null;
@@ -129,5 +150,6 @@ export interface DeviceSettings {
   quality: string;
   segment_duration_sec: number;
   session_max_duration_hours: number;
+  session_max_duration_min?: number;
   auto_start: boolean;
 }

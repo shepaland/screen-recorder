@@ -73,14 +73,15 @@ prg:
     login-attempt-window: 900
   device:
     heartbeat-interval-sec: ${DEVICE_HEARTBEAT_INTERVAL:30}
-    segment-duration-sec: ${DEVICE_SEGMENT_DURATION:10}
-    capture-fps: ${DEVICE_CAPTURE_FPS:5}
-    quality: ${DEVICE_QUALITY:medium}
+    segment-duration-sec: ${DEVICE_SEGMENT_DURATION:60}
+    capture-fps: ${DEVICE_CAPTURE_FPS:1}
+    quality: ${DEVICE_QUALITY:low}
     ingest-base-url: ${INGEST_BASE_URL:}
     control-plane-base-url: ${CONTROL_PLANE_BASE_URL:}
     default-resolution: ${DEVICE_DEFAULT_RESOLUTION:720p}
-    default-session-max-hours: ${DEVICE_SESSION_MAX_HOURS:24}
-    default-auto-start: ${DEVICE_AUTO_START:true}
+    default-session-max-min: ${DEVICE_SESSION_MAX_MIN:60}
+    default-session-max-hours: ${DEVICE_SESSION_MAX_HOURS:0}
+    default-auto-start: ${DEVICE_AUTO_START:false}
   oauth:
     yandex:
       client-id: ${YANDEX_OAUTH_CLIENT_ID:}
@@ -89,15 +90,6 @@ prg:
       token-url: https://oauth.yandex.ru/token
       user-info-url: https://login.yandex.ru/info?format=json
       callback-url: ${YANDEX_OAUTH_CALLBACK_URL:}
-    mailru:
-      client-id: ${MAILRU_OAUTH_CLIENT_ID:}
-      client-secret: ${MAILRU_OAUTH_CLIENT_SECRET:}
-      authorize-url: https://oauth.mail.ru/login
-      token-url: https://oauth.mail.ru/token
-      user-info-url: https://oauth.mail.ru/userinfo
-      callback-url: ${MAILRU_OAUTH_CALLBACK_URL:}
-      scope: userinfo
-      enabled: ${MAILRU_OAUTH_ENABLED:false}
     intermediate-token-ttl: 600
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:3000}

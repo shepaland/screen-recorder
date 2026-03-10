@@ -1,7 +1,6 @@
 package com.prg.auth.controller;
 
 import com.prg.auth.config.FrontendConfig;
-import com.prg.auth.config.MailruOAuthConfig;
 import com.prg.auth.dto.request.OnboardingRequest;
 import com.prg.auth.dto.request.SelectTenantRequest;
 import com.prg.auth.dto.response.LoginResponse;
@@ -40,7 +39,6 @@ public class OAuthController {
     private final OAuthService oauthService;
     private final OnboardingService onboardingService;
     private final FrontendConfig frontendConfig;
-    private final MailruOAuthConfig mailruOAuthConfig;
     private final OAuthRateLimiter oauthRateLimiter;
 
     private static final String REFRESH_TOKEN_COOKIE = "refresh_token";
@@ -79,48 +77,6 @@ public class OAuthController {
         return processOAuthCallback("yandex", code, state, error, httpRequest, httpResponse);
     }
 
-    // ======================== Mail.ru OAuth ========================
-
-    /**
-     * GET /api/v1/auth/oauth/mailru
-     * Redirect to Mail.ru authorization page.
-     */
-    @GetMapping("/mailru")
-    public ResponseEntity<Void> initiateMailruOAuth() {
-        if (!mailruOAuthConfig.isEnabled()) {
-            log.warn("Mail.ru OAuth is disabled");
-            String frontendBaseUrl = frontendConfig.getBaseUrl();
-            String redirectUrl = frontendBaseUrl + "/login?error=" + urlEncode("Mail.ru OAuth is not configured");
-            return ResponseEntity.status(HttpStatus.FOUND)
-                    .header("Location", redirectUrl)
-                    .build();
-        }
-
-        String authorizationUrl = oauthService.getMailruAuthorizationUrl();
-        log.info("Initiating Mail.ru OAuth redirect");
-        return ResponseEntity.status(HttpStatus.FOUND)
-                .header("Location", authorizationUrl)
-                .build();
-    }
-
-    /**
-     * GET /api/v1/auth/oauth/mailru/callback?code=...&state=...
-     * Process Mail.ru callback. This is a browser redirect flow, not JSON API.
-     */
-    @GetMapping("/mailru/callback")
-    public ResponseEntity<Void> handleMailruCallback(
-            @RequestParam(required = false) String code,
-            @RequestParam(required = false) String state,
-            @RequestParam(required = false) String error,
-            HttpServletRequest httpRequest,
-            HttpServletResponse httpResponse) {
-
-        String ipAddress = getClientIp(httpRequest);
-        oauthRateLimiter.checkCallbackRateLimit(ipAddress);
-
-        return processOAuthCallback("mailru", code, state, error, httpRequest, httpResponse);
-    }
-
     // ======================== Common OAuth callback processing ========================
 
     /**
@@ -157,12 +113,7 @@ public class OAuthController {
             String ipAddress = getClientIp(httpRequest);
             String userAgent = httpRequest.getHeader("User-Agent");
 
-            OAuthService.OAuthCallbackResult result;
-            if ("mailru".equals(provider)) {
-                result = oauthService.handleMailruCallback(code, state, ipAddress, userAgent);
-            } else {
-                result = oauthService.handleCallback(code, state, ipAddress, userAgent);
-            }
+            OAuthService.OAuthCallbackResult result = oauthService.handleCallback(code, state, ipAddress, userAgent);
 
             OAuthCallbackResponse response = result.getResponse();
             String redirectUrl;

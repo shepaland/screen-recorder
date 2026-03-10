@@ -39,6 +39,13 @@ public class AgentStatus
 {
     public string ConnectionStatus { get; set; } = "disconnected"; // "connected", "disconnected", "error", "reconnecting"
     public string RecordingStatus { get; set; } = "stopped"; // "recording", "stopped", "starting"
+
+    /// <summary>Human-readable agent state for tray display (Russian). E.g. "Запись экрана", "Онлайн".</summary>
+    public string AgentStateDisplay { get; set; } = "Запуск...";
+
+    /// <summary>Machine-readable agent state name matching heartbeat status. E.g. "recording", "online", "idle".</summary>
+    public string AgentStateName { get; set; } = "starting";
+
     public string? DeviceId { get; set; }
     public string? ServerUrl { get; set; }
     public int CaptureFps { get; set; }
@@ -51,6 +58,7 @@ public class AgentStatus
     public int SegmentsQueued { get; set; }
     public string? Resolution { get; set; }
     public int SessionMaxDurationHours { get; set; }
+    public int SessionMaxDurationMin { get; set; }
     public bool AutoStart { get; set; }
     public bool SessionLocked { get; set; }
     public int AuditEventsQueued { get; set; }

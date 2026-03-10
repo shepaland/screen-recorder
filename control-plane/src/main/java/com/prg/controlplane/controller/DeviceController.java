@@ -2,10 +2,7 @@ package com.prg.controlplane.controller;
 
 import com.prg.controlplane.dto.request.HeartbeatRequest;
 import com.prg.controlplane.dto.request.UpdateDeviceRequest;
-import com.prg.controlplane.dto.response.DeviceDetailResponse;
-import com.prg.controlplane.dto.response.DeviceResponse;
-import com.prg.controlplane.dto.response.HeartbeatResponse;
-import com.prg.controlplane.dto.response.PageResponse;
+import com.prg.controlplane.dto.response.*;
 import com.prg.controlplane.exception.AccessDeniedException;
 import com.prg.controlplane.security.DevicePrincipal;
 import com.prg.controlplane.service.DeviceService;
@@ -15,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @RestController
@@ -84,6 +82,22 @@ public class DeviceController {
         requirePermission(principal, "DEVICES:UPDATE");
 
         DeviceResponse response = deviceService.restoreDevice(id, principal.getTenantId());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}/status-log")
+    public ResponseEntity<PageResponse<DeviceStatusLogResponse>> getDeviceStatusLog(
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(required = false) Instant from,
+            @RequestParam(required = false) Instant to,
+            HttpServletRequest httpRequest) {
+        DevicePrincipal principal = getPrincipal(httpRequest);
+        requirePermission(principal, "DEVICES:READ");
+
+        PageResponse<DeviceStatusLogResponse> response = deviceService.getDeviceStatusLog(
+                id, principal.getTenantId(), from, to, page, size);
         return ResponseEntity.ok(response);
     }
 

@@ -59,9 +59,9 @@ export default function MetricsRow() {
       color: 'bg-blue-50 text-blue-600',
     },
     {
-      title: 'В работе',
-      value: loading ? '...' : `${metrics?.active_devices ?? 0}`,
-      subtitle: 'устройств',
+      title: 'Активные пользователи',
+      value: loading ? '...' : `${metrics?.active_users ?? 0}`,
+      subtitle: 'за 24ч',
       icon: SignalIcon,
       color: 'bg-green-50 text-green-600',
     },

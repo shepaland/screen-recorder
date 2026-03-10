@@ -1,14 +1,11 @@
 import ingestApiClient from './ingest';
 import type {
   GroupType,
-  GroupListResponse,
   CreateGroupRequest,
   UpdateGroupRequest,
   AppGroup,
-  GroupItemsResponse,
   AddItemRequest,
   GroupItem,
-  BatchAddItemsResponse,
   AppAlias,
   UngroupedResponse,
   DashboardMetrics,
@@ -16,15 +13,14 @@ import type {
   GroupSummaryResponse,
   TopUngroupedResponse,
   TopUsersUngroupedResponse,
-  SeedResponse,
   CreateAliasRequest,
   UpdateAliasRequest,
 } from '../types/catalogs';
 
 // ---- Groups ----
 
-export async function getGroups(groupType: GroupType): Promise<GroupListResponse> {
-  const { data } = await ingestApiClient.get<GroupListResponse>('/catalogs/groups', {
+export async function getGroups(groupType: GroupType): Promise<AppGroup[]> {
+  const { data } = await ingestApiClient.get<AppGroup[]>('/catalogs/groups', {
     params: { group_type: groupType },
   });
   return data;
@@ -46,8 +42,8 @@ export async function deleteGroup(groupId: string): Promise<void> {
 
 // ---- Items ----
 
-export async function getGroupItems(groupId: string): Promise<GroupItemsResponse> {
-  const { data } = await ingestApiClient.get<GroupItemsResponse>(
+export async function getGroupItems(groupId: string): Promise<GroupItem[]> {
+  const { data } = await ingestApiClient.get<GroupItem[]>(
     `/catalogs/groups/${groupId}/items`,
   );
   return data;
@@ -64,8 +60,8 @@ export async function addGroupItem(groupId: string, request: AddItemRequest): Pr
 export async function addGroupItemsBatch(
   groupId: string,
   items: AddItemRequest[],
-): Promise<BatchAddItemsResponse> {
-  const { data } = await ingestApiClient.post<BatchAddItemsResponse>(
+): Promise<GroupItem[]> {
+  const { data } = await ingestApiClient.post<GroupItem[]>(
     `/catalogs/groups/${groupId}/items/batch`,
     { items },
   );
@@ -181,9 +177,8 @@ export async function getTopUsersUngrouped(
 export async function seedCatalogs(
   groupType?: GroupType,
   force?: boolean,
-): Promise<SeedResponse> {
-  const { data } = await ingestApiClient.post<SeedResponse>('/catalogs/seed', null, {
+): Promise<void> {
+  await ingestApiClient.post('/catalogs/seed', null, {
     params: { group_type: groupType, force },
   });
-  return data;
 }

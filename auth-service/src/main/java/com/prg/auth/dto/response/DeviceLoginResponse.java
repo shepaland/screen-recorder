@@ -33,6 +33,8 @@ public class DeviceLoginResponse {
         private String ingestBaseUrl;
         private String controlPlaneBaseUrl;
         private String resolution;
+        private Integer sessionMaxDurationMin;
+        /** @deprecated Use sessionMaxDurationMin instead. Kept for backward compatibility with older agents. */
         private Integer sessionMaxDurationHours;
         private Boolean autoStart;
     }

@@ -134,8 +134,8 @@ public class DashboardService {
                        SUM(duration_ms) AS dur
                 FROM app_focus_intervals
                 WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId)
-                  AND started_at >= CAST(:from AS date) AT TIME ZONE :tz
-                  AND started_at < (CAST(:to AS date) + INTERVAL '1 day') AT TIME ZONE :tz
+                  AND started_at >= CAST(:from AS timestamp) AT TIME ZONE :tz
+                  AND started_at < (CAST(:to AS timestamp) + INTERVAL '1 day') AT TIME ZONE :tz
                   %s
                 GROUP BY d, val
                 ORDER BY d
@@ -165,11 +165,12 @@ public class DashboardService {
             dayTotals.merge(date, dur, Long::sum);
         }
 
-        // Build response
+        // Build response — exclude default group from groups (it becomes "ungrouped" on the chart)
         List<GroupTimelineResponse.GroupInfo> groupInfos = groups.stream()
+                .filter(g -> !g.isDefault())
                 .map(g -> GroupTimelineResponse.GroupInfo.builder()
-                        .id(g.getId())
-                        .name(g.getName())
+                        .groupId(g.getId())
+                        .groupName(g.getName())
                         .color(g.getColor())
                         .build())
                 .toList();
@@ -183,20 +184,31 @@ public class DashboardService {
             Map<UUID, Long> groupDurations = entry.getValue();
             long dayTotal = dayTotals.getOrDefault(date, 0L);
 
-            List<GroupTimelineResponse.GroupDuration> breakdown = groupDurations.entrySet().stream()
-                    .map(e -> GroupTimelineResponse.GroupDuration.builder()
-                            .groupId(e.getKey())
-                            .groupName(groupNames.getOrDefault(e.getKey(), "Прочее"))
-                            .durationMs(e.getValue())
-                            .percentage(dayTotal > 0 ? (e.getValue() * 100.0 / dayTotal) : 0)
-                            .build())
-                    .sorted((a, b) -> Long.compare(b.getDurationMs(), a.getDurationMs()))
-                    .toList();
+            // Separate default group (ungrouped) from named groups
+            long ungroupedDurationMs = 0;
+            List<GroupTimelineResponse.GroupDuration> breakdown = new ArrayList<>();
+            for (var e : groupDurations.entrySet()) {
+                UUID gid = e.getKey();
+                long dur = e.getValue();
+                if (gid != null && gid.equals(finalDefaultGroupId)) {
+                    ungroupedDurationMs = dur;
+                } else {
+                    breakdown.add(GroupTimelineResponse.GroupDuration.builder()
+                            .groupId(gid)
+                            .groupName(groupNames.getOrDefault(gid, "Прочее"))
+                            .durationMs(dur)
+                            .percentage(dayTotal > 0 ? (dur * 100.0 / dayTotal) : 0)
+                            .build());
+                }
+            }
+            breakdown.sort((a, b) -> Long.compare(b.getDurationMs(), a.getDurationMs()));
 
             days.add(GroupTimelineResponse.DayBreakdown.builder()
                     .date(date)
                     .totalDurationMs(dayTotal)
                     .breakdown(breakdown)
+                    .ungroupedDurationMs(ungroupedDurationMs)
+                    .ungroupedPercentage(dayTotal > 0 ? (ungroupedDurationMs * 100.0 / dayTotal) : 0)
                     .build());
         }
 

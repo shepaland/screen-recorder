@@ -163,6 +163,11 @@ public class PipeServer : BackgroundService
         if (intervals == null || intervals.Count == 0)
             return new PipeResponse { Success = true };
 
+        // T-159: Inject current recording session ID from service if tray didn't provide one.
+        // TrayWindowTracker runs in user session and doesn't know the recording session ID.
+        // PipeServer runs in service (Session 0) where CommandHandler tracks CurrentSessionId.
+        var fallbackSessionId = _commandExecutor.CurrentSessionId;
+
         foreach (var data in intervals)
         {
             _focusIntervalSink.Enqueue(new FocusInterval
@@ -178,11 +183,12 @@ public class PipeServer : BackgroundService
                 EndedAt = data.EndedAt != null && DateTime.TryParse(data.EndedAt, null,
                     System.Globalization.DateTimeStyles.RoundtripKind, out var e) ? e : null,
                 DurationMs = data.DurationMs,
-                SessionId = data.SessionId
+                SessionId = data.SessionId ?? fallbackSessionId
             });
         }
 
-        _logger.LogDebug("Enqueued {Count} focus intervals from tray", intervals.Count);
+        _logger.LogDebug("Enqueued {Count} focus intervals from tray (sessionId={SessionId})",
+            intervals.Count, fallbackSessionId ?? "none");
         return new PipeResponse { Success = true };
     }
 }

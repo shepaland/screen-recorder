@@ -96,6 +96,16 @@ if (args.Contains("--test-ui"))
 // Must run on STA thread — ContextMenuStrip requires STA for COM message pump.
 if (args.Contains("--tray"))
 {
+    // Single-instance check: only one tray process per user session.
+    // Uses Local\ prefix (not Global\) so multiple RDP users can each have one tray.
+    // HKLM\Run + HKCU\Run can both fire at login — Mutex prevents duplicate icons.
+    using var trayMutex = new Mutex(false, @"Local\KaderoAgentTray", out var isFirstTray);
+    if (!isFirstTray)
+    {
+        // Another tray is already running in this user session — exit silently
+        return;
+    }
+
     var staThread = new Thread(() =>
     {
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
@@ -168,8 +178,10 @@ builder.Services.AddSingleton<AgentCommandExecutor>();
 builder.Services.AddSingleton<KaderoAgent.Ipc.ICommandExecutor>(sp => sp.GetRequiredService<AgentCommandExecutor>());
 
 // Background services
+// AgentService must be Singleton so HeartbeatService can inject it for AgentState access
+builder.Services.AddSingleton<AgentService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<AgentService>());
 builder.Services.AddHostedService<HeartbeatService>();
-builder.Services.AddHostedService<AgentService>();
 
 // Named Pipe server — always start so --tray UI can connect
 builder.Services.AddHostedService<PipeServer>();
@@ -303,6 +315,14 @@ if (!args.Contains("--service"))
     apiClient.SetTokenRefreshCallback(() => authManager.RefreshTokenAsync());
 }
 
+// Wire up CommandHandler -> AgentService reference for state transitions
+// (avoids circular DI: AgentService depends on CommandHandler, CommandHandler needs AgentService for state)
+{
+    var commandHandler = host.Services.GetRequiredService<CommandHandler>();
+    var agentService = host.Services.GetRequiredService<AgentService>();
+    commandHandler.SetAgentService(agentService);
+}
+
 // Initialize FocusIntervalSink with current username
 {
     var userSessionInfo = host.Services.GetRequiredService<UserSessionInfo>();
@@ -313,11 +333,35 @@ if (!args.Contains("--service"))
 
 // Ensure only one agent host runs at a time (Windows Service OR standalone).
 // If service is already running, this process should not start another host.
-using var hostMutex = new Mutex(false, @"Global\KaderoAgentHost", out var isFirstInstance);
+// NOTE: When the service runs as LocalSystem, it creates the Global Mutex with
+// restricted ACL. A regular-user process cannot even open it — catching
+// UnauthorizedAccessException and treating it as "service already running".
+Mutex? hostMutex = null;
+bool isFirstInstance = false;
+try
+{
+    hostMutex = new Mutex(false, @"Global\KaderoAgentHost", out isFirstInstance);
+}
+catch (UnauthorizedAccessException)
+{
+    // Global Mutex exists but is owned by SYSTEM (Windows Service).
+    // Treat as "another host is already running".
+    if (!args.Contains("--service"))
+        return;
+    throw; // --service should always run as SYSTEM — propagate if not
+}
 if (!isFirstInstance && !args.Contains("--service"))
 {
+    hostMutex?.Dispose();
     // Service already running. Tray was launched above. Exit gracefully.
     return;
 }
 
-await host.RunAsync();
+try
+{
+    await host.RunAsync();
+}
+finally
+{
+    hostMutex?.Dispose();
+}
