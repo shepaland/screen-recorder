@@ -38,11 +38,9 @@ public class TimelineService {
             throw new IllegalArgumentException("Invalid date format: " + date + ". Expected: yyyy-MM-dd");
         }
 
-        // Validate timezone early
-        try {
-            ZoneId.of(timezone);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid timezone: " + timezone);
+        // Validate timezone early — only accept IANA zone IDs (e.g. Europe/Moscow), reject arbitrary offsets
+        if (!ZoneId.getAvailableZoneIds().contains(timezone)) {
+            throw new IllegalArgumentException("Invalid timezone: " + timezone + ". Use IANA timezone IDs (e.g. Europe/Moscow, UTC)");
         }
 
         log.debug("Building timeline: tenant={}, date={}, tz={}", tenantId, date, timezone);

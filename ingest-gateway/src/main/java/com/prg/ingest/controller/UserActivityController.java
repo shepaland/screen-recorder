@@ -205,13 +205,17 @@ public class UserActivityController {
 
     /**
      * Resolve effective tenant_id for the query.
-     * Users with "global" scope (SUPER_ADMIN) can specify tenant_id as query param,
-     * or omit it to query all tenants (null = no tenant filter).
+     * Users with "global" scope (SUPER_ADMIN) must specify tenant_id explicitly.
      * Regular users always use their JWT tenant_id.
+     * Security: prevents cross-tenant data exposure and DoS from querying all tenants.
      */
     private UUID resolveEffectiveTenantId(DevicePrincipal principal, UUID tenantIdParam) {
         if (principal.hasScope("global")) {
-            return tenantIdParam; // null = all tenants, or specific tenant if provided
+            if (tenantIdParam == null) {
+                throw new IllegalArgumentException(
+                        "tenant_id is required for global scope. Specify tenant_id query parameter.");
+            }
+            return tenantIdParam;
         }
         return principal.getTenantId();
     }
