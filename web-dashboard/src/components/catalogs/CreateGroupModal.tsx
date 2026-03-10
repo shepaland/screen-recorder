@@ -7,7 +7,7 @@ interface CreateGroupModalProps {
   groupType: GroupType;
   onClose: () => void;
   onCreated: () => void;
-  onCreate: (data: { group_type: GroupType; name: string; description?: string; color?: string; sort_order?: number }) => Promise<void>;
+  onCreate: (data: { group_type: GroupType; name: string; description?: string; color?: string; sort_order?: number; is_browser_group?: boolean }) => Promise<void>;
 }
 
 const DEFAULT_COLORS = [
@@ -20,6 +20,7 @@ export default function CreateGroupModal({ open, groupType, onClose, onCreated, 
   const [description, setDescription] = useState('');
   const [color, setColor] = useState(DEFAULT_COLORS[0]);
   const [sortOrder, setSortOrder] = useState(0);
+  const [isBrowserGroup, setIsBrowserGroup] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,11 +37,13 @@ export default function CreateGroupModal({ open, groupType, onClose, onCreated, 
         description: description.trim() || undefined,
         color,
         sort_order: sortOrder,
+        is_browser_group: groupType === 'APP' ? isBrowserGroup : undefined,
       });
       setName('');
       setDescription('');
       setColor(DEFAULT_COLORS[0]);
       setSortOrder(0);
+      setIsBrowserGroup(false);
       onCreated();
       onClose();
     } catch (err: unknown) {
@@ -139,6 +142,22 @@ export default function CreateGroupModal({ open, groupType, onClose, onCreated, 
                       min={0}
                     />
                   </div>
+
+                  {groupType === 'APP' && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="is_browser_group"
+                        checked={isBrowserGroup}
+                        onChange={(e) => setIsBrowserGroup(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                      />
+                      <label htmlFor="is_browser_group" className="text-sm text-gray-700">
+                        Браузерная группа
+                      </label>
+                      <span className="text-xs text-gray-400">(показывает группы сайтов в таймлайне)</span>
+                    </div>
+                  )}
 
                   <div className="flex justify-end gap-3 pt-2">
                     <button type="button" onClick={onClose} className="btn-secondary">

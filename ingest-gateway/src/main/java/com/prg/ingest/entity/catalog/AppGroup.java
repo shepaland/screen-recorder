@@ -46,6 +46,10 @@ public class AppGroup {
     @Builder.Default
     private boolean isDefault = false;
 
+    @Column(name = "is_browser_group", nullable = false)
+    @Builder.Default
+    private boolean isBrowserGroup = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

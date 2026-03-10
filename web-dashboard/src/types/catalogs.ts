@@ -13,6 +13,7 @@ export interface AppGroup {
   color: string | null;
   sort_order: number;
   is_default: boolean;
+  is_browser_group: boolean;
   item_count: number;
   created_at: string;
   updated_at: string;
@@ -27,6 +28,7 @@ export interface CreateGroupRequest {
   description?: string;
   color?: string;
   sort_order?: number;
+  is_browser_group?: boolean;
 }
 
 export interface UpdateGroupRequest {
@@ -34,6 +36,7 @@ export interface UpdateGroupRequest {
   description?: string;
   color?: string;
   sort_order?: number;
+  is_browser_group?: boolean;
 }
 
 // ---- Items ----

@@ -185,12 +185,12 @@ public class TimelineService {
         // Eagerly load items for each group
         List<AppGroupWithItems> appRules = appGroups.stream().map(g -> {
             List<AppGroupItem> items = appGroupItemRepository.findByGroupId(g.getId());
-            return new AppGroupWithItems(g.getId(), g.getName(), g.getColor(), items);
+            return new AppGroupWithItems(g.getId(), g.getName(), g.getColor(), g.isBrowserGroup(), items);
         }).toList();
 
         List<AppGroupWithItems> siteRules = siteGroups.stream().map(g -> {
             List<AppGroupItem> items = appGroupItemRepository.findByGroupId(g.getId());
-            return new AppGroupWithItems(g.getId(), g.getName(), g.getColor(), items);
+            return new AppGroupWithItems(g.getId(), g.getName(), g.getColor(), false, items);
         }).toList();
 
         GroupRules rules = new GroupRules(appRules, siteRules);
@@ -306,26 +306,68 @@ public class TimelineService {
             GroupRules groupRules,
             Set<UUID> hourSessionIds) {
 
-        // Separate browser vs non-browser rows
-        List<FocusRow> nonBrowserRows = hourRows.stream().filter(r -> !r.isBrowser).toList();
-        List<FocusRow> browserRows = hourRows.stream().filter(r -> r.isBrowser).toList();
-
         List<TimelineAppGroup> result = new ArrayList<>();
 
-        // --- Non-browser apps: match to APP groups ---
-        // Map<groupId (null=ungrouped), groupName, color, list of apps>
+        // Step 1: Match each row to an APP group from catalog
+        // Browser rows (isBrowser=true) → match to APP group with is_browser_group=true from catalog
+        //   If no catalog browser group exists, create a fallback "Браузеры" group
+        // Non-browser rows → match to regular APP groups
+
+        // Find the browser APP group from catalog (first one with isBrowserGroup=true)
+        AppGroupWithItems catalogBrowserGroup = groupRules.appGroups.stream()
+                .filter(AppGroupWithItems::isBrowserGroup)
+                .findFirst()
+                .orElse(null);
+
+        // Accumulators: groupId -> AppGroupAccumulator (for non-browser groups)
         Map<UUID, AppGroupAccumulator> appGroupMap = new LinkedHashMap<>();
 
-        for (FocusRow row : nonBrowserRows) {
-            AppGroupWithItems matched = matchAppGroup(row.processName, groupRules.appGroups);
-            UUID groupId = matched != null ? matched.groupId : null;
-            String groupName = matched != null ? matched.groupName : "Другие";
-            String color = matched != null ? matched.color : "#9E9E9E";
+        // Accumulator for browser group (uses catalog browser group if available)
+        UUID browserGroupId = catalogBrowserGroup != null ? catalogBrowserGroup.groupId : null;
+        String browserGroupName = catalogBrowserGroup != null ? catalogBrowserGroup.groupName : "Браузеры";
+        String browserGroupColor = catalogBrowserGroup != null ? catalogBrowserGroup.color : "#2196F3";
+        Map<UUID, SiteGroupAccumulator> siteGroupMap = new LinkedHashMap<>();
+        long browserTotalDuration = 0;
+        boolean hasBrowserRows = false;
 
-            appGroupMap.computeIfAbsent(groupId, k -> new AppGroupAccumulator(groupId, groupName, color))
-                    .addApp(row.processName, row.totalDurationMs, !row.sessionIds.isEmpty());
+        for (FocusRow row : hourRows) {
+            if (row.isBrowser) {
+                // Browser row → accumulate into browser group with site sub-groups
+                hasBrowserRows = true;
+                browserTotalDuration += row.totalDurationMs;
+
+                if (row.domain != null && !row.domain.isBlank()) {
+                    AppGroupWithItems matchedSite = matchSiteGroup(row.domain, groupRules.siteGroups);
+                    UUID sgId = matchedSite != null ? matchedSite.groupId : null;
+                    String sgName = matchedSite != null ? matchedSite.groupName : "Другие сайты";
+                    String sgColor = matchedSite != null ? matchedSite.color : "#9E9E9E";
+
+                    siteGroupMap.computeIfAbsent(sgId, k -> new SiteGroupAccumulator(sgId, sgName, sgColor))
+                            .addSite(row.domain, row.totalDurationMs, !row.sessionIds.isEmpty());
+                }
+            } else {
+                // Non-browser row → match to APP group from catalog
+                AppGroupWithItems matched = matchAppGroup(row.processName, groupRules.appGroups);
+
+                // If matched group is a browser group, treat as non-browser app within it
+                if (matched != null && matched.isBrowserGroup) {
+                    // Browser process matched by catalog pattern but not flagged as browser in focus_intervals
+                    // Still treat as browser group for consistency
+                    hasBrowserRows = true;
+                    browserTotalDuration += row.totalDurationMs;
+                    continue;
+                }
+
+                UUID groupId = matched != null ? matched.groupId : null;
+                String groupName = matched != null ? matched.groupName : "Другие";
+                String color = matched != null ? matched.color : "#9E9E9E";
+
+                appGroupMap.computeIfAbsent(groupId, k -> new AppGroupAccumulator(groupId, groupName, color))
+                        .addApp(row.processName, row.totalDurationMs, !row.sessionIds.isEmpty());
+            }
         }
 
+        // Build non-browser APP groups
         for (AppGroupAccumulator acc : appGroupMap.values()) {
             result.add(TimelineAppGroup.builder()
                     .groupId(acc.groupId)
@@ -338,33 +380,16 @@ public class TimelineService {
                     .build());
         }
 
-        // --- Browser rows: group into a single "Browsers" app group, then sub-group by site groups ---
-        if (!browserRows.isEmpty()) {
-            long browserTotalDuration = browserRows.stream().mapToLong(r -> r.totalDurationMs).sum();
-
-            // Group domains by site groups
-            Map<UUID, SiteGroupAccumulator> siteGroupMap = new LinkedHashMap<>();
-
-            for (FocusRow row : browserRows) {
-                if (row.domain == null || row.domain.isBlank()) continue;
-
-                AppGroupWithItems matched = matchSiteGroup(row.domain, groupRules.siteGroups);
-                UUID groupId = matched != null ? matched.groupId : null;
-                String groupName = matched != null ? matched.groupName : "Другие сайты";
-                String color = matched != null ? matched.color : "#9E9E9E";
-
-                siteGroupMap.computeIfAbsent(groupId, k -> new SiteGroupAccumulator(groupId, groupName, color))
-                        .addSite(row.domain, row.totalDurationMs, !row.sessionIds.isEmpty());
-            }
-
+        // Build browser group with site sub-groups
+        if (hasBrowserRows) {
             List<TimelineSiteGroup> siteGroups = siteGroupMap.values().stream()
                     .map(SiteGroupAccumulator::toSiteGroup)
                     .toList();
 
             result.add(TimelineAppGroup.builder()
-                    .groupId(null)
-                    .groupName("Браузеры")
-                    .color("#2196F3")
+                    .groupId(browserGroupId)
+                    .groupName(browserGroupName)
+                    .color(browserGroupColor)
                     .durationMs(browserTotalDuration)
                     .isBrowserGroup(true)
                     .apps(null)
@@ -424,7 +449,7 @@ public class TimelineService {
 
     private record GroupRules(List<AppGroupWithItems> appGroups, List<AppGroupWithItems> siteGroups) {}
 
-    private record AppGroupWithItems(UUID groupId, String groupName, String color, List<AppGroupItem> items) {}
+    private record AppGroupWithItems(UUID groupId, String groupName, String color, boolean isBrowserGroup, List<AppGroupItem> items) {}
 
     private record CachedGroups(GroupRules rules, long expiresAt) {}
 
