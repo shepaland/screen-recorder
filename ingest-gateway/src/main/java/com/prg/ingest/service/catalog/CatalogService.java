@@ -60,6 +60,12 @@ public class CatalogService {
         int sortOrder = request.getSortOrder() != null ? request.getSortOrder()
                 : (int) groupRepo.countByTenantIdAndGroupType(tenantId, groupType) + 1;
 
+        // is_browser_group only valid for APP groups
+        boolean browserGroup = request.getIsBrowserGroup() != null && request.getIsBrowserGroup();
+        if (browserGroup && groupType != GroupType.APP) {
+            throw new IllegalArgumentException("is_browser_group can only be set for APP groups");
+        }
+
         AppGroup group = AppGroup.builder()
                 .tenantId(tenantId)
                 .groupType(groupType)
@@ -67,7 +73,7 @@ public class CatalogService {
                 .description(request.getDescription())
                 .color(request.getColor())
                 .sortOrder(sortOrder)
-                .isBrowserGroup(request.getIsBrowserGroup() != null && request.getIsBrowserGroup())
+                .isBrowserGroup(browserGroup)
                 .createdBy(userId)
                 .build();
         groupRepo.save(group);
@@ -92,7 +98,12 @@ public class CatalogService {
         if (request.getDescription() != null) group.setDescription(request.getDescription());
         if (request.getColor() != null) group.setColor(request.getColor());
         if (request.getSortOrder() != null) group.setSortOrder(request.getSortOrder());
-        if (request.getIsBrowserGroup() != null) group.setBrowserGroup(request.getIsBrowserGroup());
+        if (request.getIsBrowserGroup() != null) {
+            if (request.getIsBrowserGroup() && group.getGroupType() != GroupType.APP) {
+                throw new IllegalArgumentException("is_browser_group can only be set for APP groups");
+            }
+            group.setBrowserGroup(request.getIsBrowserGroup());
+        }
 
         groupRepo.save(group);
         log.info("Updated group: id={} tenant={}", groupId, tenantId);
