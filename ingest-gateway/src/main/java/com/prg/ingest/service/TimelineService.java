@@ -54,8 +54,11 @@ public class TimelineService {
         // 3. Load app/site group rules (with cache)
         GroupRules groupRules = loadGroupRules(tenantId);
 
-        // 4. Assemble response
-        return assembleTimeline(date, timezone, focusRows, userInfoMap, groupRules);
+        // 4. Recording sessions for the day — correlate with focus intervals for has_recording flag
+        Map<UUID, List<RecordingSessionInfo>> deviceRecordings = queryRecordingSessions(tenantId, date, timezone);
+
+        // 5. Assemble response
+        return assembleTimeline(date, timezone, focusRows, userInfoMap, groupRules, deviceRecordings);
     }
 
     // ============================ SQL Queries ============================
@@ -125,6 +128,42 @@ public class TimelineService {
         return map;
     }
 
+    /**
+     * Query recording sessions that overlap with the target date.
+     * Returns Map<deviceId, List<RecordingSessionInfo>> for correlation with focus intervals.
+     * This ensures has_recording=true even when focus_intervals lack session_id (old agent data).
+     */
+    private Map<UUID, List<RecordingSessionInfo>> queryRecordingSessions(UUID tenantId, String date, String timezone) {
+        String sql = """
+                SELECT id, device_id, started_ts, ended_ts
+                FROM recording_sessions
+                WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId)
+                  AND started_ts < (CAST(:date AS timestamp) + INTERVAL '1 day') AT TIME ZONE :tz
+                  AND (ended_ts IS NULL OR ended_ts >= CAST(:date AS timestamp) AT TIME ZONE :tz)
+                  AND status IN ('active', 'completed')
+                """;
+
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = em.createNativeQuery(sql)
+                .setParameter("tenantId", tenantId)
+                .setParameter("date", date)
+                .setParameter("tz", timezone)
+                .getResultList();
+
+        Map<UUID, List<RecordingSessionInfo>> result = new HashMap<>();
+        for (Object[] r : rows) {
+            UUID sessionId = toUuid(r[0]);
+            UUID deviceId = toUuid(r[1]);
+            Instant startedTs = toInstant(r[2]);
+            Instant endedTs = toInstant(r[3]);
+            result.computeIfAbsent(deviceId, k -> new ArrayList<>())
+                    .add(new RecordingSessionInfo(sessionId, deviceId, startedTs, endedTs));
+        }
+        log.debug("Found {} recording sessions across {} devices for date={}",
+                result.values().stream().mapToInt(List::size).sum(), result.size(), date);
+        return result;
+    }
+
     // ============================ Group Rules ============================
 
     private GroupRules loadGroupRules(UUID tenantId) {
@@ -165,7 +204,11 @@ public class TimelineService {
             String date, String timezone,
             List<FocusRow> focusRows,
             Map<String, UserInfo> userInfoMap,
-            GroupRules groupRules) {
+            GroupRules groupRules,
+            Map<UUID, List<RecordingSessionInfo>> deviceRecordings) {
+
+        ZoneId zoneId = ZoneId.of(timezone);
+        LocalDate targetDate = LocalDate.parse(date);
 
         // Group focus rows by username
         Map<String, List<FocusRow>> byUser = focusRows.stream()
@@ -198,9 +241,22 @@ public class TimelineService {
 
                 long totalDurationMs = hourRows.stream().mapToLong(r -> r.totalDurationMs).sum();
 
-                // Collect all session IDs from this hour's focus rows
+                // Collect session IDs from focus_intervals (new agent data with session_id)
                 Set<UUID> hourSessionIds = new LinkedHashSet<>();
                 hourRows.forEach(r -> hourSessionIds.addAll(r.sessionIds));
+
+                // Correlate with recording_sessions by device_id + hour overlap
+                // This ensures has_recording=true even for old focus data without session_id
+                Set<UUID> hourDeviceIds = new LinkedHashSet<>();
+                hourRows.forEach(r -> hourDeviceIds.addAll(r.deviceIds));
+                for (UUID deviceId : hourDeviceIds) {
+                    List<RecordingSessionInfo> sessions = deviceRecordings.getOrDefault(deviceId, List.of());
+                    for (RecordingSessionInfo session : sessions) {
+                        if (sessionOverlapsHour(session, targetDate, hour, zoneId)) {
+                            hourSessionIds.add(session.sessionId);
+                        }
+                    }
+                }
 
                 boolean hasRecording = !hourSessionIds.isEmpty();
 
@@ -372,6 +428,8 @@ public class TimelineService {
 
     private record CachedGroups(GroupRules rules, long expiresAt) {}
 
+    private record RecordingSessionInfo(UUID sessionId, UUID deviceId, Instant startedTs, Instant endedTs) {}
+
     // Accumulators for building grouped results
     private static class AppGroupAccumulator {
         final UUID groupId;
@@ -471,6 +529,16 @@ public class TimelineService {
             this.durationMs += dur;
             if (rec) this.hasRecording = true;
         }
+    }
+
+    /**
+     * Check if a recording session overlaps with a specific hour on the target date.
+     */
+    private static boolean sessionOverlapsHour(RecordingSessionInfo session, LocalDate date, int hour, ZoneId zone) {
+        Instant hourStart = date.atTime(hour, 0).atZone(zone).toInstant();
+        Instant hourEnd = date.atTime(hour, 0).atZone(zone).plusHours(1).toInstant();
+        Instant sessionEnd = session.endedTs != null ? session.endedTs : Instant.now();
+        return session.startedTs.isBefore(hourEnd) && sessionEnd.isAfter(hourStart);
     }
 
     // ============================ Utility ============================

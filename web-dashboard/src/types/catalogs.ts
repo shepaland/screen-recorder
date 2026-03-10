@@ -106,7 +106,7 @@ export interface UngroupedResponse {
 export interface DashboardMetrics {
   connected_devices: number;
   total_devices: number;
-  active_devices: number;
+  active_users: number;
   tokens_used: number;
   tokens_total: number;
   video_size_bytes: number;

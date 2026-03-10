@@ -35,13 +35,18 @@ function HourCells({
   hasRecording,
   onRecordingClick,
   colorClass,
+  barColor,
+  barHeight,
 }: {
   hours: { hour: number; duration_ms: number; has_recording: boolean; session_ids?: string[] }[];
   hasRecording?: boolean;
   onRecordingClick?: (hour: number, sessionIds: string[]) => void;
   colorClass?: string;
+  barColor?: string;
+  barHeight?: string;
 }) {
   const hourMap = new Map(hours.map((h) => [h.hour, h]));
+  const cellHeight = barHeight ?? 'h-6';
 
   return (
     <>
@@ -54,19 +59,24 @@ function HourCells({
         if (duration <= 0) {
           return (
             <td key={hour} className="px-0 py-1">
-              <div className="h-6 w-full rounded-sm bg-gray-50" />
+              <div className={`${cellHeight} w-full rounded-sm bg-gray-50`} />
             </td>
           );
         }
 
-        const bgClass = recording
+        // Recording → red; barColor (inline) → use style; colorClass → use class; fallback → gray
+        const isRecording = recording;
+        const bgClass = isRecording
           ? 'bg-red-500 hover:bg-red-600 cursor-pointer'
-          : colorClass ?? 'bg-gray-300';
+          : barColor ? '' : (colorClass ?? 'bg-gray-300');
+        const bgStyle = isRecording
+          ? undefined
+          : barColor ? { backgroundColor: barColor, opacity: 0.75 } : undefined;
 
         return (
           <td key={hour} className="px-0 py-1">
             <div
-              className="h-6 w-full rounded-sm bg-gray-50 relative overflow-hidden group"
+              className={`${cellHeight} w-full rounded-sm bg-gray-50 relative overflow-hidden group`}
               title={`${String(hour).padStart(2, '0')}:00 -- ${formatDuration(duration)}${recording ? ' (есть запись)' : ''}`}
               onClick={
                 recording && onRecordingClick && h?.session_ids
@@ -76,7 +86,7 @@ function HourCells({
             >
               <div
                 className={`absolute left-0 top-0 h-full rounded-sm transition-all ${bgClass}`}
-                style={{ width: `${fillPct}%` }}
+                style={{ width: `${fillPct}%`, ...bgStyle }}
               />
             </div>
           </td>
@@ -167,6 +177,69 @@ export default function TimelineTable({ data }: TimelineTableProps) {
         duration_ms: group?.duration_ms ?? 0,
         has_recording: hourData.has_recording,
         session_ids: hourData.recording_session_ids,
+      };
+    });
+  };
+
+  // Build per-hour data for an individual app within a group
+  const getAppHourData = (user: TimelineUser, groupId: string | null, groupName: string, processName: string) => {
+    return HOURS.map((hour) => {
+      const hourData = user.hours.find((h) => h.hour === hour);
+      if (!hourData) return { hour, duration_ms: 0, has_recording: false, session_ids: [] as string[] };
+      const group = hourData.app_groups.find(
+        (g) => g.group_id === groupId && g.group_name === groupName,
+      );
+      if (!group || !group.apps) return { hour, duration_ms: 0, has_recording: false, session_ids: [] as string[] };
+      const app = group.apps.find((a) => a.process_name === processName);
+      return {
+        hour,
+        duration_ms: app?.duration_ms ?? 0,
+        has_recording: app?.has_recording ?? false,
+        session_ids: hourData.recording_session_ids,
+      };
+    });
+  };
+
+  // Build per-hour data for a site group within the browser group
+  const getSiteGroupHourData = (user: TimelineUser, browserGroupId: string | null, browserGroupName: string, sgGroupId: string | null, sgGroupName: string) => {
+    return HOURS.map((hour) => {
+      const hourData = user.hours.find((h) => h.hour === hour);
+      if (!hourData) return { hour, duration_ms: 0, has_recording: false, session_ids: [] as string[] };
+      const browserGroup = hourData.app_groups.find(
+        (g) => g.group_id === browserGroupId && g.group_name === browserGroupName,
+      );
+      if (!browserGroup || !browserGroup.site_groups) return { hour, duration_ms: 0, has_recording: false, session_ids: [] as string[] };
+      const sg = browserGroup.site_groups.find(
+        (s) => s.group_id === sgGroupId && s.group_name === sgGroupName,
+      );
+      return {
+        hour,
+        duration_ms: sg?.duration_ms ?? 0,
+        has_recording: false,
+        session_ids: [] as string[],
+      };
+    });
+  };
+
+  // Build per-hour data for an individual site within a site group
+  const getSiteHourData = (user: TimelineUser, browserGroupId: string | null, browserGroupName: string, sgGroupId: string | null, sgGroupName: string, domain: string) => {
+    return HOURS.map((hour) => {
+      const hourData = user.hours.find((h) => h.hour === hour);
+      if (!hourData) return { hour, duration_ms: 0, has_recording: false, session_ids: [] as string[] };
+      const browserGroup = hourData.app_groups.find(
+        (g) => g.group_id === browserGroupId && g.group_name === browserGroupName,
+      );
+      if (!browserGroup || !browserGroup.site_groups) return { hour, duration_ms: 0, has_recording: false, session_ids: [] as string[] };
+      const sg = browserGroup.site_groups.find(
+        (s) => s.group_id === sgGroupId && s.group_name === sgGroupName,
+      );
+      if (!sg) return { hour, duration_ms: 0, has_recording: false, session_ids: [] as string[] };
+      const site = sg.sites.find((s) => s.domain === domain);
+      return {
+        hour,
+        duration_ms: site?.duration_ms ?? 0,
+        has_recording: site?.has_recording ?? false,
+        session_ids: [] as string[],
       };
     });
   };
@@ -337,7 +410,7 @@ export default function TimelineTable({ data }: TimelineTableProps) {
 
                     return (
                       <Fragment key={groupKey}>
-                        {/* App group row */}
+                        {/* App group row — with colored hour bars */}
                         <tr
                           className={`hover:bg-gray-50 transition-colors ${hasChildren ? 'cursor-pointer' : ''}`}
                           onClick={hasChildren ? () => toggleGroup(groupKey) : undefined}
@@ -365,35 +438,39 @@ export default function TimelineTable({ data }: TimelineTableProps) {
                           </td>
                           <HourCells
                             hours={groupHours}
-                            colorClass={`opacity-70`}
+                            barColor={group.color || '#9CA3AF'}
+                            barHeight="h-5"
                           />
                         </tr>
 
-                        {/* Level 3: Apps (non-browser groups) */}
+                        {/* Level 3: Apps (non-browser groups) — with per-app hour bars */}
                         {isGroupExpanded && !group.is_browser_group &&
-                          apps.map((app) => (
-                            <tr key={`${groupKey}::app::${app.process_name}`} className="hover:bg-gray-50">
-                              <td className="pl-14 pr-3 py-1">
-                                <span className="text-xs text-gray-600 truncate block">{app.process_name}</span>
-                              </td>
-                              <td className="text-right px-2 py-1">
-                                <span className="text-xs text-gray-400">{formatDuration(app.total_ms)}</span>
-                              </td>
-                              {/* Empty hour cells for individual apps -- no per-hour breakdown at this level */}
-                              {HOURS.map((hour) => (
-                                <td key={hour} className="px-0 py-1">
-                                  <div className="h-4" />
+                          apps.map((app) => {
+                            const appHours = getAppHourData(user, group.group_id, group.group_name, app.process_name);
+                            return (
+                              <tr key={`${groupKey}::app::${app.process_name}`} className="hover:bg-gray-50">
+                                <td className="pl-14 pr-3 py-1">
+                                  <span className="text-xs text-gray-600 truncate block">{app.process_name}</span>
                                 </td>
-                              ))}
-                            </tr>
-                          ))}
+                                <td className="text-right px-2 py-1">
+                                  <span className="text-xs text-gray-400">{formatDuration(app.total_ms)}</span>
+                                </td>
+                                <HourCells
+                                  hours={appHours}
+                                  barColor={group.color || '#9CA3AF'}
+                                  barHeight="h-4"
+                                />
+                              </tr>
+                            );
+                          })}
 
-                        {/* Level 3: Site Groups (browser groups) */}
+                        {/* Level 3: Site Groups (browser groups) — with per-site-group hour bars */}
                         {isGroupExpanded && group.is_browser_group &&
                           siteGroups.map((sg) => {
                             const sgKey = `${groupKey}::sg::${sg.group_id ?? 'null'}::${sg.group_name}`;
                             const isSgExpanded = expandedSiteGroups.has(sgKey);
                             const hasSites = sg.sites.size > 0;
+                            const sgHours = getSiteGroupHourData(user, group.group_id, group.group_name, sg.group_id, sg.group_name);
 
                             return (
                               <Fragment key={sgKey}>
@@ -422,53 +499,59 @@ export default function TimelineTable({ data }: TimelineTableProps) {
                                   <td className="text-right px-2 py-1">
                                     <span className="text-xs text-gray-400">{formatDuration(sg.total_ms)}</span>
                                   </td>
-                                  {HOURS.map((hour) => (
-                                    <td key={hour} className="px-0 py-1">
-                                      <div className="h-4" />
-                                    </td>
-                                  ))}
+                                  <HourCells
+                                    hours={sgHours}
+                                    barColor={sg.color || '#9CA3AF'}
+                                    barHeight="h-4"
+                                  />
                                 </tr>
 
-                                {/* Level 4: Individual sites */}
+                                {/* Level 4: Individual sites — with per-site hour bars */}
                                 {isSgExpanded &&
                                   Array.from(sg.sites.values())
                                     .sort((a, b) => b.total_ms - a.total_ms)
-                                    .map((site) => (
-                                      <tr key={`${sgKey}::${site.domain}`} className="hover:bg-gray-50">
-                                        <td className="pl-20 pr-3 py-1">
-                                          <span className="text-xs text-gray-500 truncate block">{site.domain}</span>
-                                        </td>
-                                        <td className="text-right px-2 py-1">
-                                          <span className="text-xs text-gray-400">{formatDuration(site.total_ms)}</span>
-                                        </td>
-                                        {HOURS.map((hour) => (
-                                          <td key={hour} className="px-0 py-1">
-                                            <div className="h-4" />
+                                    .map((site) => {
+                                      const siteHours = getSiteHourData(user, group.group_id, group.group_name, sg.group_id, sg.group_name, site.domain);
+                                      return (
+                                        <tr key={`${sgKey}::${site.domain}`} className="hover:bg-gray-50">
+                                          <td className="pl-20 pr-3 py-1">
+                                            <span className="text-xs text-gray-500 truncate block">{site.domain}</span>
                                           </td>
-                                        ))}
-                                      </tr>
-                                    ))}
+                                          <td className="text-right px-2 py-1">
+                                            <span className="text-xs text-gray-400">{formatDuration(site.total_ms)}</span>
+                                          </td>
+                                          <HourCells
+                                            hours={siteHours}
+                                            barColor={sg.color || '#9CA3AF'}
+                                            barHeight="h-3"
+                                          />
+                                        </tr>
+                                      );
+                                    })}
                               </Fragment>
                             );
                           })}
 
                         {/* If browser group is expanded but also has regular apps, show them too */}
                         {isGroupExpanded && group.is_browser_group &&
-                          apps.map((app) => (
-                            <tr key={`${groupKey}::app::${app.process_name}`} className="hover:bg-gray-50">
-                              <td className="pl-14 pr-3 py-1">
-                                <span className="text-xs text-gray-600 truncate block">{app.process_name}</span>
-                              </td>
-                              <td className="text-right px-2 py-1">
-                                <span className="text-xs text-gray-400">{formatDuration(app.total_ms)}</span>
-                              </td>
-                              {HOURS.map((hour) => (
-                                <td key={hour} className="px-0 py-1">
-                                  <div className="h-4" />
+                          apps.map((app) => {
+                            const appHours = getAppHourData(user, group.group_id, group.group_name, app.process_name);
+                            return (
+                              <tr key={`${groupKey}::app::${app.process_name}`} className="hover:bg-gray-50">
+                                <td className="pl-14 pr-3 py-1">
+                                  <span className="text-xs text-gray-600 truncate block">{app.process_name}</span>
                                 </td>
-                              ))}
-                            </tr>
-                          ))}
+                                <td className="text-right px-2 py-1">
+                                  <span className="text-xs text-gray-400">{formatDuration(app.total_ms)}</span>
+                                </td>
+                                <HourCells
+                                  hours={appHours}
+                                  barColor={group.color || '#2196F3'}
+                                  barHeight="h-4"
+                                />
+                              </tr>
+                            );
+                          })}
                       </Fragment>
                     );
                   })}

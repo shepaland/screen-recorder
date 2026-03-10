@@ -21,8 +21,8 @@ public class GroupTimelineResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class GroupInfo {
-        private UUID id;
-        private String name;
+        private UUID groupId;
+        private String groupName;
         private String color;
     }
 
@@ -34,6 +34,8 @@ public class GroupTimelineResponse {
         private String date;
         private long totalDurationMs;
         private List<GroupDuration> breakdown;
+        private long ungroupedDurationMs;
+        private double ungroupedPercentage;
     }
 
     @Data
