@@ -1,5 +1,5 @@
 import apiClient from './client';
-import type { DeviceTokenResponse, CreateDeviceTokenRequest } from '../types/device';
+import type { DeviceTokenResponse, CreateDeviceTokenRequest, UpdateDeviceTokenRequest } from '../types/device';
 import type { PageResponse } from '../types/common';
 
 export interface TokenDeviceItem {
@@ -39,6 +39,11 @@ export async function getDeviceToken(id: string): Promise<DeviceTokenResponse> {
 
 export async function createDeviceToken(data: CreateDeviceTokenRequest): Promise<DeviceTokenResponse> {
   const response = await apiClient.post<DeviceTokenResponse>('/device-tokens', data);
+  return response.data;
+}
+
+export async function updateDeviceToken(id: string, data: UpdateDeviceTokenRequest): Promise<DeviceTokenResponse> {
+  const response = await apiClient.patch<DeviceTokenResponse>(`/device-tokens/${id}`, data);
   return response.data;
 }
 

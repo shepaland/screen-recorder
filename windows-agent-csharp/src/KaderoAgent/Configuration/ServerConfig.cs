@@ -23,6 +23,13 @@ public class ServerConfig
     public bool? AutoStart { get; set; }
 
     /// <summary>
+    /// When false, the agent must NOT capture screen. Heartbeat, focus tracking, and audit events continue.
+    /// Controlled by the recording_enabled flag on the device registration token.
+    /// Default is true for backward compatibility with servers that don't send this field.
+    /// </summary>
+    public bool RecordingEnabled { get; set; } = true;
+
+    /// <summary>
     /// True if this config was received from a real server response (device-login or heartbeat).
     /// False if the config is a default or was loaded from cache without server confirmation.
     /// Used to guard autostart: only auto-start recording if the server explicitly confirmed the config.

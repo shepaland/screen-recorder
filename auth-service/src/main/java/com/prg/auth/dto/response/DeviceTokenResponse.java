@@ -24,6 +24,7 @@ public class DeviceTokenResponse {
     private Integer deviceCount;
     private Instant expiresAt;
     private Boolean isActive;
+    private Boolean recordingEnabled;
     private String createdByUsername;
     private Instant createdTs;
 }

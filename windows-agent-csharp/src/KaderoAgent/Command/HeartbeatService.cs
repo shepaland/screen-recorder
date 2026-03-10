@@ -106,13 +106,21 @@ public class HeartbeatService : BackgroundService
                         await _commandHandler.RestartRecordingAsync(baseUrl, ct);
                     }
 
+                    // Stop recording if recording_enabled was turned off via heartbeat
+                    if (_authManager.ServerConfig is { RecordingEnabled: false } && _captureManager.IsRecording)
+                    {
+                        _logger.LogInformation("recording_enabled=false from heartbeat, stopping recording");
+                        await _commandHandler.StopRecordingExternalAsync(ct);
+                        _agentService.SetState(AgentState.Online);
+                    }
+
                     // After first heartbeat with device_settings, auto-start if needed.
                     // This handles the case where ConfigReceivedFromServer was false at boot,
                     // but now we have confirmed config from server.
                     if (_agentService.CurrentState == AgentState.Online)
                     {
                         var serverCfg = _authManager.ServerConfig;
-                        if (serverCfg is { ConfigReceivedFromServer: true, AutoStart: true })
+                        if (serverCfg is { ConfigReceivedFromServer: true, AutoStart: true, RecordingEnabled: true })
                         {
                             _logger.LogInformation("Server confirmed auto_start=true via heartbeat, starting recording");
                             await _commandHandler.AutoStartRecordingAsync(baseUrl, ct);
@@ -174,6 +182,18 @@ public class HeartbeatService : BackgroundService
             { cfg.SessionMaxDurationMin = maxM; changed = true; }
             if (ds.TryGetValue("heartbeat_interval_sec", out var hbEl) && hbEl.TryGetInt32(out var hb) && hb > 0)
             { cfg.HeartbeatIntervalSec = hb; changed = true; }
+
+            if (ds.TryGetValue("recording_enabled", out var recEl) &&
+                (recEl.ValueKind == JsonValueKind.True || recEl.ValueKind == JsonValueKind.False))
+            {
+                var newValue = recEl.GetBoolean();
+                if (cfg.RecordingEnabled != newValue)
+                {
+                    _logger.LogInformation("recording_enabled changed: {Old} -> {New}", cfg.RecordingEnabled, newValue);
+                    cfg.RecordingEnabled = newValue;
+                    changed = true;
+                }
+            }
 
             if (changed)
             {

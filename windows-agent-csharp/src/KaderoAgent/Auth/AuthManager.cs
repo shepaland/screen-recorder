@@ -316,6 +316,7 @@ public class AuthManager
             SessionMaxDurationHours = existing.SessionMaxDurationHours ?? incoming.SessionMaxDurationHours,
             SessionMaxDurationMin = existing.SessionMaxDurationMin ?? incoming.SessionMaxDurationMin,
             AutoStart = existing.AutoStart ?? incoming.AutoStart,
+            RecordingEnabled = incoming.RecordingEnabled, // Always take server's latest value
             // If either config was received from server, the merged result is also server-confirmed
             ConfigReceivedFromServer = existing.ConfigReceivedFromServer || incoming.ConfigReceivedFromServer,
         };

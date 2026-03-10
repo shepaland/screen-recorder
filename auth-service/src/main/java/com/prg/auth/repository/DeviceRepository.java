@@ -33,4 +33,13 @@ public interface DeviceRepository extends JpaRepository<Device, UUID> {
     @Modifying
     @Query("UPDATE Device d SET d.registrationToken = null WHERE d.registrationToken.id = :tokenId AND d.tenant.id = :tenantId")
     void detachFromToken(@Param("tokenId") UUID tokenId, @Param("tenantId") UUID tenantId);
+
+    @Modifying
+    @Query(value = "UPDATE devices SET settings = jsonb_set(COALESCE(settings, '{}'), '{recording_enabled}', :value\\:\\:jsonb), " +
+            "updated_ts = NOW() " +
+            "WHERE registration_token_id = :tokenId AND tenant_id = :tenantId AND is_deleted = false",
+            nativeQuery = true)
+    void updateRecordingEnabledByTokenId(@Param("tokenId") UUID tokenId,
+                                          @Param("tenantId") UUID tenantId,
+                                          @Param("value") String value);
 }

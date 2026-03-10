@@ -58,6 +58,13 @@ kubectl -n <namespace> logs -f deployment/<service>
 swift build && swift test
 ```
 
+## Сборка Windows Agent
+
+- **Сборка**: на Windows-машине `192.168.1.135` (логин: `shepaland` / `#6TY0N0d`)
+- **Обмен файлами**: через FTP `192.168.1.38` (анонимный доступ, без пароля)
+- **Инсталлятор**: результат сборки размещается в `C:\kadero_install\` (только инсталлятор, никаких других файлов!)
+- **Workflow**: Mac → tarball → FTP upload → Windows скачивает с FTP → dotnet publish → Inno Setup → `C:\kadero_install\KaderoAgentSetup.exe`
+
 ## Развёртывание
 
 Два сервера, два стейджинга:
@@ -75,6 +82,8 @@ swift build && swift test
 Оба стейджинга используют path `/screenrecorder`. Traefik StripPrefix middleware убирает `/screenrecorder` перед пересылкой в nginx. Vite `base: "/screenrecorder/"`, React Router `basename="/screenrecorder"`.
 
 ### Пайплайн деплоя
+
+!!!! СБОРКА ВСЕХ СЕРВЕРНЫХ КОМПОНЕНТ ПРОИЗВОДИТЬ НА shepaland-cloud !!!!
 
 1. **test** — сборка + деплой на shepaland-cloud. Smoke-тесты, функциональное/интеграционное тестирование.
 2. **prod** — деплой на shepaland-videocalls-test-srv ТОЛЬКО после: все тест-кейсы passed + явное подтверждение от пользователя. Никогда не деплоить на prod без спроса.
@@ -124,3 +133,103 @@ playback-service, search-service → auth-service `/api/v1/internal/check-access
 - Timestamps: ISO 8601 / RFC 3339 в JSON, `timestamptz` в PostgreSQL
 - Аутентификация: `Authorization: Bearer <jwt>`, межсервисная: `X-Internal-API-Key`
 - Устройства: `X-Device-ID` header
+
+### Backend → Frontend контракт (ВАЖНО!)
+
+- **Jackson глобально настроен на `SNAKE_CASE`** (`application.yml` + `JacksonConfig.java`). Все Java camelCase поля сериализуются/десериализуются как snake_case в JSON.
+- **Backend контроллеры возвращают `List<T>` для коллекций** — это сериализуется как JSON-массив `[{...}, {...}]`, а **НЕ** как объект-обёртка `{ items: [...] }`.
+- **При написании фронтенда**: API-функции в `web-dashboard/src/api/catalogs.ts` должны указывать тип ответа как массив (`T[]`), а **не** как обёрточный интерфейс (`{ items: T[], total: number }`), если бэкенд возвращает `List<T>`.
+- **Типичная ошибка**: фронтенд ожидает `resp.groups` или `resp.items`, а получает массив → `undefined` → crash. Всегда проверять, что тип в axios `get<T>` соответствует фактическому ответу контроллера.
+- **Paginated endpoints** (возвращающие `PageResponse<T>`) — корректно возвращают `{ content: [...], page, size, total_elements, total_pages }`. Для них обёрточный тип на фронте правильный.
+
+---
+
+## Трекер задач и тест-кейсов
+
+Файл трекера: `docs/tracker.xlsx`
+Скрипт управления: `docs/tracker.py`
+
+Требует Python 3 + openpyxl:
+```bash
+pip install openpyxl
+```
+
+### Листы
+
+| Лист | Назначение | ID-формат |
+|------|-----------|-----------|
+| Tasks | Задачи и баги | T-001, T-002, … |
+| TestCases | Тест-кейсы | TC-001, TC-002, … |
+| Backlog | Бэклог идей и отложенных задач | — |
+
+### Поля Tasks
+
+| Поле | Значения |
+|------|---------|
+| Тип | `Task`, `Bug` |
+| Приоритет | `Low`, `Medium`, `High`, `Critical` |
+| Статус | `Open`, `In Progress`, `Done`, `Cancelled` |
+
+### Поля TestCases
+
+| Поле | Значения |
+|------|---------|
+| Статус | `Pending`, `Pass`, `Fail` |
+| Связ. задача | ID из Tasks (например, `T-001`) |
+
+### Правила работы с трекером
+
+- **Перед реализацией любой фичи или фикса** — убедиться, что в Tasks есть соответствующая запись. Если нет — создать.
+- **После реализации** — обновить статус задачи на `Done`.
+- **Для каждой значимой фичи** — создать тест-кейсы в TestCases и привязать к задаче через поле `Связ. задача`.
+- **Деплой на prod** возможен только если все связанные тест-кейсы имеют статус `Pass`.
+- Баги (`Bug`) с приоритетом `Critical` блокируют деплой на prod до перехода в `Done`.
+
+### Команды трекера
+
+```bash
+# Просмотр
+python docs/tracker.py tasks list
+python docs/tracker.py tasks list --type Bug
+python docs/tracker.py tasks list --status Open
+python docs/tracker.py tests list
+python docs/tracker.py tests list --status Fail
+python docs/tracker.py tests list --feature "Авторизация"
+
+# Создание задачи
+python docs/tracker.py tasks add \
+  --type Bug \
+  --title "Краткое описание" \
+  --desc "Подробное описание проблемы" \
+  --priority High \
+  --assignee "Алексей"
+
+# Создание тест-кейса
+python docs/tracker.py tests add \
+  --feature "Название модуля" \
+  --title "Название тест-кейса" \
+  --preconditions "Что должно быть до теста" \
+  --steps "1. Шаг один\n2. Шаг два" \
+  --expected "Ожидаемый результат" \
+  --task T-001
+
+# Обновление задачи
+python docs/tracker.py tasks update T-001 --status "In Progress"
+python docs/tracker.py tasks update T-001 --status Done
+python docs/tracker.py tasks update T-001 --priority Critical --assignee "Алексей"
+
+# Обновление тест-кейса
+python docs/tracker.py tests update TC-001 --status Pass --actual "Сработало корректно"
+python docs/tracker.py tests update TC-002 --status Fail --actual "Получили 500 вместо ошибки валидации"
+```
+
+### Связь с пайплайном деплоя
+После проведения тестирования
+1. Запустить `python docs/tracker.py tests list --status Fail` — убедиться, что нет упавших тестов.
+2. Запустить `python docs/tracker.py tasks list --type Bug --status Open` — убедиться, что нет Critical багов.
+3. Если есть блокеры — сообщить пользователю и НЕ деплоить до явного подтверждения.
+
+При выполнении `/deploy` на prod:
+1. Запустить `python docs/tracker.py tests list --status Fail` — убедиться, что нет упавших тестов.
+2. Запустить `python docs/tracker.py tasks list --type Bug --status Open` — убедиться, что нет Critical багов.
+3. Если есть блокеры — сообщить пользователю и НЕ деплоить до явного подтверждения.

@@ -127,7 +127,11 @@ public class AgentService : BackgroundService
                 var serverCfg = _authManager.ServerConfig;
                 var configFromServer = serverCfg?.ConfigReceivedFromServer ?? false;
 
-                if (!configFromServer)
+                if (configFromServer && !(serverCfg?.RecordingEnabled ?? true))
+                {
+                    _logger.LogInformation("Recording disabled by token policy, skipping auto-start on boot");
+                }
+                else if (!configFromServer)
                 {
                     _logger.LogInformation("ServerConfig not yet confirmed by server, skipping auto-start. " +
                         "Will start recording when heartbeat delivers device_settings with auto_start=true.");

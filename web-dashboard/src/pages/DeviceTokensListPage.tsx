@@ -15,6 +15,7 @@ import {
   getTokenDevices,
   revealDeviceToken,
   hardDeleteDeviceToken,
+  updateDeviceToken,
   type DeviceTokensListParams,
   type TokenDeviceItem,
   type TokenDevicesResponse,
@@ -156,6 +157,30 @@ export default function DeviceTokensListPage() {
     }
   };
 
+  // Track in-progress toggle updates
+  const [togglingRecording, setTogglingRecording] = useState<Set<string>>(new Set());
+
+  const handleToggleRecording = async (token: DeviceTokenResponse) => {
+    const newValue = !token.recording_enabled;
+    setTogglingRecording((prev) => new Set(prev).add(token.id));
+    try {
+      await updateDeviceToken(token.id, { recording_enabled: newValue });
+      // Update local state optimistically
+      setTokens((prev) =>
+        prev.map((t) => (t.id === token.id ? { ...t, recording_enabled: newValue } : t))
+      );
+      addToast('success', newValue ? 'Запись включена' : 'Запись отключена');
+    } catch {
+      addToast('error', 'Не удалось изменить настройку записи');
+    } finally {
+      setTogglingRecording((prev) => {
+        const next = new Set(prev);
+        next.delete(token.id);
+        return next;
+      });
+    }
+  };
+
   const columns: Column<DeviceTokenResponse>[] = [
     {
       key: 'name',
@@ -207,6 +232,41 @@ export default function DeviceTokensListPage() {
           inactiveText="Деактивирован"
         />
       ),
+    },
+    {
+      key: 'recording_enabled',
+      title: 'Запись',
+      render: (token) => {
+        const isToggling = togglingRecording.has(token.id);
+        return (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={token.recording_enabled}
+              disabled={isToggling}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggleRecording(token);
+              }}
+              className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                token.recording_enabled ? 'bg-indigo-600' : 'bg-gray-200'
+              }`}
+              title={token.recording_enabled ? 'Запись включена' : 'Запись отключена'}
+            >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  token.recording_enabled ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </button>
+            <span className={`text-xs ${token.recording_enabled ? 'text-green-700' : 'text-gray-500'}`}>
+              {token.recording_enabled ? 'Вкл' : 'Выкл'}
+            </span>
+          </div>
+        );
+      },
     },
     {
       key: 'created_by_username',

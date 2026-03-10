@@ -1,6 +1,7 @@
 package com.prg.auth.controller;
 
 import com.prg.auth.dto.request.CreateDeviceTokenRequest;
+import com.prg.auth.dto.request.UpdateDeviceTokenRequest;
 import com.prg.auth.dto.response.DeviceTokenResponse;
 import com.prg.auth.dto.response.PageResponse;
 import com.prg.auth.dto.response.TokenDeviceResponse;
@@ -70,6 +71,19 @@ public class DeviceTokenController {
         requirePermission(principal, "DEVICE_TOKENS:REVEAL");
         DeviceTokenResponse response = deviceTokenService.revealToken(
                 id, principal,
+                getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<DeviceTokenResponse> updateToken(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateDeviceTokenRequest request,
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest httpRequest) {
+        requirePermission(principal, "DEVICE_TOKENS:UPDATE");
+        DeviceTokenResponse response = deviceTokenService.updateDeviceToken(
+                id, request, principal,
                 getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.ok(response);
     }

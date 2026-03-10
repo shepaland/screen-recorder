@@ -8,6 +8,7 @@ export interface DeviceTokenResponse {
   device_count: number;
   expires_at: string | null;
   is_active: boolean;
+  recording_enabled: boolean;
   created_by_username?: string;
   created_ts: string;
 }
@@ -16,6 +17,13 @@ export interface CreateDeviceTokenRequest {
   name: string;
   max_uses?: number | null;
   expires_at?: string | null;
+  recording_enabled?: boolean;
+}
+
+export interface UpdateDeviceTokenRequest {
+  name?: string;
+  max_uses?: number;
+  recording_enabled?: boolean;
 }
 
 export type DeviceStatus =

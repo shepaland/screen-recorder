@@ -338,6 +338,9 @@ public class DeviceAuthService {
                 : (defaultSessionMaxHours > 0 ? defaultSessionMaxHours : null);
         Boolean autoStart = deviceSettings.containsKey("auto_start")
                 ? toBoolean(deviceSettings.get("auto_start")) : defaultAutoStart;
+        // recording_enabled: device.settings override > regToken setting > default true
+        Boolean recordingEnabled = deviceSettings.containsKey("recording_enabled")
+                ? toBoolean(deviceSettings.get("recording_enabled")) : regToken.getRecordingEnabled();
         int effectiveCaptureFps = deviceSettings.containsKey("capture_fps")
                 ? Optional.ofNullable(toInteger(deviceSettings.get("capture_fps"))).orElse(captureFps) : captureFps;
         String effectiveQuality = deviceSettings.containsKey("quality")
@@ -358,6 +361,7 @@ public class DeviceAuthService {
                 .sessionMaxDurationMin(sessionMaxDurationMin)
                 .sessionMaxDurationHours(sessionMaxDurationHours)
                 .autoStart(autoStart)
+                .recordingEnabled(recordingEnabled)
                 .build();
 
         // 11. Return refresh_token in body

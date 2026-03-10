@@ -37,5 +37,6 @@ public class DeviceLoginResponse {
         /** @deprecated Use sessionMaxDurationMin instead. Kept for backward compatibility with older agents. */
         private Integer sessionMaxDurationHours;
         private Boolean autoStart;
+        private Boolean recordingEnabled;
     }
 }

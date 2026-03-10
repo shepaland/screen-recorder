@@ -40,6 +40,10 @@ public class DeviceRegistrationToken {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
 
+    @Column(name = "recording_enabled", nullable = false)
+    @Builder.Default
+    private Boolean recordingEnabled = true;
+
     @Column(name = "encrypted_token")
     private String encryptedToken;
 

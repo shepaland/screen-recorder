@@ -16,6 +16,7 @@ export default function DeviceTokenCreatePage() {
   const [name, setName] = useState('');
   const [maxUses, setMaxUses] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
+  const [recordingEnabled, setRecordingEnabled] = useState(true);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -54,6 +55,7 @@ export default function DeviceTokenCreatePage() {
         name: name.trim(),
         max_uses: maxUses ? Number(maxUses) : null,
         expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+        recording_enabled: recordingEnabled,
       });
 
       if (result.token) {
@@ -170,6 +172,40 @@ export default function DeviceTokenCreatePage() {
             )}
             <p className="mt-1 text-xs text-gray-500">
               Оставьте пустым для бессрочного токена.
+            </p>
+          </div>
+
+          {/* Recording enabled */}
+          <div>
+            <div className="flex items-center justify-between">
+              <div>
+                <label htmlFor="recordingEnabled" className="label">
+                  Запись экрана
+                </label>
+                <p className="mt-1 text-xs text-gray-500">
+                  Включить запись экрана на устройствах, зарегистрированных с этим токеном.
+                </p>
+              </div>
+              <button
+                id="recordingEnabled"
+                type="button"
+                role="switch"
+                aria-checked={recordingEnabled}
+                onClick={() => setRecordingEnabled(!recordingEnabled)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${
+                  recordingEnabled ? 'bg-indigo-600' : 'bg-gray-200'
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    recordingEnabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-amber-600">
+              Регистрация активности пользователей работает всегда, независимо от настройки записи.
             </p>
           </div>
 

@@ -75,6 +75,12 @@ public class CommandHandler
         _isPausedByLock = false;
         _logger.LogInformation("Resuming recording: screen unlocked");
 
+        if (!(_authManager.ServerConfig?.RecordingEnabled ?? true))
+        {
+            _logger.LogInformation("Recording disabled by token policy, skipping resume after unlock");
+            return;
+        }
+
         var serverCfg = _authManager.ServerConfig;
         var autoStart = serverCfg?.AutoStart ?? _config.Value.AutoStart;
         var configFromServer = serverCfg?.ConfigReceivedFromServer ?? false;
@@ -120,6 +126,12 @@ public class CommandHandler
         // Small delay to let the new Windows session stabilize (desktop, DWM, explorer)
         await Task.Delay(3000, ct);
 
+        if (!(_authManager.ServerConfig?.RecordingEnabled ?? true))
+        {
+            _logger.LogInformation("Recording disabled by token policy, skipping logon auto-start");
+            return;
+        }
+
         // Auto-start recording for the new user
         await AutoStartRecordingAsync(baseUrl, ct);
     }
@@ -133,6 +145,11 @@ public class CommandHandler
             switch (cmd.CommandType?.ToUpper())
             {
                 case "START_RECORDING":
+                    if (!(_authManager.ServerConfig?.RecordingEnabled ?? true))
+                    {
+                        _logger.LogWarning("Ignoring START_RECORDING command: recording disabled by token policy");
+                        break;
+                    }
                     _consecutiveFailures = 0; // Reset on explicit command
                     await StartRecording(baseUrl, ct);
                     if (_captureManager.IsRecording)
@@ -171,6 +188,12 @@ public class CommandHandler
         if (!autoStart)
         {
             _logger.LogInformation("AutoStart is disabled, waiting for server command");
+            return;
+        }
+
+        if (!(_authManager.ServerConfig?.RecordingEnabled ?? true))
+        {
+            _logger.LogInformation("Recording disabled by token policy, skipping auto-start");
             return;
         }
 
@@ -247,6 +270,12 @@ public class CommandHandler
     {
         if (_captureManager.IsRecording) return;
 
+        if (!(_authManager.ServerConfig?.RecordingEnabled ?? true))
+        {
+            _logger.LogInformation("Recording disabled by token policy, ignoring StartRecording");
+            return;
+        }
+
         _currentBaseUrl = baseUrl;
 
         // Get settings: server overrides > local defaults
@@ -322,6 +351,12 @@ public class CommandHandler
         _sessionStartTime = null;
 
         await _sessionManager.EndSessionAsync(ct);
+    }
+
+    /// <summary>Stop recording externally (called from HeartbeatService when recording_enabled=false).</summary>
+    public async Task StopRecordingExternalAsync(CancellationToken ct)
+    {
+        await StopRecording(ct);
     }
 
     private async Task RotateSessionAsync(string baseUrl, CancellationToken ct)

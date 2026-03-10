@@ -1,6 +1,7 @@
 package com.prg.auth.service;
 
 import com.prg.auth.dto.request.CreateDeviceTokenRequest;
+import com.prg.auth.dto.request.UpdateDeviceTokenRequest;
 import com.prg.auth.dto.response.DeviceTokenResponse;
 import com.prg.auth.dto.response.PageResponse;
 import com.prg.auth.dto.response.TokenDeviceResponse;
@@ -61,6 +62,7 @@ public class DeviceTokenService {
                 .currentUses(0)
                 .expiresAt(request.getExpiresAt())
                 .isActive(true)
+                .recordingEnabled(request.getRecordingEnabled() != null ? request.getRecordingEnabled() : true)
                 .createdBy(createdBy)
                 .encryptedToken(encryptedToken)
                 .build();
@@ -217,6 +219,54 @@ public class DeviceTokenService {
         log.info("Device registration token hard deleted: id={}, tenant_id={}", tokenId, principal.getTenantId());
     }
 
+    @Transactional
+    public DeviceTokenResponse updateDeviceToken(UUID tokenId, UpdateDeviceTokenRequest request,
+                                                  UserPrincipal principal, String ipAddress, String userAgent) {
+        DeviceRegistrationToken token = tokenRepository.findByIdAndTenantId(tokenId, principal.getTenantId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Device registration token not found", "TOKEN_NOT_FOUND"));
+
+        boolean recordingChanged = false;
+        Map<String, String> auditDetails = new java.util.HashMap<>();
+
+        if (request.getName() != null) {
+            auditDetails.put("old_name", token.getName());
+            token.setName(request.getName());
+            auditDetails.put("new_name", request.getName());
+        }
+        if (request.getMaxUses() != null) {
+            auditDetails.put("old_max_uses", token.getMaxUses() != null ? token.getMaxUses().toString() : "unlimited");
+            token.setMaxUses(request.getMaxUses());
+            auditDetails.put("new_max_uses", request.getMaxUses().toString());
+        }
+        if (request.getRecordingEnabled() != null && !request.getRecordingEnabled().equals(token.getRecordingEnabled())) {
+            auditDetails.put("old_recording_enabled", String.valueOf(token.getRecordingEnabled()));
+            token.setRecordingEnabled(request.getRecordingEnabled());
+            auditDetails.put("new_recording_enabled", String.valueOf(request.getRecordingEnabled()));
+            recordingChanged = true;
+        }
+
+        token = tokenRepository.save(token);
+
+        // If recording_enabled changed, propagate to device.settings for all devices of this token
+        if (recordingChanged) {
+            String jsonValue = request.getRecordingEnabled() ? "true" : "false";
+            deviceRepository.updateRecordingEnabledByTokenId(tokenId, principal.getTenantId(), jsonValue);
+            log.info("Updated recording_enabled={} for all devices of token_id={}, tenant_id={}",
+                    request.getRecordingEnabled(), tokenId, principal.getTenantId());
+        }
+
+        auditService.logAction(principal.getTenantId(), principal.getUserId(),
+                "DEVICE_TOKEN_UPDATED", "DEVICE_TOKENS", tokenId,
+                auditDetails.isEmpty() ? null : auditDetails,
+                ipAddress, userAgent, getCorrelationId());
+
+        log.info("Device registration token updated: id={}, tenant_id={}", tokenId, principal.getTenantId());
+
+        Map<UUID, Long> counts = getActiveDeviceCounts(List.of(tokenId), principal.getTenantId());
+        return toResponse(token, null, counts.getOrDefault(tokenId, 0L).intValue());
+    }
+
     private Map<UUID, Long> getActiveDeviceCounts(List<UUID> tokenIds, UUID tenantId) {
         if (tokenIds.isEmpty()) return Map.of();
         List<Object[]> rows = deviceRepository.countActiveDevicesByTokenIds(tokenIds, tenantId);
@@ -238,6 +288,7 @@ public class DeviceTokenService {
                 .deviceCount(deviceCount)
                 .expiresAt(token.getExpiresAt())
                 .isActive(token.getIsActive())
+                .recordingEnabled(token.getRecordingEnabled())
                 .createdByUsername(token.getCreatedBy() != null ? token.getCreatedBy().getUsername() : null)
                 .createdTs(token.getCreatedTs())
                 .build();
