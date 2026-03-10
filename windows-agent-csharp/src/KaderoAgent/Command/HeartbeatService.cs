@@ -111,6 +111,18 @@ public class HeartbeatService : BackgroundService
                     {
                         _logger.LogInformation("recording_enabled=false from heartbeat, stopping recording");
                         await _commandHandler.StopRecordingExternalAsync(ct);
+                        _agentService.SetState(AgentState.RecordingDisabled);
+                    }
+                    // Update state to RecordingDisabled if not recording and recording is disabled
+                    else if (_authManager.ServerConfig is { RecordingEnabled: false } && !_captureManager.IsRecording
+                             && _agentService.CurrentState == AgentState.Online)
+                    {
+                        _agentService.SetState(AgentState.RecordingDisabled);
+                    }
+                    // Transition back from RecordingDisabled to Online when recording re-enabled
+                    else if (_authManager.ServerConfig is { RecordingEnabled: true }
+                             && _agentService.CurrentState == AgentState.RecordingDisabled)
+                    {
                         _agentService.SetState(AgentState.Online);
                     }
 

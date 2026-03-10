@@ -231,6 +231,11 @@ public class TrayApplication : ApplicationContext
                     tooltip = "Кадеро Agent — Онлайн";
                     statusText = "Статус: Онлайн";
                     break;
+                case "recording_disabled":
+                    newIcon = TrayIcons.Idle;
+                    tooltip = "Кадеро Agent — Запись отключена";
+                    statusText = "Статус: Запись отключена";
+                    break;
                 case "idle":
                     newIcon = TrayIcons.Idle;
                     tooltip = "Кадеро Agent — Неактивен";

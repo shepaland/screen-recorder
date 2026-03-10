@@ -472,6 +472,10 @@ public class StatusWindow : Form
                 _recordingStatusLabel.Text = stateDisplay ?? "Онлайн";
                 _recordingIndicator.BackColor = GlassHelper.StatusGreen;
                 break;
+            case "recording_disabled":
+                _recordingStatusLabel.Text = stateDisplay ?? "Запись отключена администратором";
+                _recordingIndicator.BackColor = GlassHelper.StatusYellow;
+                break;
             case "idle":
                 _recordingStatusLabel.Text = stateDisplay ?? "Пользователь неактивен";
                 _recordingIndicator.BackColor = GlassHelper.StatusYellow;

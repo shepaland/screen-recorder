@@ -90,7 +90,7 @@ public class AgentStatusProvider : IStatusProvider
             ConnectionStatus = _authManager.IsAuthenticated ? connStatus : "disconnected",
             RecordingStatus = recordingStatus,
             AgentStateDisplay = agentState.ToDisplayMessage(),
-            AgentStateName = agentState.ToHeartbeatStatus(),
+            AgentStateName = agentState.ToUiStateName(),
             DeviceId = _authManager.DeviceId,
             ServerUrl = creds?.ServerUrl,
             CaptureFps = serverConfig?.CaptureFps > 0 ? serverConfig.CaptureFps : _config.Value.CaptureFps,

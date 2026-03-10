@@ -18,6 +18,9 @@ public enum AgentState
     /// <summary>User logged in, no recording active.</summary>
     Online,
 
+    /// <summary>Recording disabled by admin via token settings.</summary>
+    RecordingDisabled,
+
     /// <summary>Screen recording active (FFmpeg running).</summary>
     Recording,
 
@@ -46,11 +49,22 @@ public static class AgentStateExtensions
         AgentState.Configuring => "configuring",
         AgentState.AwaitingUser => "awaiting_user",
         AgentState.Online => "online",
+        AgentState.RecordingDisabled => "online",
         AgentState.Recording => "recording",
         AgentState.Idle => "idle",
         AgentState.Error => "error",
         AgentState.Stopped => "stopped",
         _ => "online"
+    };
+
+    /// <summary>
+    /// Maps AgentState to UI state name for pipe protocol (tray icon switch/case).
+    /// Same as heartbeat status except RecordingDisabled maps to "recording_disabled".
+    /// </summary>
+    public static string ToUiStateName(this AgentState state) => state switch
+    {
+        AgentState.RecordingDisabled => "recording_disabled",
+        _ => state.ToHeartbeatStatus()
     };
 
     /// <summary>
@@ -62,6 +76,7 @@ public static class AgentStateExtensions
         AgentState.Configuring => "Получение конфигурации...",
         AgentState.AwaitingUser => "Ожидание входа пользователя",
         AgentState.Online => "Онлайн",
+        AgentState.RecordingDisabled => "Запись отключена администратором",
         AgentState.Recording => "Запись экрана",
         AgentState.Idle => "Пользователь неактивен",
         AgentState.Error => "Ошибка записи",
