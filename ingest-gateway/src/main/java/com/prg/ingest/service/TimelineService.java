@@ -74,8 +74,8 @@ public class TimelineService {
                        ARRAY_AGG(DISTINCT session_id) FILTER (WHERE session_id IS NOT NULL) AS session_ids
                 FROM app_focus_intervals
                 WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId)
-                  AND started_at >= CAST(:date AS date) AT TIME ZONE :tz
-                  AND started_at < (CAST(:date AS date) + INTERVAL '1 day') AT TIME ZONE :tz
+                  AND started_at >= CAST(:date AS timestamp) AT TIME ZONE :tz
+                  AND started_at < (CAST(:date AS timestamp) + INTERVAL '1 day') AT TIME ZONE :tz
                 GROUP BY username, hour, process_name, is_browser, domain
                 ORDER BY username, hour, total_duration_ms DESC
                 LIMIT 50000
@@ -224,6 +224,20 @@ public class TimelineService {
                     .deviceIds(new ArrayList<>(allDeviceIds))
                     .hours(hours)
                     .build());
+        }
+
+        // T-160: Include active users from device_user_sessions that have no focus data for this day
+        for (Map.Entry<String, UserInfo> entry : userInfoMap.entrySet()) {
+            String username = entry.getKey();
+            if (!byUser.containsKey(username)) {
+                UserInfo info = entry.getValue();
+                timelineUsers.add(TimelineUser.builder()
+                        .username(username)
+                        .displayName(info.displayName)
+                        .deviceIds(new ArrayList<>(info.deviceIds))
+                        .hours(List.of())
+                        .build());
+            }
         }
 
         return TimelineResponse.builder()

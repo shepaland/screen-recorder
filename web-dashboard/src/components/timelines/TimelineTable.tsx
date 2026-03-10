@@ -365,7 +365,6 @@ export default function TimelineTable({ data }: TimelineTableProps) {
                           </td>
                           <HourCells
                             hours={groupHours}
-                            hasRecording={false}
                             colorClass={`opacity-70`}
                           />
                         </tr>
