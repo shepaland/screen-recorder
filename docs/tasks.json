@@ -66,12 +66,12 @@
       "title": "AssignGroupDropdown: привязка к строке, viewport bounds, min 5 элементов, scroll indicator",
       "description": "Дропдаун с position:fixed не следует за скроллом, может выйти за пределы viewport. Требуется: 1) закрепить под строкой (пересчёт при скролле), 2) не выходить за пределы страницы, 3) min 5 видимых элементов, 4) индикатор скролла. Применить на дашборде и в справочниках.",
       "feature_code": "dropdown-viewport-fix",
-      "overall_status": "In Progress",
+      "overall_status": "Done",
       "role_status": {
         "BA": "Done",
         "SA": "Done",
         "FE": "Done",
-        "QA": "Waiting: User динамический тест на test-стейджинге"
+        "QA": "Done"
       },
       "artifacts": {
         "sa": "Root cause: position:fixed вычисляется 1 раз, не пересчитывается при скролле. Нет viewport bounds check. max-h-48 может обрезать < 5 элементов.",
@@ -81,7 +81,9 @@
         { "ts": "2026-03-13T19:30:00Z", "role": "BA", "action": "Задача создана: дропдаун не привязан к строке, выходит за viewport" },
         { "ts": "2026-03-13T19:31:00Z", "role": "SA", "action": "Анализ: position:fixed без scroll listener, нет viewport bounds, max-h-48 недостаточно" },
         { "ts": "2026-03-13T19:35:00Z", "role": "FE", "action": "Реализовано: scroll/resize event listeners, viewport bounds check, open up if no space below, min 5 items, scroll shadow indicators" },
-        { "ts": "2026-03-13T19:40:00Z", "role": "DevOps", "action": "Deployed web-dashboard to test-screen-record" }
+        { "ts": "2026-03-13T19:40:00Z", "role": "DevOps", "action": "Deployed web-dashboard to test-screen-record" },
+        { "ts": "2026-03-13T19:45:00Z", "role": "QA", "action": "Пользователь подтвердил: дропдаун работает корректно" },
+        { "ts": "2026-03-13T19:45:01Z", "role": "BA", "action": "Задача принята" }
       ]
     }
   ]
