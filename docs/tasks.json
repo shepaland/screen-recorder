@@ -37,12 +37,12 @@
       "title": "Агент: фильтрация системных/машинных пользователей + поддержка Terminal Server",
       "description": "После перезагрузки Windows 192.168.1.135 агент присылал события от машинного аккаунта WORKGROUP\\AIR911D$. Требуется: 1) не отправлять события от системных/машинных пользователей, 2) поддержка Terminal Server (RDS) — отдельный мониторинг для каждой активной сессии.",
       "feature_code": "agent-user-session-filter",
-      "overall_status": "In Progress",
+      "overall_status": "Done",
       "role_status": {
         "BA": "Done",
         "SA": "Done",
         "BE": "Done",
-        "QA": "In Progress"
+        "QA": "Done"
       },
       "artifacts": {
         "sa": "Root cause: IsMachineAccount() отсутствовал, Environment fallback возвращал WORKGROUP\\AIR911D$. Fix: 3 точки: UserSessionInfo, AuditEventSink, FocusIntervalSink.",
@@ -55,7 +55,9 @@
         { "ts": "2026-03-13T18:05:00Z", "role": "BE", "action": "UserSessionInfo.cs: добавлен IsMachineAccount(), GetCurrentUsername() возвращает null для системных аккаунтов, добавлен GetAllActiveUserSessions()" },
         { "ts": "2026-03-13T18:06:00Z", "role": "BE", "action": "AuditEventSink.cs: skip upload при username==null, FocusIntervalSink.cs: SetUsername принимает string?" },
         { "ts": "2026-03-13T18:10:00Z", "role": "BE", "action": "Сборка и установка на 192.168.1.135. Инсталлятор: C:\\kadero_install\\KaderoAgentSetup.exe" },
-        { "ts": "2026-03-13T18:12:00Z", "role": "QA", "action": "Verified: username=AIR911D\\ashep (WTS), не WORKGROUP\\AIR911D$ (machine). Сервер недоступен для E2E." }
+        { "ts": "2026-03-13T18:12:00Z", "role": "QA", "action": "Verified: username=AIR911D\\ashep (WTS), не WORKGROUP\\AIR911D$ (machine). Сервер недоступен для E2E." },
+        { "ts": "2026-03-13T19:20:00Z", "role": "QA", "action": "E2E Pass после перезагрузки: deferred 3 цикла (null username), после логина shepaland → 38+16 events uploaded. Машинный аккаунт не используется." },
+        { "ts": "2026-03-13T19:21:00Z", "role": "BA", "action": "Задача принята. Фикс подтверждён на 192.168.1.135." }
       ]
     }
   ]
