@@ -24,7 +24,7 @@ export default function TopUngroupedTable({ itemType, title, from, to }: TopUngr
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [groups, setGroups] = useState<AppGroup[]>([]);
-  const [assigningItem, setAssigningItem] = useState<string | null>(null);
+  const [assigningItem, setAssigningItem] = useState<{ name: string; el: HTMLElement } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -62,6 +62,10 @@ export default function TopUngroupedTable({ itemType, title, from, to }: TopUngr
     } catch {
       // Error is handled by the dropdown
     }
+  };
+
+  const handleOpenAssign = (e: React.MouseEvent<HTMLButtonElement>, name: string) => {
+    setAssigningItem({ name, el: e.currentTarget });
   };
 
   if (error) {
@@ -141,29 +145,30 @@ export default function TopUngroupedTable({ itemType, title, from, to }: TopUngr
                 <td className="py-2 px-3 text-right text-gray-600">
                   {item.user_count}
                 </td>
-                <td className="py-2 pl-3 text-right relative">
-                  {assigningItem === item.name ? (
-                    <AssignGroupDropdown
-                      groups={groups}
-                      onSelect={(groupId) => handleAssign(groupId, item.name)}
-                      onClose={() => setAssigningItem(null)}
-                    />
-                  ) : (
-                    <button
-                      onClick={() => setAssigningItem(item.name)}
-                      className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
-                      title="В группу"
-                    >
-                      <PlusIcon className="h-3.5 w-3.5" />
-                      В группу
-                    </button>
-                  )}
+                <td className="py-2 pl-3 text-right">
+                  <button
+                    onClick={(e) => handleOpenAssign(e, item.name)}
+                    className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                    title="В группу"
+                  >
+                    <PlusIcon className="h-3.5 w-3.5" />
+                    В группу
+                  </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {assigningItem && (
+        <AssignGroupDropdown
+          groups={groups}
+          anchorEl={assigningItem.el}
+          onSelect={(groupId) => handleAssign(groupId, assigningItem.name)}
+          onClose={() => setAssigningItem(null)}
+        />
+      )}
     </div>
   );
 }
