@@ -130,7 +130,13 @@ public class AuditEventSink : BackgroundService, IAuditEventSink
         var url = $"{baseUrl}/audit-events";
 
         // Get current username (WTS API works from Session 0 / Windows Service)
+        // Returns null when no real user is logged in (system/machine account only)
         var username = _userSessionInfo.GetCurrentUsername();
+        if (username == null)
+        {
+            _logger.LogDebug("No real user session found, deferring {Count} audit events", events.Count);
+            return;
+        }
 
         var body = new
         {

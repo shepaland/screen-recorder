@@ -30,7 +30,7 @@ public class FocusIntervalSink : BackgroundService
         _logger = logger;
     }
 
-    public void SetUsername(string username) => _currentUsername = username;
+    public void SetUsername(string? username) => _currentUsername = username;
 
     public void Enqueue(FocusInterval interval)
     {

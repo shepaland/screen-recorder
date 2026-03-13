@@ -21,9 +21,11 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import jakarta.persistence.EntityManager;
+
+import java.time.Instant;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +36,7 @@ public class CatalogService {
     private final AppGroupItemRepository itemRepo;
     private final AppAliasRepository aliasRepo;
     private final CatalogSeedService seedService;
+    private final EntityManager em;
 
     // ---- Groups ----
 
@@ -222,6 +225,115 @@ public class CatalogService {
         log.info("Moved item: id={} to group={} tenant={}", itemId, targetGroupId, tenantId);
 
         return toGroupItemResponse(item);
+    }
+
+    // ---- Ungrouped ----
+
+    @Transactional
+    public UngroupedPageResponse getUngrouped(UUID tenantId, ItemType itemType,
+                                               int page, int size, String search) {
+        if (page < 0) page = 0;
+        if (size < 1) size = 1;
+        if (size > 100) size = 100;
+
+        GroupType groupType = itemType == ItemType.APP ? GroupType.APP : GroupType.SITE;
+
+        // Ensure groups exist (lazy seed)
+        long groupCount = groupRepo.countByTenantIdAndGroupType(tenantId, groupType);
+        if (groupCount == 0) {
+            seedService.seed(tenantId, groupType, false);
+        }
+
+        // Get all grouped patterns
+        List<AppGroupItem> allItems = itemRepo.findByTenantIdAndItemType(tenantId, itemType);
+        Set<String> groupedPatterns = allItems.stream()
+                .map(i -> i.getPattern().toLowerCase())
+                .collect(Collectors.toSet());
+
+        boolean isApp = itemType == ItemType.APP;
+        String valueColumn = isApp ? "process_name" : "domain";
+        String extraFilter = isApp ? "" : " AND is_browser = true AND domain IS NOT NULL";
+
+        String sql = String.format("""
+                SELECT LOWER(%s) AS val,
+                       SUM(duration_ms) AS dur,
+                       COUNT(*) AS icnt,
+                       COUNT(DISTINCT username) AS ucnt,
+                       MAX(started_at) AS last_seen
+                FROM app_focus_intervals
+                WHERE tenant_id = :tenantId
+                  %s
+                GROUP BY val
+                ORDER BY dur DESC
+                """, valueColumn, extraFilter);
+
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = em.createNativeQuery(sql)
+                .setParameter("tenantId", tenantId)
+                .getResultList();
+
+        // Filter out grouped items and apply search
+        String searchLower = search != null && !search.isBlank() ? search.toLowerCase() : null;
+        List<Object[]> ungroupedRows = new ArrayList<>();
+        long totalUngroupedDuration = 0;
+        for (Object[] row : rows) {
+            String val = (String) row[0];
+            if (groupedPatterns.contains(val)) continue;
+            totalUngroupedDuration += ((Number) row[1]).longValue();
+            if (searchLower != null && !val.contains(searchLower)) continue;
+            ungroupedRows.add(row);
+        }
+
+        // Build alias map for display names
+        AppAlias.AliasType aliasType = isApp ? AppAlias.AliasType.APP : AppAlias.AliasType.SITE;
+        Map<String, String> aliasMap = aliasRepo.findByTenantIdAndAliasType(tenantId, aliasType,
+                        PageRequest.of(0, 10000)).getContent().stream()
+                .collect(Collectors.toMap(
+                        a -> a.getOriginal().toLowerCase(),
+                        AppAlias::getDisplayName,
+                        (a, b) -> a));
+
+        // Paginate
+        int totalElements = ungroupedRows.size();
+        int totalPages = (int) Math.ceil((double) totalElements / size);
+        int fromIdx = Math.min(page * size, totalElements);
+        int toIdx = Math.min(fromIdx + size, totalElements);
+        List<Object[]> pageRows = ungroupedRows.subList(fromIdx, toIdx);
+
+        List<UngroupedPageResponse.UngroupedItem> content = pageRows.stream()
+                .map(row -> {
+                    String val = (String) row[0];
+                    long dur = ((Number) row[1]).longValue();
+                    int icnt = ((Number) row[2]).intValue();
+                    int ucnt = ((Number) row[3]).intValue();
+                    Object lastSeenObj = row[4];
+                    Instant lastSeen = null;
+                    if (lastSeenObj instanceof Instant inst) {
+                        lastSeen = inst;
+                    } else if (lastSeenObj instanceof java.sql.Timestamp ts) {
+                        lastSeen = ts.toInstant();
+                    } else if (lastSeenObj instanceof java.time.OffsetDateTime odt) {
+                        lastSeen = odt.toInstant();
+                    }
+                    return UngroupedPageResponse.UngroupedItem.builder()
+                            .name(val)
+                            .displayName(aliasMap.get(val))
+                            .totalDurationMs(dur)
+                            .intervalCount(icnt)
+                            .userCount(ucnt)
+                            .lastSeenAt(lastSeen)
+                            .build();
+                })
+                .toList();
+
+        return UngroupedPageResponse.builder()
+                .content(content)
+                .page(page)
+                .size(size)
+                .totalElements(totalElements)
+                .totalPages(totalPages)
+                .totalUngroupedDurationMs(totalUngroupedDuration)
+                .build();
     }
 
     // ---- Aliases ----

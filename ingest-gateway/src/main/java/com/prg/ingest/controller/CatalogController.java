@@ -88,6 +88,31 @@ public class CatalogController {
         return ResponseEntity.noContent().build();
     }
 
+    // ---- Ungrouped ----
+
+    @GetMapping("/ungrouped")
+    public ResponseEntity<UngroupedPageResponse> getUngrouped(
+            @RequestParam("item_type") String itemType,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(name = "tenant_id", required = false) UUID tenantIdParam,
+            HttpServletRequest httpRequest) {
+
+        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_CATALOGS_READ);
+        UUID tenantId = resolveEffectiveTenantId(principal, tenantIdParam);
+
+        com.prg.ingest.entity.catalog.AppGroupItem.ItemType type;
+        try {
+            type = com.prg.ingest.entity.catalog.AppGroupItem.ItemType.valueOf(itemType.toUpperCase());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid item_type: " + itemType + ". Must be APP or SITE");
+        }
+
+        UngroupedPageResponse response = catalogService.getUngrouped(tenantId, type, page, size, search);
+        return ResponseEntity.ok(response);
+    }
+
     // ---- Items ----
 
     @GetMapping("/groups/{groupId}/items")
@@ -255,6 +280,11 @@ public class CatalogController {
         return principal;
     }
 
+    /**
+     * For catalog operations (which require INSERT/seed), tenantId must NOT be null.
+     * Global-scope users can specify tenant_id param; if not specified, fall back to their own tenant.
+     * Unlike analytics queries where null=all tenants, catalogs are per-tenant entities.
+     */
     private UUID resolveEffectiveTenantId(DevicePrincipal principal, UUID tenantIdParam) {
         if (principal.hasScope("global")) {
             if (tenantIdParam == null) {

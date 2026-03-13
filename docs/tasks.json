@@ -3,25 +3,59 @@
     {
       "id": 1,
       "created_at": "2026-03-13T00:00:00Z",
-      "title": "Модалка выбора группы поверх всего контента страницы",
-      "description": "Модалка (дропдаун) с выбором группы для добавления неразмеченного элемента рендерится внутри ячейки таблицы (td с relative + overflow-x-auto), из-за чего обрезается и не отображается поверх страницы. Нужно рендерить через portal в document.body с fixed-позиционированием.",
+      "title": "Модалка выбора группы поверх всего контента страницы + endpoint /catalogs/ungrouped",
+      "description": "1) Модалка (дропдаун) с выбором группы для добавления неразмеченного элемента рендерилась внутри ячейки таблицы (td с overflow-x-auto), из-за чего обрезалась. Fix: createPortal + fixed-позиционирование. 2) Backend endpoint GET /catalogs/ungrouped отсутствовал — реализован в CatalogController + CatalogService с пагинацией и поиском.",
       "feature_code": "catalog-assign-group-modal",
+      "overall_status": "Done",
+      "role_status": {
+        "BA": "Done",
+        "SA": "Done",
+        "FE": "Done",
+        "BE": "Done",
+        "QA": "Done"
+      },
+      "artifacts": {
+        "sa": "Анализ: overflow-x-auto обрезает child → portal; endpoint /catalogs/ungrouped отсутствовал → реализовать.",
+        "fe": "Коммит ce1f4ab: AssignGroupDropdown → createPortal(document.body), position:fixed, zIndex:9999.",
+        "be": "UngroupedPageResponse DTO + CatalogService.getUngrouped() + CatalogController endpoint GET /catalogs/ungrouped. ClassCast fix (Instant vs Timestamp).",
+        "qa": "docs/catalog-assign-group-modal/QA/tests.json — 5 тест-кейсов. API verified: groups 200, ungrouped 200, assign 201, dashboard top-ungrouped 200. Portal code in JS bundle confirmed."
+      },
+      "history": [
+        { "ts": "2026-03-13T00:00:00Z", "role": "BA", "action": "Задача создана и зарегистрирована" },
+        { "ts": "2026-03-13T00:00:01Z", "role": "SA", "action": "Анализ завершён: overflow-x-auto + отсутствующий endpoint" },
+        { "ts": "2026-03-13T00:00:02Z", "role": "FE", "action": "Portal fix реализован (ce1f4ab)" },
+        { "ts": "2026-03-13T17:30:00Z", "role": "BE", "action": "Обнаружен отсутствующий endpoint /catalogs/ungrouped. Реализован UngroupedPageResponse + CatalogService.getUngrouped + CatalogController endpoint" },
+        { "ts": "2026-03-13T17:40:00Z", "role": "BE", "action": "Fix ClassCastException: Instant vs Timestamp в native query result" },
+        { "ts": "2026-03-13T17:42:00Z", "role": "DevOps", "action": "Deployed web-dashboard + auth-service + ingest-gateway to test-screen-record" },
+        { "ts": "2026-03-13T17:45:00Z", "role": "QA", "action": "API тесты пройдены: ungrouped 200, groups 200, assign 201, dashboard 200. Portal code verified in JS bundle." },
+        { "ts": "2026-03-13T17:46:00Z", "role": "BA", "action": "Задача принята. Функционал доступен на test." }
+      ]
+    },
+    {
+      "id": 2,
+      "created_at": "2026-03-13T18:00:00Z",
+      "title": "Агент: фильтрация системных/машинных пользователей + поддержка Terminal Server",
+      "description": "После перезагрузки Windows 192.168.1.135 агент присылал события от машинного аккаунта WORKGROUP\\AIR911D$. Требуется: 1) не отправлять события от системных/машинных пользователей, 2) поддержка Terminal Server (RDS) — отдельный мониторинг для каждой активной сессии.",
+      "feature_code": "agent-user-session-filter",
       "overall_status": "In Progress",
       "role_status": {
         "BA": "Done",
         "SA": "Done",
-        "FE": "In Progress",
-        "QA": "New"
+        "BE": "Done",
+        "QA": "In Progress"
       },
       "artifacts": {
-        "sa": "Анализ выполнен inline — корень проблемы: AssignGroupDropdown рендерится в td>relative внутри overflow-x-auto. Fix: createPortal + fixed-позиционирование по getBoundingClientRect кнопки.",
-        "fe": "",
-        "qa": ""
+        "sa": "Root cause: IsMachineAccount() отсутствовал, Environment fallback возвращал WORKGROUP\\AIR911D$. Fix: 3 точки: UserSessionInfo, AuditEventSink, FocusIntervalSink.",
+        "be": "UserSessionInfo.cs: IsMachineAccount() + null return для системных аккаунтов + GetAllActiveUserSessions(). AuditEventSink.cs: skip upload при username==null. Сборка и установка на 192.168.1.135.",
+        "qa": "Verified: username определяется как AIR911D\\ashep (реальный пользователь через WTS) вместо WORKGROUP\\AIR911D$ (машинный аккаунт). Сервер недоступен с Windows-машины для полного E2E теста."
       },
       "history": [
-        { "ts": "2026-03-13T00:00:00Z", "role": "BA", "action": "Задача создана и зарегистрирована" },
-        { "ts": "2026-03-13T00:00:01Z", "role": "SA", "action": "Анализ завершён: overflow-x-auto создаёт stacking context, обрезает absolute child. Fix: portal в body с fixed позиционированием" },
-        { "ts": "2026-03-13T00:00:02Z", "role": "FE", "action": "Разработка начата: AssignGroupDropdown → createPortal, UngroupedTable → anchorEl через buttonRef" }
+        { "ts": "2026-03-13T18:00:00Z", "role": "BA", "action": "Задача создана: агент шлёт события от системного пользователя после перезагрузки" },
+        { "ts": "2026-03-13T18:01:00Z", "role": "SA", "action": "Root cause: IsMachineAccount() не реализован, Environment fallback не фильтрует машинные аккаунты" },
+        { "ts": "2026-03-13T18:05:00Z", "role": "BE", "action": "UserSessionInfo.cs: добавлен IsMachineAccount(), GetCurrentUsername() возвращает null для системных аккаунтов, добавлен GetAllActiveUserSessions()" },
+        { "ts": "2026-03-13T18:06:00Z", "role": "BE", "action": "AuditEventSink.cs: skip upload при username==null, FocusIntervalSink.cs: SetUsername принимает string?" },
+        { "ts": "2026-03-13T18:10:00Z", "role": "BE", "action": "Сборка и установка на 192.168.1.135. Инсталлятор: C:\\kadero_install\\KaderoAgentSetup.exe" },
+        { "ts": "2026-03-13T18:12:00Z", "role": "QA", "action": "Verified: username=AIR911D\\ashep (WTS), не WORKGROUP\\AIR911D$ (machine). Сервер недоступен для E2E." }
       ]
     }
   ]

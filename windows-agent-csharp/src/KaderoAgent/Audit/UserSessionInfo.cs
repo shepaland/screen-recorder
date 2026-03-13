@@ -56,11 +56,11 @@ public class UserSessionInfo
     // ── Public API ─────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Returns current Windows username in DOMAIN\user format.
+    /// Returns current Windows username in DOMAIN\user format, or null if no real user is logged in.
     /// Works in interactive sessions and in Windows Service (Session 0 / SYSTEM).
     /// Call <see cref="InvalidateCache"/> on session logon/logoff.
     /// </summary>
-    public string GetCurrentUsername()
+    public string? GetCurrentUsername()
     {
         if (_cachedUsername != null) return _cachedUsername;
 
@@ -68,7 +68,8 @@ public class UserSessionInfo
         try
         {
             var identity = WindowsIdentity.GetCurrent();
-            if (!string.IsNullOrEmpty(identity.Name) && !IsSystemDomain(identity.Name))
+            if (!string.IsNullOrEmpty(identity.Name) && !IsSystemDomain(identity.Name)
+                && !IsMachineAccount(identity.Name))
             {
                 _cachedUsername = identity.Name;
                 _logger.LogInformation("Username from WindowsIdentity: {Username}", _cachedUsername);
@@ -102,7 +103,7 @@ public class UserSessionInfo
         {
             var domain = Environment.UserDomainName;
             var user   = Environment.UserName;
-            if (!string.IsNullOrEmpty(user) && !IsSystemAccount(user))
+            if (!string.IsNullOrEmpty(user) && !IsSystemAccount(user) && !IsMachineAccount($"{domain}\\{user}"))
             {
                 _cachedUsername = $"{domain}\\{user}";
                 _logger.LogInformation("Username from Environment: {Username}", _cachedUsername);
@@ -114,10 +115,42 @@ public class UserSessionInfo
             _logger.LogDebug(ex, "Environment username lookup failed");
         }
 
-        // 4. Last resort — machine name, never null so FocusIntervalSink can start
-        _cachedUsername = Environment.MachineName + "\\UNKNOWN";
-        _logger.LogWarning("Could not determine real username, using: {Username}", _cachedUsername);
-        return _cachedUsername;
+        // 4. No real user found — return null (do NOT send events for system/machine accounts)
+        _logger.LogInformation("No real user session found, username is null (events will be deferred)");
+        return null;
+    }
+
+    /// <summary>Returns all active user sessions (for Terminal Server / multi-RDP scenarios).</summary>
+    public List<(uint SessionId, string Username)> GetAllActiveUserSessions()
+    {
+        var result = new List<(uint, string)>();
+        try
+        {
+            if (!WTSEnumerateSessions(IntPtr.Zero, 0, 1, out var pSessions, out var count))
+                return result;
+
+            try
+            {
+                int structSize = Marshal.SizeOf<WTS_SESSION_INFO>();
+                var ptr = pSessions;
+                for (int i = 0; i < count; i++, ptr = IntPtr.Add(ptr, structSize))
+                {
+                    var info = Marshal.PtrToStructure<WTS_SESSION_INFO>(ptr);
+                    if (info.SessionID == 0) continue;
+                    if (info.State != WTSActive && info.State != WTSConnected) continue;
+
+                    var username = GetUsernameForSession(info.SessionID);
+                    if (username != null && !IsMachineAccount(username))
+                        result.Add((info.SessionID, username));
+                }
+            }
+            finally { WTSFreeMemory(pSessions); }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to enumerate active user sessions");
+        }
+        return result;
     }
 
     /// <summary>Clears the cached username (call on session change).</summary>
@@ -213,4 +246,35 @@ public class UserSessionInfo
         username.Equals("СИСТЕМА",         StringComparison.OrdinalIgnoreCase) ||
         username.Equals("LOCAL SERVICE",   StringComparison.OrdinalIgnoreCase) ||
         username.Equals("NETWORK SERVICE", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// True if the full "DOMAIN\user" string is a machine/computer account.
+    /// Machine accounts end with '$' (e.g. "WORKGROUP\AIR911D$").
+    /// Also catches bare machine names without domain.
+    /// </summary>
+    private static bool IsMachineAccount(string fullName)
+    {
+        if (string.IsNullOrEmpty(fullName)) return false;
+
+        // Machine accounts always end with '$'
+        if (fullName.EndsWith('$')) return true;
+
+        // "WORKGROUP\MACHINENAME" without '$' — check if user part equals machine name
+        var parts = fullName.Split('\\');
+        if (parts.Length == 2)
+        {
+            var domain = parts[0];
+            var user = parts[1];
+
+            // WORKGROUP domain with a username that matches the machine name
+            if (domain.Equals("WORKGROUP", StringComparison.OrdinalIgnoreCase))
+            {
+                var machineName = Environment.MachineName;
+                if (user.Equals(machineName, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+
+        return false;
+    }
 }
