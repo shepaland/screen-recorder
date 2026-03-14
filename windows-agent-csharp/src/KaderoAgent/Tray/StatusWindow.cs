@@ -49,11 +49,10 @@ public class StatusWindow : Form
     private Label _queueValue = null!;
     private Label _lastHeartbeatValue = null!;
 
-    // Editable fields
+    // Connection info (read-only)
     private TextBox _serverUrlBox = null!;
-    private TextBox _tokenBox = null!;
-    private Button _reconnectBtn = null!;
-    private Label _statusMessage = null!;
+    private Panel _registrationIndicator = null!;
+    private Label _registrationLabel = null!;
 
     // Auto-refresh timer (thread pool based)
     private System.Threading.Timer? _refreshTimer;
@@ -71,7 +70,7 @@ public class StatusWindow : Form
     private void InitializeComponent()
     {
         Text = "Кадеро — Статус агента";
-        Size = new Size(480, 720);
+        Size = new Size(480, 640);
         ShowInTaskbar = true;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -213,36 +212,29 @@ public class StatusWindow : Form
         Controls.Add(GlassHelper.CreateSeparator(left, y, fullWidth));
         y += 12;
 
-        // ── Settings Section ──
-        Controls.Add(GlassHelper.CreateSectionHeader("Настройки подключения", left, y));
+        // ── Connection Info Section ──
+        Controls.Add(GlassHelper.CreateSectionHeader("Подключение к серверу", left, y));
+        y += 28;
+
+        // Registration status indicator
+        _registrationIndicator = GlassHelper.CreateIndicator(left, y, GlassHelper.StatusGreen);
+        Controls.Add(_registrationIndicator);
+        _registrationLabel = GlassHelper.CreateLabel("Агент зарегистрирован", left + 22, y, 300);
+        Controls.Add(_registrationLabel);
         y += 28;
 
         Controls.Add(GlassHelper.CreateLabel("Адрес сервера", left, y, 200, secondary: true));
         y += 20;
         _serverUrlBox = GlassHelper.CreateTextBox(left, y, fullWidth);
+        _serverUrlBox.ReadOnly = true;
+        _serverUrlBox.TabStop = false;
+        _serverUrlBox.Cursor = Cursors.Default;
         Controls.Add(_serverUrlBox);
         y += 36;
 
-        Controls.Add(GlassHelper.CreateLabel("Токен регистрации", left, y, 200, secondary: true));
-        y += 20;
-        _tokenBox = GlassHelper.CreateTextBox(left, y, fullWidth, placeholder: "drt_... (оставьте пустым для текущего)");
-        Controls.Add(_tokenBox);
-        y += 38;
-
-        _reconnectBtn = GlassHelper.CreateAccentButton("Переподключиться", left, y);
-        _reconnectBtn.Click += OnReconnect;
-        Controls.Add(_reconnectBtn);
-
-        _statusMessage = new Label
-        {
-            Location = new Point(left + 170, y + 8),
-            Size = new Size(260, 25),
-            ForeColor = GlassHelper.TextSecondary,
-            BackColor = Color.Transparent,
-            Font = new Font("Segoe UI", 9),
-            Text = ""
-        };
-        Controls.Add(_statusMessage);
+        var infoLabel = GlassHelper.CreateLabel("Изменение сервера — только через переустановку агента", left, y, fullWidth, secondary: true);
+        infoLabel.Font = new Font("Segoe UI", 7.5f, FontStyle.Italic);
+        Controls.Add(infoLabel);
     }
 
     private void StartAutoRefresh()
@@ -534,63 +526,25 @@ public class StatusWindow : Form
         _queueValue.Text = $"{status.SegmentsQueued}";
         _lastHeartbeatValue.Text = status.LastHeartbeatTs?.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") ?? "—";
 
-        if (string.IsNullOrEmpty(_serverUrlBox.Text) && !string.IsNullOrEmpty(status.ServerUrl))
+        // Server URL (read-only)
+        if (!string.IsNullOrEmpty(status.ServerUrl))
             _serverUrlBox.Text = status.ServerUrl;
-    }
 
-    private void OnReconnect(object? sender, EventArgs e)
-    {
-        _reconnectBtn.Enabled = false;
-        _statusMessage.Text = "Переподключение...";
-        _statusMessage.ForeColor = GlassHelper.TextSecondary;
-
-        var serverUrl = _serverUrlBox.Text.Trim();
-        var token = string.IsNullOrWhiteSpace(_tokenBox.Text) ? null : _tokenBox.Text.Trim();
-
-        // Pipe I/O on thread pool, marshal result back to UI
-        ThreadPool.QueueUserWorkItem(_ =>
+        // Registration status
+        if (status.ConnectionStatus == "connected" && !string.IsNullOrEmpty(status.DeviceId))
         {
-            try
-            {
-                if (!_pipeClient.IsConnected)
-                    _pipeClient.ConnectAsync().GetAwaiter().GetResult();
-
-                var response = _pipeClient.ReconnectAsync(serverUrl, token).GetAwaiter().GetResult();
-
-                if (IsDisposed) return;
-                BeginInvoke(() =>
-                {
-                    if (response?.Success == true)
-                    {
-                        _statusMessage.Text = "Подключено!";
-                        _statusMessage.ForeColor = GlassHelper.StatusGreen;
-                        _tokenBox.Text = "";
-                        _onReconnect?.Invoke();
-                    }
-                    else
-                    {
-                        _statusMessage.Text = response?.Error ?? "Ошибка подключения";
-                        _statusMessage.ForeColor = GlassHelper.StatusRed;
-                    }
-                    _reconnectBtn.Enabled = true;
-                });
-            }
-            catch (Exception ex)
-            {
-                if (IsDisposed) return;
-                try
-                {
-                    BeginInvoke(() =>
-                    {
-                        _statusMessage.Text = $"Ошибка: {ex.Message}";
-                        _statusMessage.ForeColor = GlassHelper.StatusRed;
-                        _reconnectBtn.Enabled = true;
-                    });
-                }
-                catch { }
-            }
-        });
+            _registrationLabel.Text = "Агент зарегистрирован";
+            _registrationIndicator.BackColor = GlassHelper.StatusGreen;
+        }
+        else
+        {
+            _registrationLabel.Text = "Не зарегистрирован";
+            _registrationIndicator.BackColor = GlassHelper.StatusRed;
+        }
+        _registrationIndicator.Invalidate();
     }
+
+    // OnReconnect removed — server URL and token changes only via reinstall
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
