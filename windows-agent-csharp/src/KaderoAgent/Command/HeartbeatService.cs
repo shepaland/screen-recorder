@@ -23,13 +23,14 @@ public class HeartbeatService : BackgroundService
     private readonly MetricsCollector _metrics;
     private readonly IStatusProvider _statusProvider;
     private readonly AgentService _agentService;
+    private readonly SessionManager _sessionManager;
     private readonly IOptions<AgentConfig> _config;
     private readonly ILogger<HeartbeatService> _logger;
 
     public HeartbeatService(AuthManager authManager, ApiClient apiClient, CredentialStore credentialStore,
         CommandHandler commandHandler, ScreenCaptureManager captureManager, UploadQueue uploadQueue,
         MetricsCollector metrics, IStatusProvider statusProvider, AgentService agentService,
-        IOptions<AgentConfig> config, ILogger<HeartbeatService> logger)
+        SessionManager sessionManager, IOptions<AgentConfig> config, ILogger<HeartbeatService> logger)
     {
         _authManager = authManager;
         _apiClient = apiClient;
@@ -40,6 +41,7 @@ public class HeartbeatService : BackgroundService
         _metrics = metrics;
         _statusProvider = statusProvider;
         _agentService = agentService;
+        _sessionManager = sessionManager;
         _config = config;
         _logger = logger;
     }
@@ -127,10 +129,10 @@ public class HeartbeatService : BackgroundService
                     }
 
                     // After first heartbeat with device_settings, auto-start if needed.
-                    // This handles the case where ConfigReceivedFromServer was false at boot,
-                    // but now we have confirmed config from server.
-                    // Guard: only auto-start if not already recording (prevent duplicate FFmpeg launches)
-                    if (_agentService.CurrentState == AgentState.Online && !_captureManager.IsRecording)
+                    // Guards: state must be Online, not recording, no active session
+                    if (_agentService.CurrentState == AgentState.Online
+                        && !_captureManager.IsRecording
+                        && _sessionManager.CurrentSessionId == null)
                     {
                         var serverCfg = _authManager.ServerConfig;
                         if (serverCfg is { ConfigReceivedFromServer: true, AutoStart: true, RecordingEnabled: true })
