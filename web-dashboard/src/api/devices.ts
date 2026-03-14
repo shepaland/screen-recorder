@@ -4,6 +4,7 @@ import type {
   DeviceDetailResponse,
   DeviceCommandResponse,
   CreateCommandRequest,
+  DeviceStatusLogEntry,
 } from '../types/device';
 import type { PageResponse } from '../types/common';
 
@@ -36,6 +37,25 @@ export async function restoreDevice(id: string): Promise<void> {
 
 export async function sendCommand(deviceId: string, data: CreateCommandRequest): Promise<DeviceCommandResponse> {
   const response = await cpApiClient.post<DeviceCommandResponse>(`/devices/${deviceId}/commands`, data);
+  return response.data;
+}
+
+export async function updateDeviceSettings(
+  deviceId: string,
+  settings: Record<string, unknown>,
+): Promise<DeviceResponse> {
+  const response = await cpApiClient.put<DeviceResponse>(`/devices/${deviceId}`, { settings });
+  return response.data;
+}
+
+export async function getDeviceStatusLog(
+  deviceId: string,
+  params?: { page?: number; size?: number },
+): Promise<PageResponse<DeviceStatusLogEntry>> {
+  const response = await cpApiClient.get<PageResponse<DeviceStatusLogEntry>>(
+    `/devices/${deviceId}/status-log`,
+    { params },
+  );
   return response.data;
 }
 

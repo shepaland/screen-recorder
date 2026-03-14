@@ -1,7 +1,7 @@
 import type { DeviceStatus } from '../types/device';
 
 interface DeviceStatusBadgeProps {
-  status: DeviceStatus;
+  status: DeviceStatus | string;
   size?: 'sm' | 'md';
 }
 

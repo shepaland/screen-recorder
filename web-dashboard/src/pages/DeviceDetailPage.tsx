@@ -577,7 +577,7 @@ export default function DeviceDetailPage() {
                             <DeviceStatusBadge status={entry.new_status} size="sm" />
                           </td>
                           <td className="whitespace-nowrap px-3 py-3 text-sm text-gray-500">
-                            {triggerLabels[entry.trigger] || entry.trigger}
+                            {entry.trigger ? (triggerLabels[entry.trigger] || entry.trigger) : '--'}
                           </td>
                         </tr>
                       ))}

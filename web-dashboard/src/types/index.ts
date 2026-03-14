@@ -53,4 +53,9 @@ export type {
   RecordingSessionResponse,
   CreateCommandRequest,
   DeviceSettings,
+  DeviceDaysResponse,
+  DeviceDayEntry,
+  DayTimelineResponse,
+  TimelineSession,
+  TimelineSegment,
 } from './device';
