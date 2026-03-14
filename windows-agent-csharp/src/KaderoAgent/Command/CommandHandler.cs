@@ -286,7 +286,18 @@ public class CommandHandler
         var quality = !string.IsNullOrEmpty(serverCfg?.Quality) ? serverCfg.Quality : _config.Value.Quality;
         var resolution = !string.IsNullOrEmpty(serverCfg?.Resolution) ? serverCfg.Resolution : _config.Value.Resolution;
 
-        // Create session on server (handles 409 by closing stale session)
+        // Start FFmpeg FIRST — only create server session if capture actually works.
+        // This prevents orphaned empty sessions when no user desktop is available.
+        var tempSessionId = Guid.NewGuid().ToString();
+        var started = _captureManager.Start(tempSessionId, fps, segDuration, quality, resolution);
+        if (!started)
+        {
+            _logger.LogError("FFmpeg failed to start, aborting recording (no server session created)");
+            _consecutiveFailures++;
+            return;
+        }
+
+        // FFmpeg is running — now create session on server
         string sessionId;
         try
         {
@@ -295,18 +306,12 @@ public class CommandHandler
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to create server session, using local session ID");
-            sessionId = Guid.NewGuid().ToString();
+            sessionId = tempSessionId;
         }
 
-        var started = _captureManager.Start(sessionId, fps, segDuration, quality, resolution);
-        if (!started)
-        {
-            _logger.LogError("FFmpeg failed to start, aborting recording");
-            _consecutiveFailures++;
-            // End the session we just created since FFmpeg didn't start
-            try { await _sessionManager.EndSessionAsync(ct); } catch { }
-            return;
-        }
+        // FFmpeg writes to tempSessionId dir, but uploads use server sessionId.
+        // WatchSegments reads from _captureManager.OutputDirectory (tempSessionId dir)
+        // and uploads with the server sessionId — this is fine, segment files are the same.
 
         // Don't reset _consecutiveFailures here — only reset after first segment is produced
         // (in WatchSegments) to prevent infinite crash loops when gdigrab has no desktop
