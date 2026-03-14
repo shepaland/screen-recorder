@@ -400,21 +400,22 @@
         {
           "ts": "2026-03-14T16:00:00Z",
           "role": "SA",
-<<<<<<< Updated upstream
-          "action": "Дополнен SA: секция 12 'Настройки → Аудит поведения' — UI таблица input events с фильтрацией (дата, время, тип, сотрудник, устройство), expandable rows, кнопка 'Перейти к записи'. Доступ: SUPER_ADMIN, TENANT_OWNER, TENANT_ADMIN. GET endpoint с пагинацией. Декомпозиция: U1-U5 (FE) + S8 (BE)."
-=======
           "action": "Дополнен SA: секция 12 'Настройки → Аудит поведения' UI spec"
         },
         {
           "ts": "2026-03-14T17:00:00Z",
           "role": "BE",
-          "action": "Server Phase 1 реализован: V38 миграция (user_input_events + geometry на app_focus_intervals), Entity/Repo/Service/Controller. POST /input-events (device JWT) + GET /input-events (user JWT, role check SUPER_ADMIN/OWNER/TENANT_ADMIN). Статическая проверка: 0 ошибок в новом коде (предсущ. ошибки в CatalogService не затронуты)."
+          "action": "Server Phase 1 реализован: V38 миграция (user_input_events + geometry на app_focus_intervals), Entity/Repo/Service/Controller. POST /input-events (device JWT) + GET /input-events (user JWT, role check SUPER_ADMIN/OWNER/TENANT_ADMIN)."
         },
         {
           "ts": "2026-03-14T17:30:00Z",
           "role": "FE",
-          "action": "Frontend реализован: BehaviorAuditPage (таблица с фильтрами, expandable rows, кнопка 'Перейти к записи'), API client, Sidebar пункт 'Аудит поведения'. tsc --noEmit: 0 ошибок, eslint: 0 ошибок."
->>>>>>> Stashed changes
+          "action": "Frontend реализован: BehaviorAuditPage, API client, Sidebar 'Аудит поведения'. tsc+eslint: 0 ошибок."
+        },
+        {
+          "ts": "2026-03-14T20:40:00Z",
+          "role": "DevOps",
+          "action": "Deployed: V38 миграция applied (psql), ingest-gateway + web-dashboard на test-screen-record. Fix: native SQL query (LOWER bytea), GRANT на partitions. GET /input-events: 200 OK, UI /settings/behavior-audit: 200."
         }
       ]
     },
