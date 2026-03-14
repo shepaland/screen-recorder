@@ -5,14 +5,19 @@ import com.prg.controlplane.dto.request.HeartbeatRequest;
 import com.prg.controlplane.dto.request.UpdateDeviceRequest;
 import com.prg.controlplane.dto.response.DeviceDetailResponse;
 import com.prg.controlplane.dto.response.DeviceResponse;
+import com.prg.controlplane.dto.response.DeviceStatusLogResponse;
 import com.prg.controlplane.dto.response.HeartbeatResponse;
 import com.prg.controlplane.dto.response.PageResponse;
+import com.prg.controlplane.entity.DeviceStatusLog;
 import com.prg.controlplane.exception.AccessDeniedException;
+import com.prg.controlplane.repository.DeviceStatusLogRepository;
 import com.prg.controlplane.security.DevicePrincipal;
 import com.prg.controlplane.service.DeviceService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,6 +30,7 @@ public class DeviceController {
 
     private final DeviceService deviceService;
     private final com.prg.controlplane.service.DeviceGroupService deviceGroupService;
+    private final DeviceStatusLogRepository statusLogRepository;
 
     @GetMapping
     public ResponseEntity<PageResponse<DeviceResponse>> getDevices(
@@ -120,6 +126,39 @@ public class DeviceController {
         String ipAddress = getClientIp(httpRequest);
         HeartbeatResponse response = deviceService.processHeartbeat(id, request, ipAddress, principal);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}/status-log")
+    public ResponseEntity<PageResponse<DeviceStatusLogResponse>> getDeviceStatusLog(
+            @PathVariable UUID id,
+            HttpServletRequest httpRequest,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        DevicePrincipal principal = getPrincipal(httpRequest);
+        requirePermission(principal, "DEVICES:READ");
+
+        Page<DeviceStatusLog> logPage = statusLogRepository.findByDeviceIdAndTenantIdWithDateRange(
+                id, principal.getTenantId(), null, null, PageRequest.of(page, size));
+
+        var content = logPage.getContent().stream()
+                .map(log -> DeviceStatusLogResponse.builder()
+                        .id(log.getId())
+                        .deviceId(log.getDeviceId())
+                        .previousStatus(log.getPreviousStatus())
+                        .newStatus(log.getNewStatus())
+                        .changedTs(log.getChangedTs())
+                        .trigger(log.getTrigger())
+                        .details(log.getDetails())
+                        .build())
+                .toList();
+
+        return ResponseEntity.ok(PageResponse.<DeviceStatusLogResponse>builder()
+                .content(content)
+                .page(page)
+                .size(size)
+                .totalElements(logPage.getTotalElements())
+                .totalPages(logPage.getTotalPages())
+                .build());
     }
 
     private DevicePrincipal getPrincipal(HttpServletRequest request) {
