@@ -21,15 +21,15 @@ public class DeviceDetailResponse {
     private UUID registrationTokenId;
     private String hostname;
     private String osVersion;
-    private String osType;
     private String agentVersion;
     private String hardwareId;
     private String status;
     private Instant lastHeartbeatTs;
     private Instant lastRecordingTs;
     private String ipAddress;
-    private String timezone;
     private Map<String, Object> settings;
+    private UUID deviceGroupId;
+    private String deviceGroupName;
     private Boolean isActive;
     private Boolean isDeleted;
     private Instant deletedTs;

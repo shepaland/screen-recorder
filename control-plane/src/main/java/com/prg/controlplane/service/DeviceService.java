@@ -5,12 +5,12 @@ import com.prg.controlplane.dto.request.UpdateDeviceRequest;
 import com.prg.controlplane.dto.response.*;
 import com.prg.controlplane.entity.Device;
 import com.prg.controlplane.entity.DeviceCommand;
-import com.prg.controlplane.entity.DeviceStatusLog;
 import com.prg.controlplane.exception.AccessDeniedException;
 import com.prg.controlplane.exception.ResourceNotFoundException;
+import com.prg.controlplane.entity.DeviceGroup;
 import com.prg.controlplane.repository.DeviceCommandRepository;
+import com.prg.controlplane.repository.DeviceGroupRepository;
 import com.prg.controlplane.repository.DeviceRepository;
-import com.prg.controlplane.repository.DeviceStatusLogRepository;
 import com.prg.controlplane.repository.RecordingSessionRepository;
 import com.prg.controlplane.security.DevicePrincipal;
 import lombok.RequiredArgsConstructor;
@@ -22,10 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,28 +31,64 @@ import java.util.UUID;
 public class DeviceService {
 
     private final DeviceRepository deviceRepository;
+    private final DeviceGroupRepository deviceGroupRepository;
     private final DeviceCommandRepository deviceCommandRepository;
     private final RecordingSessionRepository recordingSessionRepository;
-    private final DeviceStatusLogRepository deviceStatusLogRepository;
 
     @Value("${prg.device.default-heartbeat-interval-sec:30}")
     private int defaultHeartbeatIntervalSec;
 
     @Transactional(readOnly = true)
     public PageResponse<DeviceResponse> getDevices(UUID tenantId, String status, String search,
-                                                     boolean includeDeleted, int page, int size) {
+                                                     boolean includeDeleted, String deviceGroupId,
+                                                     int page, int size) {
         PageRequest pageRequest = PageRequest.of(page, Math.min(size, 100));
 
+        boolean filterByGroup = deviceGroupId != null && !deviceGroupId.isEmpty();
+        boolean ungrouped = "ungrouped".equals(deviceGroupId);
+        // Hibernate requires non-empty list for IN clause even if not evaluated
+        List<UUID> groupIds = new ArrayList<>(List.of(UUID.fromString("00000000-0000-0000-0000-000000000000")));
+
+        if (filterByGroup && !ungrouped) {
+            try {
+                UUID groupUuid = UUID.fromString(deviceGroupId);
+                // Include the group itself and its children (for root groups)
+                groupIds = new ArrayList<>();
+                groupIds.add(groupUuid);
+                List<DeviceGroup> children = deviceGroupRepository.findByParentIdAndTenantId(groupUuid, tenantId);
+                for (DeviceGroup child : children) {
+                    groupIds.add(child.getId());
+                }
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Invalid device_group_id: " + deviceGroupId);
+            }
+        }
+
         Page<Device> devicePage = deviceRepository.findByTenantIdWithFilters(
-                tenantId, status, search, includeDeleted, pageRequest);
+                tenantId, status, search, includeDeleted, filterByGroup, ungrouped, groupIds, pageRequest);
+
+        // Build a group name lookup for response enrichment
+        Map<UUID, String> groupNameMap = buildGroupNameMap(tenantId);
 
         return PageResponse.<DeviceResponse>builder()
-                .content(devicePage.getContent().stream().map(this::toResponse).toList())
+                .content(devicePage.getContent().stream().map(d -> toResponseWithGroup(d, groupNameMap)).toList())
                 .page(devicePage.getNumber())
                 .size(devicePage.getSize())
                 .totalElements(devicePage.getTotalElements())
                 .totalPages(devicePage.getTotalPages())
                 .build();
+    }
+
+    private Map<UUID, String> buildGroupNameMap(UUID tenantId) {
+        List<DeviceGroup> groups = deviceGroupRepository.findByTenantIdOrderBySortOrderAscNameAsc(tenantId);
+        return groups.stream().collect(Collectors.toMap(DeviceGroup::getId, DeviceGroup::getName));
+    }
+
+    @Transactional(readOnly = true)
+    public DeviceResponse getDeviceResponse(UUID deviceId, UUID tenantId) {
+        Device device = findDeviceByIdAndTenant(deviceId, tenantId);
+        Map<UUID, String> groupNameMap = buildGroupNameMap(tenantId);
+        return toResponseWithGroup(device, groupNameMap);
     }
 
     @Transactional(readOnly = true)
@@ -169,10 +203,6 @@ public class DeviceService {
                     deviceId, principal.getTenantId());
         }
 
-        // Track status change for device_status_log
-        String previousStatus = device.getStatus();
-        boolean statusChanged = !request.getStatus().equals(previousStatus);
-
         // Update device fields
         device.setStatus(request.getStatus());
         device.setLastHeartbeatTs(Instant.now());
@@ -180,42 +210,11 @@ public class DeviceService {
         if (request.getAgentVersion() != null) {
             device.setAgentVersion(request.getAgentVersion());
         }
-        if (request.getTimezone() != null) {
-            device.setTimezone(request.getTimezone());
-        }
-        if (request.getOsType() != null) {
-            device.setOsType(request.getOsType());
-        }
         if ("recording".equals(request.getStatus())) {
             device.setLastRecordingTs(Instant.now());
         }
 
         deviceRepository.save(device);
-
-        // Log status transition when status actually changed
-        if (statusChanged) {
-            Map<String, Object> details = new HashMap<>();
-            if (request.getAgentVersion() != null) {
-                details.put("agent_version", request.getAgentVersion());
-            }
-            if (request.getSessionLocked() != null) {
-                details.put("session_locked", request.getSessionLocked());
-            }
-
-            DeviceStatusLog statusLog = DeviceStatusLog.builder()
-                    .tenantId(principal.getTenantId())
-                    .deviceId(deviceId)
-                    .previousStatus(previousStatus)
-                    .newStatus(request.getStatus())
-                    .changedTs(Instant.now())
-                    .trigger("heartbeat")
-                    .details(details.isEmpty() ? null : details)
-                    .build();
-            deviceStatusLogRepository.save(statusLog);
-
-            log.info("Device status changed: device_id={}, {} -> {}, trigger=heartbeat",
-                    deviceId, previousStatus, request.getStatus());
-        }
 
         // Find and deliver pending commands
         List<DeviceCommand> pendingCommands = deviceCommandRepository
@@ -235,47 +234,10 @@ public class DeviceService {
         log.debug("Heartbeat processed: device_id={}, status={}, commands_delivered={}",
                 deviceId, request.getStatus(), pendingCommands.size());
 
-        // Include device settings in response if present
-        Map<String, Object> deviceSettings = device.getSettings() != null && !device.getSettings().isEmpty()
-                ? device.getSettings() : null;
-
         return HeartbeatResponse.builder()
                 .serverTs(now)
                 .pendingCommands(pendingCommands.stream().map(this::toCommandResponse).toList())
                 .nextHeartbeatSec(defaultHeartbeatIntervalSec)
-                .deviceSettings(deviceSettings)
-                .build();
-    }
-
-    @Transactional(readOnly = true)
-    public PageResponse<DeviceStatusLogResponse> getDeviceStatusLog(UUID deviceId, UUID tenantId,
-                                                                      Instant from, Instant to,
-                                                                      int page, int size) {
-        // Verify device exists and belongs to tenant
-        findDeviceByIdAndTenant(deviceId, tenantId);
-
-        PageRequest pageRequest = PageRequest.of(page, Math.min(size, 200));
-        Page<DeviceStatusLog> logPage = deviceStatusLogRepository
-                .findByDeviceIdAndTenantIdWithDateRange(deviceId, tenantId, from, to, pageRequest);
-
-        return PageResponse.<DeviceStatusLogResponse>builder()
-                .content(logPage.getContent().stream().map(this::toStatusLogResponse).toList())
-                .page(logPage.getNumber())
-                .size(logPage.getSize())
-                .totalElements(logPage.getTotalElements())
-                .totalPages(logPage.getTotalPages())
-                .build();
-    }
-
-    private DeviceStatusLogResponse toStatusLogResponse(DeviceStatusLog log) {
-        return DeviceStatusLogResponse.builder()
-                .id(log.getId())
-                .deviceId(log.getDeviceId())
-                .previousStatus(log.getPreviousStatus())
-                .newStatus(log.getNewStatus())
-                .changedTs(log.getChangedTs())
-                .trigger(log.getTrigger())
-                .details(log.getDetails())
                 .build();
     }
 
@@ -292,20 +254,27 @@ public class DeviceService {
                 .userId(device.getUserId())
                 .hostname(device.getHostname())
                 .osVersion(device.getOsVersion())
-                .osType(device.getOsType())
                 .agentVersion(device.getAgentVersion())
                 .status(device.getStatus())
                 .lastHeartbeatTs(device.getLastHeartbeatTs())
                 .lastRecordingTs(device.getLastRecordingTs())
                 .ipAddress(device.getIpAddress())
-                .timezone(device.getTimezone())
                 .settings(device.getSettings())
+                .deviceGroupId(device.getDeviceGroupId())
                 .isActive(device.getIsActive())
                 .isDeleted(device.getIsDeleted())
                 .deletedTs(device.getDeletedTs())
                 .createdTs(device.getCreatedTs())
                 .updatedTs(device.getUpdatedTs())
                 .build();
+    }
+
+    private DeviceResponse toResponseWithGroup(Device device, Map<UUID, String> groupNameMap) {
+        DeviceResponse resp = toResponse(device);
+        if (device.getDeviceGroupId() != null) {
+            resp.setDeviceGroupName(groupNameMap.get(device.getDeviceGroupId()));
+        }
+        return resp;
     }
 
     private DeviceDetailResponse toDetailResponse(Device device, List<DeviceCommand> recentCommands) {
@@ -316,15 +285,14 @@ public class DeviceService {
                 .registrationTokenId(device.getRegistrationTokenId())
                 .hostname(device.getHostname())
                 .osVersion(device.getOsVersion())
-                .osType(device.getOsType())
                 .agentVersion(device.getAgentVersion())
                 .hardwareId(device.getHardwareId())
                 .status(device.getStatus())
                 .lastHeartbeatTs(device.getLastHeartbeatTs())
                 .lastRecordingTs(device.getLastRecordingTs())
                 .ipAddress(device.getIpAddress())
-                .timezone(device.getTimezone())
                 .settings(device.getSettings())
+                .deviceGroupId(device.getDeviceGroupId())
                 .isActive(device.getIsActive())
                 .isDeleted(device.getIsDeleted())
                 .deletedTs(device.getDeletedTs())

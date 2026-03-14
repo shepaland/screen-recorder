@@ -1,8 +1,12 @@
 package com.prg.controlplane.controller;
 
+import com.prg.controlplane.dto.request.AssignDeviceGroupRequest;
 import com.prg.controlplane.dto.request.HeartbeatRequest;
 import com.prg.controlplane.dto.request.UpdateDeviceRequest;
-import com.prg.controlplane.dto.response.*;
+import com.prg.controlplane.dto.response.DeviceDetailResponse;
+import com.prg.controlplane.dto.response.DeviceResponse;
+import com.prg.controlplane.dto.response.HeartbeatResponse;
+import com.prg.controlplane.dto.response.PageResponse;
 import com.prg.controlplane.exception.AccessDeniedException;
 import com.prg.controlplane.security.DevicePrincipal;
 import com.prg.controlplane.service.DeviceService;
@@ -12,7 +16,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Instant;
 import java.util.UUID;
 
 @RestController
@@ -21,6 +24,7 @@ import java.util.UUID;
 public class DeviceController {
 
     private final DeviceService deviceService;
+    private final com.prg.controlplane.service.DeviceGroupService deviceGroupService;
 
     @GetMapping
     public ResponseEntity<PageResponse<DeviceResponse>> getDevices(
@@ -29,12 +33,13 @@ public class DeviceController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
-            @RequestParam(name = "include_deleted", defaultValue = "false") boolean includeDeleted) {
+            @RequestParam(name = "include_deleted", defaultValue = "false") boolean includeDeleted,
+            @RequestParam(name = "device_group_id", required = false) String deviceGroupId) {
         DevicePrincipal principal = getPrincipal(httpRequest);
         requirePermission(principal, "DEVICES:READ");
 
         PageResponse<DeviceResponse> response = deviceService.getDevices(
-                principal.getTenantId(), status, search, includeDeleted, page, size);
+                principal.getTenantId(), status, search, includeDeleted, deviceGroupId, page, size);
         return ResponseEntity.ok(response);
     }
 
@@ -85,19 +90,16 @@ public class DeviceController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/{id}/status-log")
-    public ResponseEntity<PageResponse<DeviceStatusLogResponse>> getDeviceStatusLog(
+    @PutMapping("/{id}/group")
+    public ResponseEntity<DeviceResponse> assignDeviceGroup(
             @PathVariable UUID id,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "50") int size,
-            @RequestParam(required = false) Instant from,
-            @RequestParam(required = false) Instant to,
+            @RequestBody AssignDeviceGroupRequest request,
             HttpServletRequest httpRequest) {
         DevicePrincipal principal = getPrincipal(httpRequest);
-        requirePermission(principal, "DEVICES:READ");
+        requirePermission(principal, "DEVICES:MANAGE");
 
-        PageResponse<DeviceStatusLogResponse> response = deviceService.getDeviceStatusLog(
-                id, principal.getTenantId(), from, to, page, size);
+        deviceGroupService.assignDeviceToGroup(principal.getTenantId(), id, request.getDeviceGroupId());
+        DeviceResponse response = deviceService.getDeviceResponse(id, principal.getTenantId());
         return ResponseEntity.ok(response);
     }
 

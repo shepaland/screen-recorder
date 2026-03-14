@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,6 +16,8 @@ import java.util.UUID;
 public interface DeviceRepository extends JpaRepository<Device, UUID> {
 
     Optional<Device> findByIdAndTenantId(UUID id, UUID tenantId);
+
+    List<Device> findByTenantIdAndIsDeletedFalse(UUID tenantId);
 
     @Query("""
             SELECT d FROM Device d
@@ -26,6 +29,11 @@ public interface DeviceRepository extends JpaRepository<Device, UUID> {
               ))
               AND (:includeDeleted = TRUE OR d.isDeleted = FALSE)
               AND (:search IS NULL OR LOWER(d.hostname) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))
+              AND (:filterByGroup = FALSE OR (
+                  CASE WHEN :ungrouped = TRUE THEN d.deviceGroupId IS NULL
+                       ELSE d.deviceGroupId IN :groupIds
+                  END
+              ))
             ORDER BY d.createdTs DESC
             """)
     Page<Device> findByTenantIdWithFilters(
@@ -33,5 +41,8 @@ public interface DeviceRepository extends JpaRepository<Device, UUID> {
             @Param("status") String status,
             @Param("search") String search,
             @Param("includeDeleted") boolean includeDeleted,
+            @Param("filterByGroup") boolean filterByGroup,
+            @Param("ungrouped") boolean ungrouped,
+            @Param("groupIds") List<UUID> groupIds,
             Pageable pageable);
 }

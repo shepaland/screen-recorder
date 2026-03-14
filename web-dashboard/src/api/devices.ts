@@ -3,9 +3,7 @@ import type {
   DeviceResponse,
   DeviceDetailResponse,
   DeviceCommandResponse,
-  DeviceStatusLogEntry,
   CreateCommandRequest,
-  DeviceSettings,
 } from '../types/device';
 import type { PageResponse } from '../types/common';
 
@@ -15,6 +13,7 @@ export interface DevicesListParams {
   status?: string;
   search?: string;
   include_deleted?: boolean;
+  device_group_id?: string;
 }
 
 export async function getDevices(params?: DevicesListParams): Promise<PageResponse<DeviceResponse>> {
@@ -46,35 +45,6 @@ export async function getDeviceCommands(
 ): Promise<PageResponse<DeviceCommandResponse>> {
   const response = await cpApiClient.get<PageResponse<DeviceCommandResponse>>(
     `/devices/${deviceId}/commands`,
-    { params },
-  );
-  return response.data;
-}
-
-export async function updateDeviceSettings(
-  deviceId: string,
-  settings: DeviceSettings,
-): Promise<DeviceResponse> {
-  const response = await cpApiClient.put<DeviceResponse>(
-    `/devices/${deviceId}`,
-    { settings },
-  );
-  return response.data;
-}
-
-export interface StatusLogParams {
-  page?: number;
-  size?: number;
-  from?: string;
-  to?: string;
-}
-
-export async function getDeviceStatusLog(
-  deviceId: string,
-  params?: StatusLogParams,
-): Promise<PageResponse<DeviceStatusLogEntry>> {
-  const response = await cpApiClient.get<PageResponse<DeviceStatusLogEntry>>(
-    `/devices/${deviceId}/status-log`,
     { params },
   );
   return response.data;
