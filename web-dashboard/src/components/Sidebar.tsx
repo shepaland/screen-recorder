@@ -50,7 +50,7 @@ const catalogsSubmenu: NavItem[] = [
 
 /** Settings submenu for tenant users. */
 const tenantSettingsSubmenu: NavItem[] = [
-  { name: 'Устройства', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
+  { name: 'Агенты', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
   { name: 'Пользователи', href: '/users', icon: UsersIcon, permission: 'USERS:READ' },
   { name: 'Токены', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
   { name: 'Настройки записи', href: '/recording-settings', icon: AdjustmentsHorizontalIcon, permission: 'DEVICES:READ' },
@@ -60,7 +60,7 @@ const tenantSettingsSubmenu: NavItem[] = [
 const superAdminSettingsSubmenu: NavItem[] = [
   { name: 'Users', href: '/users', icon: UsersIcon, permission: 'USERS:READ' },
   { name: 'Roles', href: '/roles', icon: ShieldCheckIcon, permission: 'ROLES:READ' },
-  { name: 'Устройства', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
+  { name: 'Агенты', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
   { name: 'Настройки записи', href: '/recording-settings', icon: AdjustmentsHorizontalIcon, permission: 'DEVICES:READ' },
   { name: 'Токены регистрации', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
 ];

@@ -387,9 +387,9 @@ export default function DevicesListPage() {
         {/* Page header */}
         <div className="sm:flex sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900">Устройства</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900">Агенты</h1>
             <p className="mt-2 text-sm text-gray-600">
-              Мониторинг и управление зарегистрированными устройствами.
+              Мониторинг и управление зарегистрированными агентами.
             </p>
           </div>
         </div>
