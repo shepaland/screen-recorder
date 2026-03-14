@@ -129,7 +129,8 @@ public class HeartbeatService : BackgroundService
                     // After first heartbeat with device_settings, auto-start if needed.
                     // This handles the case where ConfigReceivedFromServer was false at boot,
                     // but now we have confirmed config from server.
-                    if (_agentService.CurrentState == AgentState.Online)
+                    // Guard: only auto-start if not already recording (prevent duplicate FFmpeg launches)
+                    if (_agentService.CurrentState == AgentState.Online && !_captureManager.IsRecording)
                     {
                         var serverCfg = _authManager.ServerConfig;
                         if (serverCfg is { ConfigReceivedFromServer: true, AutoStart: true, RecordingEnabled: true })
