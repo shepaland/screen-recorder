@@ -9,7 +9,7 @@ namespace KaderoAgent.Tray;
 /// <summary>
 /// Tracks mouse clicks in the interactive user session (tray process).
 /// Uses low-level mouse hook (WH_MOUSE_LL) to capture click events.
-/// Sends batched events to service via Named Pipe every 30 seconds.
+/// Pending events are drained by TrayWindowTracker and sent via its pipe connection.
 /// </summary>
 public class InputTracker : IDisposable
 {
@@ -19,7 +19,6 @@ public class InputTracker : IDisposable
     private const int WM_MBUTTONDOWN = 0x0207;
     private const int WM_LBUTTONDBLCLK = 0x0203;
 
-    private const int SendIntervalMs = 30_000;
     private const int MaxClicksPerSecond = 100;
     private const int DoubleClickThresholdMs = 500;
     private const int DoubleClickDistancePx = 5;
@@ -62,15 +61,12 @@ public class InputTracker : IDisposable
     }
 
     private IntPtr _hookHandle = IntPtr.Zero;
-    private LowLevelMouseProc? _hookProc; // prevent GC of delegate
-    private readonly PipeClient _pipe = new();
-    private System.Threading.Timer? _sendTimer;
+    private LowLevelMouseProc? _hookProc;
 
     private readonly ConcurrentQueue<InputEventData> _pending = new();
     private int _clicksThisSecond;
     private long _lastClickSecond;
 
-    // Double-click detection
     private DateTime _lastClickTime;
     private int _lastClickX, _lastClickY;
     private string _lastClickButton = "";
@@ -90,8 +86,26 @@ public class InputTracker : IDisposable
         }
 
         _log.Info("Mouse hook installed");
+    }
 
-        _sendTimer = new System.Threading.Timer(_ => SendPendingAsync().Wait(), null, SendIntervalMs, SendIntervalMs);
+    /// <summary>
+    /// Drain all pending input events. Called by TrayWindowTracker on its send timer.
+    /// </summary>
+    public List<InputEventData> DrainPending()
+    {
+        var batch = new List<InputEventData>();
+        while (batch.Count < 500 && _pending.TryDequeue(out var item))
+        {
+            batch.Add(item);
+        }
+        return batch;
+    }
+
+    /// <summary>Re-queue events on send failure.</summary>
+    public void Requeue(List<InputEventData> events)
+    {
+        foreach (var item in events)
+            _pending.Enqueue(item);
     }
 
     private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
@@ -101,7 +115,6 @@ public class InputTracker : IDisposable
             int msg = wParam.ToInt32();
             if (msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN || msg == WM_MBUTTONDOWN || msg == WM_LBUTTONDBLCLK)
             {
-                // Rate limit
                 long nowSecond = Environment.TickCount64 / 1000;
                 if (nowSecond != _lastClickSecond)
                 {
@@ -123,7 +136,6 @@ public class InputTracker : IDisposable
                     _ => "left"
                 };
 
-                // Double-click detection
                 string clickType = "single";
                 if (msg == WM_LBUTTONDBLCLK)
                 {
@@ -142,7 +154,6 @@ public class InputTracker : IDisposable
                 _lastClickY = hookStruct.Y;
                 _lastClickButton = button;
 
-                // Get foreground window context (fast, < 1ms)
                 string processName = "";
                 string windowTitle = "";
                 try
@@ -179,58 +190,13 @@ public class InputTracker : IDisposable
         return CallNextHookEx(_hookHandle, nCode, wParam, lParam);
     }
 
-    private async Task SendPendingAsync()
-    {
-        if (_pending.IsEmpty) return;
-
-        var batch = new List<InputEventData>();
-        while (batch.Count < 500 && _pending.TryDequeue(out var item))
-        {
-            batch.Add(item);
-        }
-
-        if (batch.Count == 0) return;
-
-        try
-        {
-            if (!_pipe.IsConnected)
-                await _pipe.ConnectAsync(3000);
-
-            var response = await _pipe.SendAsync(new PipeRequest
-            {
-                Command = "report_input_events",
-                InputEvents = batch
-            });
-
-            if (response?.Success == true)
-            {
-                _log.Debug($"Sent {batch.Count} input events to service");
-            }
-            else
-            {
-                _log.Warn($"Service rejected input events: {response?.Error}");
-                // Re-queue on failure
-                foreach (var item in batch)
-                    _pending.Enqueue(item);
-            }
-        }
-        catch (Exception ex)
-        {
-            _log.Warn($"Failed to send input events: {ex.Message}");
-            foreach (var item in batch)
-                _pending.Enqueue(item);
-        }
-    }
-
     public void Dispose()
     {
-        _sendTimer?.Dispose();
         if (_hookHandle != IntPtr.Zero)
         {
             UnhookWindowsHookEx(_hookHandle);
             _hookHandle = IntPtr.Zero;
             _log.Info("Mouse hook removed");
         }
-        _pipe.Dispose();
     }
 }

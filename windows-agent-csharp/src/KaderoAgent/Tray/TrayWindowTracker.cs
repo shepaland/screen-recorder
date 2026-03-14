@@ -31,6 +31,7 @@ public class TrayWindowTracker : IDisposable
     private static readonly log4net.ILog _log = log4net.LogManager.GetLogger(typeof(TrayWindowTracker));
 
     private readonly PipeClient _pipe = new();
+    private InputTracker? _inputTracker;
     private System.Threading.Timer? _pollTimer;
     private System.Threading.Timer? _sendTimer;
 
@@ -53,6 +54,9 @@ public class TrayWindowTracker : IDisposable
         "KaderoAgent", "explorer", "Progman", "ShellExperienceHost",
         "Idle", "dwm", "csrss", "svchost", "winlogon"
     };
+
+    /// <summary>Attach InputTracker so its events are sent via this tracker's pipe connection.</summary>
+    public void SetInputTracker(InputTracker tracker) => _inputTracker = tracker;
 
     public void Start()
     {
@@ -253,6 +257,45 @@ public class TrayWindowTracker : IDisposable
         {
             _log.Warn($"TrayWindowTracker.SendIntervals error: {ex.Message}. Re-queuing {batch.Count} intervals.");
             lock (_pendingLock) { _pending.InsertRange(0, batch); }
+        }
+
+        // Send input events (mouse clicks) via same pipe connection
+        SendInputEvents();
+    }
+
+    private void SendInputEvents()
+    {
+        if (_inputTracker == null) return;
+
+        var inputBatch = _inputTracker.DrainPending();
+        if (inputBatch.Count == 0) return;
+
+        try
+        {
+            if (!_pipe.IsConnected)
+                _pipe.ConnectAsync(1000).GetAwaiter().GetResult();
+
+            var request = new PipeRequest
+            {
+                Command = "report_input_events",
+                InputEvents = inputBatch
+            };
+
+            var response = _pipe.SendAsync(request).GetAwaiter().GetResult();
+            if (response?.Success == true)
+            {
+                _log.Info($"TrayWindowTracker: sent {inputBatch.Count} input events to service");
+            }
+            else
+            {
+                _log.Warn($"TrayWindowTracker: service rejected input events: {response?.Error}. Re-queuing.");
+                _inputTracker.Requeue(inputBatch);
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.Warn($"TrayWindowTracker.SendInputEvents error: {ex.Message}. Re-queuing {inputBatch.Count} events.");
+            _inputTracker.Requeue(inputBatch);
         }
     }
 

@@ -56,11 +56,12 @@ public class TrayApplication : ApplicationContext
         // Start background status polling on thread pool
         StartStatusPolling();
 
-        // Start active window tracking (runs in interactive session — GetForegroundWindow works here)
-        _windowTracker.Start();
-
         // Start input tracking (mouse clicks via low-level hook)
         _inputTracker.Start();
+
+        // Start active window tracking — attach InputTracker so events are sent via same pipe
+        _windowTracker.SetInputTracker(_inputTracker);
+        _windowTracker.Start();
     }
 
     private ContextMenuStrip CreateContextMenu()
