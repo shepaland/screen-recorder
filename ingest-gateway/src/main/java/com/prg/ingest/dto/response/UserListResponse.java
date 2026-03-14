@@ -1,5 +1,6 @@
 package com.prg.ingest.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -32,6 +33,7 @@ public class UserListResponse {
         private List<UUID> deviceIds;
         private Instant firstSeenTs;
         private Instant lastSeenTs;
+        @JsonProperty("is_active")
         private boolean isActive;
     }
 }

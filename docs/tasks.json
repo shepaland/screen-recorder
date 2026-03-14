@@ -137,6 +137,53 @@
         { "ts": "2026-03-14T00:02:00Z", "role": "QA", "action": "Статическая проверка: TypeScript компиляция без ошибок, неиспользуемых импортов нет" },
         { "ts": "2026-03-14T00:03:00Z", "role": "BA", "action": "Задача принята. Панель событий скрыта, данные в БД сохраняются." }
       ]
+    },
+    {
+      "id": 6,
+      "created_at": "2026-03-14T12:00:00Z",
+      "title": "Pre-implementation analysis: Сервис распознавания и классификации действий пользователя по записи экрана",
+      "description": "Техническое заключение о готовности проекта к внедрению сервиса анализа screen recordings: OCR, UI detection, event reconstruction, action classification, review workflow. AS-IS assessment, gap analysis, architecture options, target design, roadmap.",
+      "feature_code": "screen-action-analysis",
+      "overall_status": "In Progress",
+      "role_status": {
+        "BA": "Done",
+        "ARCH": "Done",
+        "SA": "In Progress"
+      },
+      "artifacts": {
+        "arch": "docs/screen-action-analysis/ARCH/pre-implementation-analysis.md"
+      },
+      "history": [
+        { "ts": "2026-03-14T12:00:00Z", "role": "BA", "action": "Задача зарегистрирована: pre-implementation analysis для сервиса распознавания действий" },
+        { "ts": "2026-03-14T12:01:00Z", "role": "ARCH", "action": "Полный архитектурный анализ завершён: AS-IS, readiness, gap analysis, 3 варианта, target design, risk register, roadmap. Документ: docs/screen-action-analysis/ARCH/pre-implementation-analysis.md" }
+      ]
+    },
+    {
+      "id": 7,
+      "created_at": "2026-03-14T06:30:00Z",
+      "title": "Статусная модель сотрудников: Активен/Неактивен по факту залогиненности",
+      "description": "Сотрудник залогинен на рабочей станции → статус 'Активен', разлогинен → 'Неактивен'. Статусы отображаются везде где есть статусы сотрудников.",
+      "feature_code": "employee-active-status",
+      "overall_status": "Done",
+      "role_status": {
+        "BA": "Done",
+        "SA": "Done",
+        "BE": "Done",
+        "QA": "Done"
+      },
+      "artifacts": {
+        "sa": "Анализ: is_active в device_user_sessions всегда true (никогда не сбрасывается). Fix: view v_tenant_users вычисляет is_active по last_seen_ts (< 5 мин = активен).",
+        "be": "V36 миграция: v_tenant_users view с BOOL_OR(last_seen_ts > NOW() - INTERVAL '5 minutes'). @JsonProperty(\"is_active\") на UserSummary.isActive (Jackson boolean fix).",
+        "fe": "Фронтенд не менялся — is_active уже корректно отображается в EmployeeListPage, UserListPage, UsersListPage, UserDetailPage."
+      },
+      "history": [
+        { "ts": "2026-03-14T06:30:00Z", "role": "BA", "action": "Задача создана: статусная модель сотрудников Активен/Неактивен" },
+        { "ts": "2026-03-14T06:31:00Z", "role": "SA", "action": "Анализ: is_active никогда не сбрасывается. View v_tenant_users нужно пересчитывать по last_seen_ts" },
+        { "ts": "2026-03-14T06:32:00Z", "role": "BE", "action": "V36 миграция: v_tenant_users view — is_active = BOOL_OR(last_seen_ts > NOW() - 5 min). @JsonProperty fix для is_active" },
+        { "ts": "2026-03-14T06:35:00Z", "role": "DevOps", "action": "View применён через psql (Flyway отключён для ingest-gw). ingest-gateway пересобран и задеплоен." },
+        { "ts": "2026-03-14T06:36:00Z", "role": "QA", "action": "API verified: все 4 пользователя is_active=false (нет активности в последние 5 мин). Фильтр is_active=true/false работает." },
+        { "ts": "2026-03-14T06:37:00Z", "role": "BA", "action": "Задача принята. Статус динамический, отображается корректно." }
+      ]
     }
   ]
 }
