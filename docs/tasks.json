@@ -85,6 +85,58 @@
         { "ts": "2026-03-13T19:45:00Z", "role": "QA", "action": "Пользователь подтвердил: дропдаун работает корректно" },
         { "ts": "2026-03-13T19:45:01Z", "role": "BA", "action": "Задача принята" }
       ]
+    },
+    {
+      "id": 4,
+      "created_at": "2026-03-13T20:00:00Z",
+      "title": "macOS Agent: Windows-parity доработки (409 retry, BrowserDomainParser 128, Session rotation, ProcessWatcher)",
+      "description": "Доработка macOS-агента для полного паритета с Windows-агентом: 1) SessionManager 409 retry — при 409 Conflict искать и закрывать stale sessions, затем повторять создание. 2) BrowserDomainParser — расширить до 128 маппингов (Windows parity). 3) Session rotation (SessionMaxDurationMin=60) — ротация recording session каждые 60 минут. 4) ProcessWatcher — мониторинг запуска/завершения приложений через NSWorkspace notifications.",
+      "feature_code": "macos-agent-parity",
+      "overall_status": "Done",
+      "role_status": {
+        "BA": "Done",
+        "SA": "Done",
+        "BE": "Done",
+        "QA": "Done"
+      },
+      "artifacts": {
+        "sa": "docs/macos-agent-parity/SA/system-analysis.md",
+        "be": "SessionManager.swift: 409 retry + closeActiveSessionsForDevice. BrowserDomainParser.swift: 90 known mappings (Windows 70) + multi-strategy resolution. AgentService.swift: session rotation timer (60 min). ProcessWatcher.swift: NSWorkspace notifications + 3s debounce + system process filter. APIClient.swift: get<T>(). APIEndpoints.swift: recordings(), endSession(). DTOs.swift: RecordingsListResponse. AuditEvent.swift: processStart/processStop. ServerConfig.swift: sessionMaxDurationMin.",
+        "qa": "docs/macos-agent-parity/QA/tests.json — 12 тест-кейсов, 12 Pass. Build: 0 errors, 0 warnings. 44 файлов, 4479 LOC."
+      },
+      "history": [
+        { "ts": "2026-03-13T20:00:00Z", "role": "BA", "action": "Задача создана: 4 доработки macOS-агента для паритета с Windows" },
+        { "ts": "2026-03-13T20:01:00Z", "role": "SA", "action": "Системный анализ завершён: 4 подзадачи, декомпозиция на 10 файлов" },
+        { "ts": "2026-03-13T20:10:00Z", "role": "BE", "action": "BE-1: SessionManager 409 retry (99 LOC). catch .conflict → closeActiveSessionsForDevice → retry" },
+        { "ts": "2026-03-13T20:11:00Z", "role": "BE", "action": "BE-2: BrowserDomainParser 90 mappings + multi-strategy resolution (277 LOC)" },
+        { "ts": "2026-03-13T20:12:00Z", "role": "BE", "action": "BE-3: Session rotation timer + rotateSession() в AgentService" },
+        { "ts": "2026-03-13T20:13:00Z", "role": "BE", "action": "BE-4: ProcessWatcher (155 LOC): NSWorkspace notifications, 3s debounce, system filter" },
+        { "ts": "2026-03-13T20:14:00Z", "role": "BE", "action": "Статические проверки: swift build → Build complete! 0 errors, 0 warnings" },
+        { "ts": "2026-03-13T20:15:00Z", "role": "QA", "action": "12 тест-кейсов: 12 Pass. Code review: все 4 доработки корректны, Windows parity достигнут" },
+        { "ts": "2026-03-13T20:16:00Z", "role": "BA", "action": "Задача принята. Все 4 доработки реализованы и протестированы." }
+      ]
+    },
+    {
+      "id": 5,
+      "created_at": "2026-03-14T00:00:00Z",
+      "title": "Плеер записей: скрыть панель событий аудита из UI",
+      "description": "В плеере видеозаписей убрать правую панель с перечнем событий аудита. События продолжают сохраняться в БД, но пользователь их не видит.",
+      "feature_code": "hide-audit-events-panel",
+      "overall_status": "Done",
+      "role_status": {
+        "BA": "Done",
+        "FE": "Done",
+        "QA": "Done"
+      },
+      "artifacts": {
+        "fe": "DeviceRecordingsPage.tsx: удалена правая панель (AuditEventTimeline), удалены импорты и состояния auditEvents/auditLoading/activeAuditEventId, удалён fetch audit events, удалён handleAuditEventClick. TypeScript: 0 ошибок."
+      },
+      "history": [
+        { "ts": "2026-03-14T00:00:00Z", "role": "BA", "action": "Задача создана: скрыть панель событий в плеере, данные остаются в БД" },
+        { "ts": "2026-03-14T00:01:00Z", "role": "FE", "action": "Удалена правая панель AuditEventTimeline, все связанные состояния и обработчики. tsc --noEmit: 0 ошибок" },
+        { "ts": "2026-03-14T00:02:00Z", "role": "QA", "action": "Статическая проверка: TypeScript компиляция без ошибок, неиспользуемых импортов нет" },
+        { "ts": "2026-03-14T00:03:00Z", "role": "BA", "action": "Задача принята. Панель событий скрыта, данные в БД сохраняются." }
+      ]
     }
   ]
 }

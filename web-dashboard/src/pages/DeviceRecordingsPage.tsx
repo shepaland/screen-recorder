@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   getDeviceRecordingDays,
   getDeviceDayTimeline,
-  getDeviceAuditEvents,
   downloadRecording,
 } from '../api/ingest';
 import { getDevice } from '../api/devices';
@@ -13,9 +12,7 @@ import type {
   TimelineSegment,
   DeviceDetailResponse,
 } from '../types/device';
-import type { AuditEvent } from '../types/audit-event';
 import DayTimeline from '../components/DayTimeline';
-import AuditEventTimeline from '../components/AuditEventTimeline';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { formatBytes, formatDuration } from '../utils/timeAgo';
 import {
@@ -51,6 +48,8 @@ function formatDateRu(dateStr: string): string {
 export default function DeviceRecordingsPage() {
   const { deviceId } = useParams<{ deviceId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialDate = searchParams.get('date');
 
   // Device info
   const [device, setDevice] = useState<DeviceDetailResponse | null>(null);
@@ -64,11 +63,6 @@ export default function DeviceRecordingsPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<DayTimelineResponse | null>(null);
   const [timelineLoading, setTimelineLoading] = useState(false);
-
-  // Audit events
-  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
-  const [auditLoading, setAuditLoading] = useState(false);
-  const [activeAuditEventId, setActiveAuditEventId] = useState<string | undefined>();
 
   // Video player state
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -104,16 +98,19 @@ export default function DeviceRecordingsPage() {
       setDaysLoading(true);
       const resp = await getDeviceRecordingDays(deviceId, { page: daysPage, size: 30 });
       setDaysData(resp);
-      // Auto-select first day if none selected
+      // Auto-select day: prefer ?date= from URL, fallback to first day
       if (!selectedDate && resp.days.length > 0) {
-        setSelectedDate(resp.days[0].date);
+        const targetDate = initialDate && resp.days.some(d => d.date === initialDate)
+          ? initialDate
+          : resp.days[0].date;
+        setSelectedDate(targetDate);
       }
     } catch (err) {
       console.error('Failed to load recording days', err);
     } finally {
       setDaysLoading(false);
     }
-  }, [deviceId, daysPage, selectedDate]);
+  }, [deviceId, daysPage, selectedDate, initialDate]);
 
   useEffect(() => {
     fetchDays();
@@ -144,28 +141,6 @@ export default function DeviceRecordingsPage() {
     };
 
     fetchTimeline();
-    return () => { cancelled = true; };
-  }, [deviceId, selectedDate]);
-
-  // Fetch audit events for selected date
-  useEffect(() => {
-    if (!deviceId || !selectedDate) return;
-    let cancelled = false;
-
-    const fetchAuditEvents = async () => {
-      try {
-        setAuditLoading(true);
-        const resp = await getDeviceAuditEvents(deviceId, selectedDate, { size: 1000 });
-        if (!cancelled) setAuditEvents(resp.events);
-      } catch (err) {
-        console.error('Failed to load audit events', err);
-        if (!cancelled) setAuditEvents([]);
-      } finally {
-        if (!cancelled) setAuditLoading(false);
-      }
-    };
-
-    fetchAuditEvents();
     return () => { cancelled = true; };
   }, [deviceId, selectedDate]);
 
@@ -220,54 +195,6 @@ export default function DeviceRecordingsPage() {
     setActiveSegmentIndex(0);
     setTimeline(null);
     setVideoUrl(null);
-    setAuditEvents([]);
-    setActiveAuditEventId(undefined);
-  };
-
-  // Find segment for audit event by timestamp
-  const handleAuditEventClick = (event: AuditEvent) => {
-    setActiveAuditEventId(event.id);
-
-    if (!timeline) return;
-
-    const eventTime = new Date(event.event_ts).getTime();
-
-    for (const session of timeline.sessions) {
-      let segStartMs = new Date(session.started_ts).getTime();
-
-      for (let i = 0; i < session.segments.length; i++) {
-        const seg = session.segments[i];
-        const segEndMs = segStartMs + seg.duration_ms;
-
-        if (eventTime >= segStartMs && eventTime < segEndMs) {
-          setActiveSessionId(session.session_id);
-          setActiveSegmentIndex(i);
-          return;
-        }
-        segStartMs = segEndMs;
-      }
-    }
-
-    // Fallback: find closest session/segment
-    let closestSession = timeline.sessions[0];
-    let closestSegIdx = 0;
-    let minDiff = Infinity;
-
-    for (const session of timeline.sessions) {
-      let segStartMs = new Date(session.started_ts).getTime();
-      for (let i = 0; i < session.segments.length; i++) {
-        const diff = Math.abs(eventTime - segStartMs);
-        if (diff < minDiff) {
-          minDiff = diff;
-          closestSession = session;
-          closestSegIdx = i;
-        }
-        segStartMs += session.segments[i].duration_ms;
-      }
-    }
-
-    setActiveSessionId(closestSession.session_id);
-    setActiveSegmentIndex(closestSegIdx);
   };
 
   // Download active session
@@ -536,28 +463,6 @@ export default function DeviceRecordingsPage() {
           )}
         </div>
 
-        {/* Right panel: Audit events */}
-        {timeline && selectedDate && !timelineLoading && (
-          <div className="w-80 shrink-0 border-l border-gray-700 bg-gray-800 flex flex-col min-h-0">
-            {auditLoading ? (
-              <div className="flex-1 flex items-center justify-center">
-                <LoadingSpinner size="sm" />
-              </div>
-            ) : auditEvents.length > 0 ? (
-              <AuditEventTimeline
-                events={auditEvents}
-                timezone={timeline.timezone}
-                sessions={timeline.sessions}
-                onEventClick={handleAuditEventClick}
-                activeEventId={activeAuditEventId}
-              />
-            ) : (
-              <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
-                Нет событий аудита
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );
