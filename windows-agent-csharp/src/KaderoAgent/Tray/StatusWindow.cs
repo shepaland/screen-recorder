@@ -32,14 +32,7 @@ public class StatusWindow : Form
     private Label _recordingStatusLabel = null!;
     private Panel _recordingIndicator = null!;
 
-    // Read-only parameters
-    private Label _fpsValue = null!;
-    private Label _qualityValue = null!;
-    private Label _resolutionValue = null!;
-    private Label _segmentValue = null!;
-    private Label _heartbeatValue = null!;
-    private Label _autoStartValue = null!;
-    private Label _maxSessionValue = null!;
+    // Device info
     private Label _deviceIdValue = null!;
 
     // Metrics
@@ -70,7 +63,7 @@ public class StatusWindow : Form
     private void InitializeComponent()
     {
         Text = "Кадеро — Статус агента";
-        Size = new Size(480, 640);
+        Size = new Size(480, 520);
         ShowInTaskbar = true;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -138,45 +131,6 @@ public class StatusWindow : Form
         Controls.Add(GlassHelper.CreateLabel("ID устройства", left, y, 140, bold: true, secondary: true));
         _deviceIdValue = GlassHelper.CreateLabel("—", valX, y, 280);
         Controls.Add(_deviceIdValue);
-        y += 28;
-
-        // ── Parameters Section ──
-        Controls.Add(GlassHelper.CreateSectionHeader("Параметры записи", left, y));
-        y += 28;
-
-        Controls.Add(GlassHelper.CreateLabel("FPS", left, y, 140, secondary: true));
-        _fpsValue = GlassHelper.CreateLabel("—", valX, y, 200);
-        Controls.Add(_fpsValue);
-        y += 22;
-
-        Controls.Add(GlassHelper.CreateLabel("Качество", left, y, 140, secondary: true));
-        _qualityValue = GlassHelper.CreateLabel("—", valX, y, 200);
-        Controls.Add(_qualityValue);
-        y += 22;
-
-        Controls.Add(GlassHelper.CreateLabel("Разрешение", left, y, 140, secondary: true));
-        _resolutionValue = GlassHelper.CreateLabel("—", valX, y, 200);
-        Controls.Add(_resolutionValue);
-        y += 22;
-
-        Controls.Add(GlassHelper.CreateLabel("Сегмент", left, y, 140, secondary: true));
-        _segmentValue = GlassHelper.CreateLabel("—", valX, y, 200);
-        Controls.Add(_segmentValue);
-        y += 22;
-
-        Controls.Add(GlassHelper.CreateLabel("Heartbeat", left, y, 140, secondary: true));
-        _heartbeatValue = GlassHelper.CreateLabel("—", valX, y, 200);
-        Controls.Add(_heartbeatValue);
-        y += 22;
-
-        Controls.Add(GlassHelper.CreateLabel("Автостарт", left, y, 140, secondary: true));
-        _autoStartValue = GlassHelper.CreateLabel("—", valX, y, 200);
-        Controls.Add(_autoStartValue);
-        y += 22;
-
-        Controls.Add(GlassHelper.CreateLabel("Макс. сессия", left, y, 140, secondary: true));
-        _maxSessionValue = GlassHelper.CreateLabel("—", valX, y, 200);
-        Controls.Add(_maxSessionValue);
         y += 28;
 
         // Separator
@@ -457,7 +411,7 @@ public class StatusWindow : Form
         switch (stateName)
         {
             case "recording":
-                _recordingStatusLabel.Text = stateDisplay ?? "Запись идёт";
+                _recordingStatusLabel.Text = "Включено";
                 _recordingIndicator.BackColor = GlassHelper.StatusGreen;
                 break;
             case "online":
@@ -500,25 +454,6 @@ public class StatusWindow : Form
         UpdateServiceStatus("Running");
 
         _deviceIdValue.Text = status.DeviceId ?? "—";
-        _fpsValue.Text = status.CaptureFps > 0 ? $"{status.CaptureFps} кадров/сек" : "—";
-        _qualityValue.Text = status.Quality switch
-        {
-            "low" => "Низкое",
-            "medium" => "Среднее",
-            "high" => "Высокое",
-            _ => status.Quality ?? "—"
-        };
-        _resolutionValue.Text = !string.IsNullOrEmpty(status.Resolution) ? status.Resolution : "—";
-        _segmentValue.Text = status.SegmentDurationSec > 0 ? $"{status.SegmentDurationSec} сек" : "—";
-        _heartbeatValue.Text = status.HeartbeatIntervalSec > 0 ? $"{status.HeartbeatIntervalSec} сек" : "—";
-        _autoStartValue.Text = status.AutoStart ? "Да" : "Нет";
-        // Prefer SessionMaxDurationMin; fallback to Hours for backward compat
-        if (status.SessionMaxDurationMin > 0)
-            _maxSessionValue.Text = $"{status.SessionMaxDurationMin} мин";
-        else if (status.SessionMaxDurationHours > 0)
-            _maxSessionValue.Text = $"{status.SessionMaxDurationHours} ч";
-        else
-            _maxSessionValue.Text = "---";
 
         _cpuValue.Text = $"{status.CpuPercent:F1}%";
         _memoryValue.Text = $"{status.MemoryMb:F0} МБ";
