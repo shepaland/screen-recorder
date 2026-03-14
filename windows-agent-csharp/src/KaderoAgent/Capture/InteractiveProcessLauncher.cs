@@ -191,11 +191,12 @@ public static class InteractiveProcessLauncher
             logger.LogInformation("Trying console session: {SessionId}", consoleSessionId);
             var pid = TryLaunchInSession(consoleSessionId, exePath, arguments,
                 workingDirectory, logger, stderrLogPath);
-            if (pid > 0) return pid;
-            logger.LogWarning("Console session {SessionId} failed, trying other sessions...", consoleSessionId);
+            if (pid > 0 && IsProcessAlive(pid, logger)) return pid;
+            if (pid > 0) logger.LogWarning("Process {PID} in console session {SessionId} exited immediately", pid, consoleSessionId);
+            else logger.LogWarning("Console session {SessionId} failed, trying other sessions...", consoleSessionId);
         }
 
-        // Strategy 2: Enumerate all WTS sessions and find active ones with a user
+        // Strategy 2: Enumerate all WTS sessions (Active first, then Disconnected)
         var sessionIds = GetActiveUserSessions(logger);
         foreach (var sid in sessionIds)
         {
@@ -203,12 +204,29 @@ public static class InteractiveProcessLauncher
             logger.LogInformation("Trying WTS session: {SessionId}", sid);
             var pid = TryLaunchInSession(sid, exePath, arguments,
                 workingDirectory, logger, stderrLogPath);
-            if (pid > 0) return pid;
+            if (pid > 0 && IsProcessAlive(pid, logger)) return pid;
+            if (pid > 0) logger.LogWarning("Process {PID} in session {SessionId} exited immediately, trying next...", pid, sid);
         }
 
         logger.LogError("No user session available to launch process. Sessions tried: console={Console}, WTS=[{Sessions}]",
             consoleSessionId, string.Join(",", sessionIds));
         return -1;
+    }
+
+    /// <summary>Wait briefly and check if process is still alive (FFmpeg may crash immediately on inaccessible desktop).</summary>
+    private static bool IsProcessAlive(int pid, ILogger logger)
+    {
+        try
+        {
+            Thread.Sleep(500); // Give process time to crash if desktop inaccessible
+            using var proc = System.Diagnostics.Process.GetProcessById(pid);
+            return !proc.HasExited;
+        }
+        catch
+        {
+            logger.LogDebug("Process {PID} not found after launch — likely exited", pid);
+            return false;
+        }
     }
 
     private static List<uint> GetActiveUserSessions(ILogger logger)
@@ -236,7 +254,11 @@ public static class InteractiveProcessLauncher
                     var stationName = Marshal.PtrToStringUni(sessionInfo.pWinStationName) ?? "?";
                     logger.LogDebug("Found session {Id}: state={State}, station={Station}",
                         sessionInfo.SessionId, sessionInfo.State, stationName);
-                    result.Add(sessionInfo.SessionId);
+                    // Active sessions first, disconnected last
+                    if (sessionInfo.State == WTS_CONNECTSTATE_CLASS.WTSActive)
+                        result.Insert(0, sessionInfo.SessionId);
+                    else
+                        result.Add(sessionInfo.SessionId);
                 }
             }
         }
