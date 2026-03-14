@@ -5,6 +5,8 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
+import java.util.UUID;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -21,4 +23,6 @@ public class EmployeeGroupCreateRequest {
     private String color;
 
     private Integer sortOrder;
+
+    private UUID parentId;
 }

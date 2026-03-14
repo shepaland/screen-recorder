@@ -44,6 +44,9 @@ public class EmployeeGroup {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "parent_id")
+    private UUID parentId;
+
     @Column(name = "created_by")
     private UUID createdBy;
 

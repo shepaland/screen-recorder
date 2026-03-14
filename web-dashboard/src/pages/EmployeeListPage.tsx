@@ -7,17 +7,21 @@ import {
   updateEmployeeGroup,
   deleteEmployeeGroup,
   addEmployeeGroupMember,
+  getGroupMetrics,
 } from '../api/employee-groups';
 import type { UserSummary } from '../types/user-activity';
-import type { EmployeeGroup } from '../types/employee-groups';
+import type { EmployeeGroup, GroupMetricsResponse } from '../types/employee-groups';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmployeeGroupSidebar from '../components/employees/EmployeeGroupSidebar';
 import CreateEmployeeGroupModal from '../components/employees/CreateEmployeeGroupModal';
+import GroupTimelineChart from '../components/dashboard/GroupTimelineChart';
 import {
   UserGroupIcon,
   MagnifyingGlassIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  UsersIcon,
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 
 const PAGE_SIZE = 20;
@@ -39,6 +43,19 @@ function getInitials(username: string): string {
   return name.substring(0, 2).toUpperCase();
 }
 
+/** Search recursively for group name by id (supports nested groups) */
+function findGroupName(groups: EmployeeGroup[], id: string): string {
+  for (const g of groups) {
+    if (g.id === id) return g.name;
+    if (g.children) {
+      for (const child of g.children) {
+        if (child.id === id) return `${g.name} / ${child.name}`;
+      }
+    }
+  }
+  return '';
+}
+
 export default function EmployeeListPage() {
   const navigate = useNavigate();
   const [users, setUsers] = useState<UserSummary[]>([]);
@@ -58,6 +75,10 @@ export default function EmployeeListPage() {
   // Modal
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [editingGroup, setEditingGroup] = useState<EmployeeGroup | null>(null);
+  const [createParentId, setCreateParentId] = useState<string | null>(null);
+
+  // Metrics
+  const [metrics, setMetrics] = useState<GroupMetricsResponse | null>(null);
 
   // Assign to group
   const [assigningUser, setAssigningUser] = useState<string | null>(null);
@@ -72,6 +93,15 @@ export default function EmployeeListPage() {
       console.error('Failed to load employee groups', err);
     }
   }, []);
+
+  const fetchMetrics = useCallback(async () => {
+    try {
+      const data = await getGroupMetrics(selectedGroupId || undefined);
+      setMetrics(data);
+    } catch (err) {
+      console.error('Failed to load group metrics', err);
+    }
+  }, [selectedGroupId]);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -104,6 +134,10 @@ export default function EmployeeListPage() {
     fetchUsers();
   }, [fetchUsers]);
 
+  useEffect(() => {
+    fetchMetrics();
+  }, [fetchMetrics]);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(0);
@@ -132,8 +166,9 @@ export default function EmployeeListPage() {
     setPage(0);
   };
 
-  const handleCreateGroup = () => {
+  const handleCreateGroup = (parentId?: string) => {
     setEditingGroup(null);
+    setCreateParentId(parentId || null);
     setShowGroupModal(true);
   };
 
@@ -154,7 +189,7 @@ export default function EmployeeListPage() {
     }
   };
 
-  const handleGroupSubmit = async (data: { name: string; description?: string; color?: string }) => {
+  const handleGroupSubmit = async (data: { name: string; description?: string; color?: string; parent_id?: string }) => {
     try {
       if (editingGroup) {
         await updateEmployeeGroup(editingGroup.id, data);
@@ -162,7 +197,9 @@ export default function EmployeeListPage() {
         await createEmployeeGroup(data);
       }
       setShowGroupModal(false);
+      setCreateParentId(null);
       await fetchGroups();
+      await fetchMetrics();
     } catch (err) {
       console.error('Failed to save group', err);
       alert('Ошибка: ' + (err instanceof Error ? err.message : 'Не удалось сохранить'));
@@ -188,6 +225,12 @@ export default function EmployeeListPage() {
       console.error('Failed to assign employee', err);
     }
   };
+
+  // Chart date range: last 7 days
+  const chartTo = new Date().toISOString().split('T')[0];
+  const chartFromDate = new Date();
+  chartFromDate.setDate(chartFromDate.getDate() - 6);
+  const chartFrom = chartFromDate.toISOString().split('T')[0];
 
   // Close assign menu on click outside
   useEffect(() => {
@@ -221,7 +264,7 @@ export default function EmployeeListPage() {
             <h1 className="text-2xl font-bold text-gray-900">Сотрудники</h1>
             <p className="mt-1 text-sm text-gray-500">
               {selectedGroupId
-                ? `Группа: ${groups.find(g => g.id === selectedGroupId)?.name || ''}`
+                ? `Группа: ${findGroupName(groups, selectedGroupId)}`
                 : showUngrouped
                   ? 'Неразмеченные сотрудники'
                   : 'Все сотрудники'}
@@ -230,6 +273,48 @@ export default function EmployeeListPage() {
           <div className="text-sm text-gray-500">
             {totalElements} сотрудник{totalElements === 1 ? '' : totalElements < 5 ? 'а' : 'ов'}
           </div>
+        </div>
+
+        {/* Metrics cards */}
+        {metrics && (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-3">
+              <div className="p-2 bg-blue-50 rounded-lg">
+                <UsersIcon className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900">{metrics.total_employees}</p>
+                <p className="text-sm text-gray-500">Всего сотрудников</p>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-3">
+              <div className="p-2 bg-green-50 rounded-lg">
+                <CheckCircleIcon className="h-6 w-6 text-green-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900">{metrics.active_employees}</p>
+                <p className="text-sm text-gray-500">Активных</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Timeline charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <GroupTimelineChart
+            groupType="APP"
+            from={chartFrom}
+            to={chartTo}
+            title="Приложения"
+            employeeGroupId={selectedGroupId || undefined}
+          />
+          <GroupTimelineChart
+            groupType="SITE"
+            from={chartFrom}
+            to={chartTo}
+            title="Сайты"
+            employeeGroupId={selectedGroupId || undefined}
+          />
         </div>
 
         {/* Filters */}
@@ -345,12 +430,22 @@ export default function EmployeeListPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <button
-                        onClick={(e) => handleAssignClick(e, user.username)}
-                        className="text-xs text-gray-500 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded transition-colors"
-                      >
-                        В группу
-                      </button>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {user.groups && user.groups.length > 0 ? (
+                          user.groups.map((gn, i) => (
+                            <span key={i} className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                              {gn}
+                            </span>
+                          ))
+                        ) : null}
+                        <button
+                          onClick={(e) => handleAssignClick(e, user.username)}
+                          className="text-xs text-gray-400 hover:text-red-600 hover:bg-red-50 px-1.5 py-0.5 rounded transition-colors"
+                          title="Назначить группу"
+                        >
+                          +
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -385,36 +480,60 @@ export default function EmployeeListPage() {
         )}
       </div>
 
-      {/* Assign dropdown */}
+      {/* Assign dropdown — show flat list of all leaf groups */}
       {showAssignMenu && groups.length > 0 && (
         <div
-          className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px]"
+          className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[200px] max-h-[300px] overflow-y-auto"
           style={{
-            left: Math.min(assignMenuPos.x, window.innerWidth - 200),
-            top: Math.min(assignMenuPos.y, window.innerHeight - 200),
+            left: Math.min(assignMenuPos.x, window.innerWidth - 220),
+            top: Math.min(assignMenuPos.y, window.innerHeight - 320),
           }}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="px-3 py-1.5 text-xs font-medium text-gray-500 uppercase">В группу</div>
-          {groups.map((g) => (
-            <button
-              key={g.id}
-              onClick={() => handleAssignToGroup(g.id)}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
-            >
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: g.color || '#9CA3AF' }} />
-              {g.name}
-            </button>
-          ))}
+          {groups.map((g) => {
+            const hasChildren = g.children && g.children.length > 0;
+            if (hasChildren) {
+              // Show parent as label, children as options
+              return (
+                <div key={g.id}>
+                  <div className="px-3 py-1 text-xs font-semibold text-gray-400 mt-1">{g.name}</div>
+                  {g.children!.map((child) => (
+                    <button
+                      key={child.id}
+                      onClick={() => handleAssignToGroup(child.id)}
+                      className="w-full flex items-center gap-2 px-5 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: child.color || g.color || '#9CA3AF' }} />
+                      {child.name}
+                    </button>
+                  ))}
+                </div>
+              );
+            }
+            // Leaf group at root level
+            return (
+              <button
+                key={g.id}
+                onClick={() => handleAssignToGroup(g.id)}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: g.color || '#9CA3AF' }} />
+                {g.name}
+              </button>
+            );
+          })}
         </div>
       )}
 
       {/* Create/Edit modal */}
       <CreateEmployeeGroupModal
         isOpen={showGroupModal}
-        onClose={() => setShowGroupModal(false)}
+        onClose={() => { setShowGroupModal(false); setCreateParentId(null); }}
         onSubmit={handleGroupSubmit}
         editGroup={editingGroup}
+        parentId={createParentId}
+        parentName={createParentId ? groups.find(g => g.id === createParentId)?.name || null : null}
       />
     </div>
   );

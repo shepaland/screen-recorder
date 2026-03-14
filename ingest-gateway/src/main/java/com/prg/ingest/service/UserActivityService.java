@@ -78,9 +78,9 @@ public class UserActivityService {
             countSql.append(clause);
         }
 
-        // Filter by employee group
+        // Filter by employee group (hierarchical: group + its children)
         if (groupId != null) {
-            String clause = " AND LOWER(username) IN (SELECT LOWER(egm.username) FROM employee_group_members egm WHERE egm.group_id = :groupId AND egm.tenant_id = :tenantId)";
+            String clause = " AND LOWER(username) IN (SELECT LOWER(egm.username) FROM employee_group_members egm WHERE egm.tenant_id = :tenantId AND egm.group_id IN (SELECT id FROM employee_groups WHERE id = :groupId OR parent_id = :groupId))";
             sql.append(clause);
             countSql.append(clause);
         } else if (Boolean.TRUE.equals(ungrouped)) {
@@ -133,6 +133,15 @@ public class UserActivityService {
                         .isActive(row[7] != null && (Boolean) row[7])
                         .build())
                 .toList();
+
+        // Enrich with group names (L2 / leaf group names)
+        if (!users.isEmpty()) {
+            List<String> usernames = users.stream().map(UserListResponse.UserSummary::getUsername).toList();
+            Map<String, List<String>> groupsByUsername = getGroupNamesForUsers(tenantId, usernames);
+            for (UserListResponse.UserSummary u : users) {
+                u.setGroups(groupsByUsername.getOrDefault(u.getUsername().toLowerCase(), Collections.emptyList()));
+            }
+        }
 
         return UserListResponse.builder()
                 .content(users)
@@ -801,6 +810,42 @@ public class UserActivityService {
     }
 
     // --- Helper methods ---
+
+    /**
+     * Fetch group names for a batch of usernames.
+     * Returns a map: lowercase(username) -> list of group names.
+     */
+    private Map<String, List<String>> getGroupNamesForUsers(UUID tenantId, List<String> usernames) {
+        if (usernames.isEmpty()) return Collections.emptyMap();
+
+        String sql = """
+                SELECT LOWER(egm.username), eg.name
+                FROM employee_group_members egm
+                JOIN employee_groups eg ON eg.id = egm.group_id
+                WHERE egm.tenant_id = :tenantId
+                  AND LOWER(egm.username) IN :usernames
+                ORDER BY eg.name
+                """;
+
+        List<String> lowerUsernames = usernames.stream()
+                .map(String::toLowerCase)
+                .distinct()
+                .collect(Collectors.toList());
+
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = em.createNativeQuery(sql)
+                .setParameter("tenantId", tenantId)
+                .setParameter("usernames", lowerUsernames)
+                .getResultList();
+
+        Map<String, List<String>> result = new HashMap<>();
+        for (Object[] row : rows) {
+            String username = (String) row[0];
+            String groupName = (String) row[1];
+            result.computeIfAbsent(username, k -> new ArrayList<>()).add(groupName);
+        }
+        return result;
+    }
 
     private String getDisplayName(UUID tenantId, String username) {
         var query = em.createNativeQuery(

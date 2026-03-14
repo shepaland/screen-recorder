@@ -10,11 +10,13 @@ const PRESET_COLORS = [
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: { name: string; description?: string; color?: string }) => void;
+  onSubmit: (data: { name: string; description?: string; color?: string; parent_id?: string }) => void;
   editGroup?: EmployeeGroup | null;
+  parentId?: string | null;
+  parentName?: string | null;
 }
 
-export default function CreateEmployeeGroupModal({ isOpen, onClose, onSubmit, editGroup }: Props) {
+export default function CreateEmployeeGroupModal({ isOpen, onClose, onSubmit, editGroup, parentId, parentName }: Props) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState(PRESET_COLORS[0]);
@@ -36,7 +38,12 @@ export default function CreateEmployeeGroupModal({ isOpen, onClose, onSubmit, ed
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onSubmit({ name: name.trim(), description: description.trim() || undefined, color });
+    onSubmit({
+      name: name.trim(),
+      description: description.trim() || undefined,
+      color,
+      parent_id: editGroup ? undefined : (parentId || undefined),
+    });
   };
 
   return (
@@ -44,7 +51,11 @@ export default function CreateEmployeeGroupModal({ isOpen, onClose, onSubmit, ed
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">
-            {editGroup ? 'Редактировать группу' : 'Новая группа'}
+            {editGroup
+              ? 'Редактировать группу'
+              : parentName
+                ? `Новая подгруппа (${parentName})`
+                : 'Новая группа'}
           </h3>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded">
             <XMarkIcon className="h-5 w-5" />

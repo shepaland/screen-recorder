@@ -17,6 +17,7 @@ interface GroupTimelineChartProps {
   from: string;
   to: string;
   title: string;
+  employeeGroupId?: string;
 }
 
 function formatDate(dateStr: string): string {
@@ -82,7 +83,7 @@ function CustomTooltip({ active, payload, label, groups }: CustomTooltipProps) {
   );
 }
 
-export default function GroupTimelineChart({ groupType, from, to, title }: GroupTimelineChartProps) {
+export default function GroupTimelineChart({ groupType, from, to, title, employeeGroupId }: GroupTimelineChartProps) {
   const [data, setData] = useState<GroupTimelineResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,7 +92,7 @@ export default function GroupTimelineChart({ groupType, from, to, title }: Group
     setLoading(true);
     setError(null);
     try {
-      const resp = await catalogsApi.getGroupTimeline(groupType, from, to);
+      const resp = await catalogsApi.getGroupTimeline(groupType, from, to, undefined, employeeGroupId);
       setData(resp);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load timeline';
@@ -103,7 +104,7 @@ export default function GroupTimelineChart({ groupType, from, to, title }: Group
 
   useEffect(() => {
     load();
-  }, [groupType, from, to]);
+  }, [groupType, from, to, employeeGroupId]);
 
   const chartData = useMemo(() => {
     if (!data) return [];

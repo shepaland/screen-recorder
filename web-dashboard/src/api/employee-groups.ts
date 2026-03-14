@@ -5,6 +5,7 @@ import type {
   EmployeeGroupCreateRequest,
   EmployeeGroupUpdateRequest,
   AssignEmployeeRequest,
+  GroupMetricsResponse,
 } from '../types/employee-groups';
 
 export async function getEmployeeGroups(): Promise<EmployeeGroup[]> {
@@ -38,4 +39,11 @@ export async function addEmployeeGroupMember(groupId: string, request: AssignEmp
 
 export async function removeEmployeeGroupMember(memberId: string): Promise<void> {
   await ingestApiClient.delete(`/employee-groups/members/${memberId}`);
+}
+
+export async function getGroupMetrics(groupId?: string): Promise<GroupMetricsResponse> {
+  const { data } = await ingestApiClient.get<GroupMetricsResponse>('/employee-groups/metrics', {
+    params: groupId ? { group_id: groupId } : undefined,
+  });
+  return data;
 }

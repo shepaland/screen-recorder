@@ -35,5 +35,6 @@ public class UserListResponse {
         private Instant lastSeenTs;
         @JsonProperty("is_active")
         private boolean isActive;
+        private List<String> groups;
     }
 }

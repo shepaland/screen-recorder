@@ -129,9 +129,10 @@ export async function getGroupTimeline(
   from: string,
   to: string,
   timezone?: string,
+  employeeGroupId?: string,
 ): Promise<GroupTimelineResponse> {
   const { data } = await ingestApiClient.get<GroupTimelineResponse>('/dashboard/group-timeline', {
-    params: { group_type: groupType, from, to, timezone },
+    params: { group_type: groupType, from, to, timezone, employee_group_id: employeeGroupId },
   });
   return data;
 }

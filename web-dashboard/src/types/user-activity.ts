@@ -7,6 +7,7 @@ export interface UserSummary {
   first_seen_ts: string
   last_seen_ts: string
   is_active: boolean
+  groups?: string[]
 }
 
 export interface UserListResponse {

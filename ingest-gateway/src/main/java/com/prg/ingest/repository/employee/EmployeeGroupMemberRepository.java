@@ -15,7 +15,10 @@ public interface EmployeeGroupMemberRepository extends JpaRepository<EmployeeGro
     List<EmployeeGroupMember> findByGroupIdAndTenantId(UUID groupId, UUID tenantId);
 
     @Query("SELECT m FROM EmployeeGroupMember m WHERE m.tenantId = :tenantId AND LOWER(m.username) = LOWER(:username)")
-    Optional<EmployeeGroupMember> findByTenantIdAndUsernameIgnoreCase(UUID tenantId, String username);
+    List<EmployeeGroupMember> findAllByTenantIdAndUsernameIgnoreCase(UUID tenantId, String username);
+
+    @Query("SELECT m FROM EmployeeGroupMember m WHERE m.group.id = :groupId AND m.tenantId = :tenantId AND LOWER(m.username) = LOWER(:username)")
+    Optional<EmployeeGroupMember> findByGroupIdAndTenantIdAndUsernameIgnoreCase(UUID groupId, UUID tenantId, String username);
 
     Optional<EmployeeGroupMember> findByIdAndTenantId(UUID id, UUID tenantId);
 

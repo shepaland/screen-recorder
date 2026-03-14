@@ -44,6 +44,7 @@ public class DashboardController {
             @RequestParam String from,
             @RequestParam String to,
             @RequestParam(defaultValue = "Europe/Moscow") String timezone,
+            @RequestParam(name = "employee_group_id", required = false) UUID employeeGroupId,
             @RequestParam(name = "tenant_id", required = false) UUID tenantIdParam,
             HttpServletRequest httpRequest) {
 
@@ -51,8 +52,8 @@ public class DashboardController {
         UUID tenantId = resolveEffectiveTenantId(principal, tenantIdParam);
         GroupType type = parseGroupType(groupType);
 
-        log.debug("Getting group timeline: tenant={} groupType={} from={} to={}", tenantId, type, from, to);
-        GroupTimelineResponse response = dashboardService.getGroupTimeline(tenantId, type, from, to, timezone);
+        log.debug("Getting group timeline: tenant={} groupType={} from={} to={} employeeGroup={}", tenantId, type, from, to, employeeGroupId);
+        GroupTimelineResponse response = dashboardService.getGroupTimeline(tenantId, type, from, to, timezone, employeeGroupId);
         return ResponseEntity.ok(response);
     }
 

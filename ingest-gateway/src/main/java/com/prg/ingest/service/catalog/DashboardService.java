@@ -104,6 +104,17 @@ public class DashboardService {
     @Transactional
     public GroupTimelineResponse getGroupTimeline(UUID tenantId, GroupType groupType,
                                                     String from, String to, String timezone) {
+        return getGroupTimeline(tenantId, groupType, from, to, timezone, null);
+    }
+
+    /**
+     * Group timeline: aggregated focus intervals by group per day.
+     * Optionally filtered by employee group (includes group + children).
+     */
+    @Transactional
+    public GroupTimelineResponse getGroupTimeline(UUID tenantId, GroupType groupType,
+                                                    String from, String to, String timezone,
+                                                    UUID employeeGroupId) {
         ensureGroupsExist(tenantId, groupType);
 
         List<AppGroup> groups = groupRepo.findByTenantIdAndGroupTypeOrderBySortOrder(tenantId, groupType);
@@ -128,6 +139,18 @@ public class DashboardService {
         String valueColumn = isApp ? "process_name" : "domain";
         String extraFilter = isApp ? "" : " AND is_browser = true AND domain IS NOT NULL";
 
+        // Employee group filter
+        String employeeGroupFilter = "";
+        if (employeeGroupId != null) {
+            employeeGroupFilter = """
+                     AND LOWER(username) IN (
+                       SELECT LOWER(egm.username) FROM employee_group_members egm
+                       WHERE egm.tenant_id = :tenantId
+                         AND egm.group_id IN (SELECT id FROM employee_groups WHERE id = :employeeGroupId OR parent_id = :employeeGroupId)
+                     )
+                    """;
+        }
+
         String sql = String.format("""
                 SELECT DATE(started_at AT TIME ZONE :tz) AS d,
                        LOWER(%s) AS val,
@@ -137,17 +160,22 @@ public class DashboardService {
                   AND started_at >= CAST(:from AS timestamp) AT TIME ZONE :tz
                   AND started_at < (CAST(:to AS timestamp) + INTERVAL '1 day') AT TIME ZONE :tz
                   %s
+                  %s
                 GROUP BY d, val
                 ORDER BY d
-                """, valueColumn, extraFilter);
+                """, valueColumn, extraFilter, employeeGroupFilter);
 
-        @SuppressWarnings("unchecked")
-        List<Object[]> rows = em.createNativeQuery(sql)
+        var query = em.createNativeQuery(sql)
                 .setParameter("tenantId", tenantId)
                 .setParameter("from", from)
                 .setParameter("to", to)
-                .setParameter("tz", timezone)
-                .getResultList();
+                .setParameter("tz", timezone);
+        if (employeeGroupId != null) {
+            query.setParameter("employeeGroupId", employeeGroupId);
+        }
+
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = query.getResultList();
 
         // Aggregate by day and group
         Map<String, Map<UUID, Long>> dayGroupDuration = new LinkedHashMap<>();

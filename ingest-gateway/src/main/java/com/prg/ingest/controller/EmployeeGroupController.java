@@ -119,6 +119,19 @@ public class EmployeeGroupController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/metrics")
+    public ResponseEntity<GroupMetricsResponse> getGroupMetrics(
+            @RequestParam(name = "group_id", required = false) UUID groupId,
+            @RequestParam(name = "tenant_id", required = false) UUID tenantIdParam,
+            HttpServletRequest httpRequest) {
+
+        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_EMPLOYEES_READ);
+        UUID tenantId = resolveEffectiveTenantId(principal, tenantIdParam);
+
+        GroupMetricsResponse response = employeeGroupService.getGroupMetrics(tenantId, groupId);
+        return ResponseEntity.ok(response);
+    }
+
     // ---- Security helpers ----
 
     private DevicePrincipal getPrincipal(HttpServletRequest request) {

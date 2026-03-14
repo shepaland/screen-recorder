@@ -21,4 +21,18 @@ public interface EmployeeGroupRepository extends JpaRepository<EmployeeGroup, UU
 
     @Query("SELECT COUNT(g) > 0 FROM EmployeeGroup g WHERE g.tenantId = :tenantId AND LOWER(g.name) = LOWER(:name) AND g.id <> :excludeId")
     boolean existsByTenantIdAndNameIgnoreCaseAndIdNot(UUID tenantId, String name, UUID excludeId);
+
+    // --- Nested groups support ---
+
+    List<EmployeeGroup> findByTenantIdAndParentIdIsNullOrderBySortOrderAscNameAsc(UUID tenantId);
+
+    List<EmployeeGroup> findByParentId(UUID parentId);
+
+    boolean existsByParentId(UUID parentId);
+
+    @Query("SELECT COUNT(g) > 0 FROM EmployeeGroup g WHERE g.tenantId = :tenantId AND g.parentId = :parentId AND LOWER(g.name) = LOWER(:name)")
+    boolean existsByTenantIdAndParentIdAndNameIgnoreCase(UUID tenantId, UUID parentId, String name);
+
+    @Query("SELECT COUNT(g) > 0 FROM EmployeeGroup g WHERE g.tenantId = :tenantId AND g.parentId = :parentId AND LOWER(g.name) = LOWER(:name) AND g.id <> :excludeId")
+    boolean existsByTenantIdAndParentIdAndNameIgnoreCaseAndIdNot(UUID tenantId, UUID parentId, String name, UUID excludeId);
 }
