@@ -16,7 +16,7 @@ import java.util.Map;
 public class CreateCommandRequest {
 
     @NotBlank(message = "Command type is required")
-    @Pattern(regexp = "^(START_RECORDING|STOP_RECORDING|UPDATE_SETTINGS|RESTART_AGENT|UNREGISTER)$",
+    @Pattern(regexp = "^(START_RECORDING|STOP_RECORDING|UPDATE_SETTINGS|RESTART_AGENT|UNREGISTER|UPLOAD_LOGS)$",
              message = "Invalid command type")
     private String commandType;
 
