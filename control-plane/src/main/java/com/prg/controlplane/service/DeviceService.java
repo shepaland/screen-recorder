@@ -238,6 +238,7 @@ public class DeviceService {
                 .serverTs(now)
                 .pendingCommands(pendingCommands.stream().map(this::toCommandResponse).toList())
                 .nextHeartbeatSec(defaultHeartbeatIntervalSec)
+                .deviceSettings(device.getSettings())
                 .build();
     }
 
