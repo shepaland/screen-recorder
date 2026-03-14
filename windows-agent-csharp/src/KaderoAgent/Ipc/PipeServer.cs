@@ -18,6 +18,7 @@ public class PipeServer : BackgroundService
     private readonly IStatusProvider _statusProvider;
     private readonly ICommandExecutor _commandExecutor;
     private readonly FocusIntervalSink _focusIntervalSink;
+    private readonly InputEventSink _inputEventSink;
     private readonly ILogger<PipeServer> _logger;
     private readonly JsonSerializerOptions _jsonOptions;
 
@@ -25,11 +26,13 @@ public class PipeServer : BackgroundService
         IStatusProvider statusProvider,
         ICommandExecutor commandExecutor,
         FocusIntervalSink focusIntervalSink,
+        InputEventSink inputEventSink,
         ILogger<PipeServer> logger)
     {
         _statusProvider = statusProvider;
         _commandExecutor = commandExecutor;
         _focusIntervalSink = focusIntervalSink;
+        _inputEventSink = inputEventSink;
         _logger = logger;
         _jsonOptions = new JsonSerializerOptions
         {
@@ -148,6 +151,9 @@ public class PipeServer : BackgroundService
             case "report_focus_intervals":
                 return HandleFocusIntervals(request);
 
+            case "report_input_events":
+                return HandleInputEvents(request);
+
             case "restart_service":
                 // Removed: restart via pipe is a DoS risk. Use sc.exe with UAC elevation instead.
                 return new PipeResponse { Success = false, Error = "Restart service via sc.exe (requires elevation)" };
@@ -155,6 +161,48 @@ public class PipeServer : BackgroundService
             default:
                 return new PipeResponse { Success = false, Error = $"Unknown command: {request.Command}" };
         }
+    }
+
+    private PipeResponse HandleInputEvents(PipeRequest request)
+    {
+        var events = request.InputEvents;
+        if (events == null || events.Count == 0)
+            return new PipeResponse { Success = true };
+
+        var fallbackSessionId = _commandExecutor.CurrentSessionId;
+
+        foreach (var data in events)
+        {
+            _inputEventSink.Enqueue(new InputEvent
+            {
+                Id = string.IsNullOrEmpty(data.Id) ? Guid.NewGuid().ToString() : data.Id,
+                EventType = data.EventType,
+                EventTs = DateTime.TryParse(data.EventTs, null,
+                    System.Globalization.DateTimeStyles.RoundtripKind, out var ts) ? ts : DateTime.UtcNow,
+                EventEndTs = data.EventEndTs != null && DateTime.TryParse(data.EventEndTs, null,
+                    System.Globalization.DateTimeStyles.RoundtripKind, out var ets) ? ets : null,
+                ClickX = data.ClickX,
+                ClickY = data.ClickY,
+                ClickButton = data.ClickButton,
+                ClickType = data.ClickType,
+                UiElementType = data.UiElementType,
+                UiElementName = data.UiElementName,
+                KeystrokeCount = data.KeystrokeCount,
+                HasTypingBurst = data.HasTypingBurst,
+                ScrollDirection = data.ScrollDirection,
+                ScrollTotalDelta = data.ScrollTotalDelta,
+                ScrollEventCount = data.ScrollEventCount,
+                ProcessName = data.ProcessName,
+                WindowTitle = data.WindowTitle,
+                SegmentId = data.SegmentId,
+                SegmentOffsetMs = data.SegmentOffsetMs,
+                SessionId = data.SessionId ?? fallbackSessionId
+            });
+        }
+
+        _logger.LogDebug("Enqueued {Count} input events from tray (sessionId={SessionId})",
+            events.Count, fallbackSessionId ?? "none");
+        return new PipeResponse { Success = true };
     }
 
     private PipeResponse HandleFocusIntervals(PipeRequest request)

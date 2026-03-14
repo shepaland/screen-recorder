@@ -18,6 +18,7 @@ public class SessionWatcher : BackgroundService
     private readonly ScreenCaptureManager _captureManager;
     private readonly UserSessionInfo _userSessionInfo;
     private readonly FocusIntervalSink _focusIntervalSink;
+    private readonly InputEventSink _inputEventSink;
     private readonly ILogger<SessionWatcher> _logger;
 
     // AgentService is resolved lazily to avoid circular DI (SessionWatcher is injected into AgentService).
@@ -37,6 +38,7 @@ public class SessionWatcher : BackgroundService
         ScreenCaptureManager captureManager,
         UserSessionInfo userSessionInfo,
         FocusIntervalSink focusIntervalSink,
+        InputEventSink inputEventSink,
         IServiceProvider serviceProvider,
         ILogger<SessionWatcher> logger)
     {
@@ -47,6 +49,7 @@ public class SessionWatcher : BackgroundService
         _captureManager = captureManager;
         _userSessionInfo = userSessionInfo;
         _focusIntervalSink = focusIntervalSink;
+        _inputEventSink = inputEventSink;
         _serviceProvider = serviceProvider;
         _logger = logger;
     }
@@ -154,10 +157,11 @@ public class SessionWatcher : BackgroundService
                             Details = new Dictionary<string, object> { ["reason"] = "SessionLogon" }
                         });
 
-                        // Update FocusIntervalSink with new username
+                        // Update FocusIntervalSink and InputEventSink with new username
                         {
                             var newUsername = _userSessionInfo.GetCurrentUsername();
                             _focusIntervalSink.SetUsername(newUsername);
+                            _inputEventSink.SetUsername(newUsername);
                             _logger.LogInformation("Session logon: username updated to {Username}", newUsername);
                         }
 
@@ -226,10 +230,11 @@ public class SessionWatcher : BackgroundService
                             Details = new Dictionary<string, object> { ["reason"] = e.Reason.ToString() }
                         });
 
-                        // Update FocusIntervalSink username and resume if paused
+                        // Update FocusIntervalSink and InputEventSink username and resume if paused
                         {
                             var reconnectUsername = _userSessionInfo.GetCurrentUsername();
                             _focusIntervalSink.SetUsername(reconnectUsername);
+                            _inputEventSink.SetUsername(reconnectUsername);
                         }
                         {
                             var creds = _credentialStore.Load();

@@ -8,9 +8,10 @@ public static class PipeProtocol
 
 public class PipeRequest
 {
-    public string Command { get; set; } = ""; // "get_status", "reconnect", "report_focus_intervals"
+    public string Command { get; set; } = ""; // "get_status", "reconnect", "report_focus_intervals", "report_input_events"
     public Dictionary<string, string>? Params { get; set; }
     public List<FocusIntervalData>? FocusIntervals { get; set; }
+    public List<InputEventData>? InputEvents { get; set; }
 }
 
 /// <summary>Focus interval DTO for tray→service pipe transport.</summary>
@@ -33,6 +34,43 @@ public class PipeResponse
     public bool Success { get; set; }
     public string? Error { get; set; }
     public AgentStatus? Status { get; set; }
+}
+
+/// <summary>Input event DTO for tray→service pipe transport.</summary>
+public class InputEventData
+{
+    public string Id { get; set; } = "";
+    public string EventType { get; set; } = ""; // "mouse_click", "keyboard_metric", "scroll", "clipboard"
+    public string EventTs { get; set; } = "";
+    public string? EventEndTs { get; set; }
+
+    // Mouse click
+    public int? ClickX { get; set; }
+    public int? ClickY { get; set; }
+    public string? ClickButton { get; set; }
+    public string? ClickType { get; set; }
+
+    // UI element context
+    public string? UiElementType { get; set; }
+    public string? UiElementName { get; set; }
+
+    // Keyboard metric
+    public int? KeystrokeCount { get; set; }
+    public bool? HasTypingBurst { get; set; }
+
+    // Scroll
+    public string? ScrollDirection { get; set; }
+    public int? ScrollTotalDelta { get; set; }
+    public int? ScrollEventCount { get; set; }
+
+    // Context
+    public string? ProcessName { get; set; }
+    public string? WindowTitle { get; set; }
+
+    // Session
+    public string? SessionId { get; set; }
+    public string? SegmentId { get; set; }
+    public int? SegmentOffsetMs { get; set; }
 }
 
 public class AgentStatus

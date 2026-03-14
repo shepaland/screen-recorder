@@ -170,6 +170,8 @@ builder.Services.AddHostedService<ProcessWatcher>();
 builder.Services.AddSingleton<UserSessionInfo>();
 builder.Services.AddSingleton<FocusIntervalSink>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<FocusIntervalSink>());
+builder.Services.AddSingleton<InputEventSink>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<InputEventSink>());
 
 // IPC: status provider and command executor (available in all modes)
 builder.Services.AddSingleton<AgentStatusProvider>();
@@ -323,12 +325,14 @@ if (!args.Contains("--service"))
     commandHandler.SetAgentService(agentService);
 }
 
-// Initialize FocusIntervalSink with current username
+// Initialize FocusIntervalSink and InputEventSink with current username
 {
     var userSessionInfo = host.Services.GetRequiredService<UserSessionInfo>();
     var focusSink = host.Services.GetRequiredService<FocusIntervalSink>();
+    var inputSink = host.Services.GetRequiredService<InputEventSink>();
     var username = userSessionInfo.GetCurrentUsername();
     focusSink.SetUsername(username);
+    inputSink.SetUsername(username);
 }
 
 // Ensure only one agent host runs at a time (Windows Service OR standalone).
