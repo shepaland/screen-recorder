@@ -193,6 +193,9 @@ public class InputTracker : IDisposable
 
         try
         {
+            if (!_pipe.IsConnected)
+                await _pipe.ConnectAsync(3000);
+
             var response = await _pipe.SendAsync(new PipeRequest
             {
                 Command = "report_input_events",
