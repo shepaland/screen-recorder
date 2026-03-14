@@ -1,0 +1,69 @@
+{
+  "task_id": 10,
+  "feature": "Группы устройств с вложенностью и статистикой (#28)",
+  "test_cases": [
+    {
+      "id": "TC-28-01",
+      "title": "POST device-groups создаёт root группу",
+      "status": "Pass",
+      "priority": "High",
+      "blocking": true
+    },
+    {
+      "id": "TC-28-02",
+      "title": "POST device-groups с parent_id создаёт подгруппу",
+      "status": "Pass",
+      "priority": "High",
+      "blocking": true
+    },
+    {
+      "id": "TC-28-03",
+      "title": "Попытка 3-го уровня → 400 DEPTH_EXCEEDED",
+      "status": "Pass",
+      "priority": "High",
+      "blocking": true
+    },
+    {
+      "id": "TC-28-04",
+      "title": "GET device-groups?include_stats=true возвращает stats",
+      "status": "Pass",
+      "priority": "High",
+      "blocking": true
+    },
+    {
+      "id": "TC-28-05",
+      "title": "Stats содержит total_devices, online_devices, total_video_gb",
+      "status": "Pass",
+      "priority": "High",
+      "blocking": true
+    },
+    {
+      "id": "TC-28-06",
+      "title": "Sidebar дерево устройств",
+      "status": "Not Run",
+      "priority": "High",
+      "blocking": false
+    },
+    {
+      "id": "TC-28-07",
+      "title": "Привязка устройства к группе PUT /devices/{id}/group",
+      "status": "Not Run",
+      "priority": "High",
+      "blocking": false
+    },
+    {
+      "id": "TC-28-08",
+      "title": "Фильтр устройств по device_group_id",
+      "status": "Not Run",
+      "priority": "Medium",
+      "blocking": false
+    },
+    {
+      "id": "TC-28-09",
+      "title": "Удаление группы → ON DELETE SET NULL на устройствах",
+      "status": "Not Run",
+      "priority": "Medium",
+      "blocking": false
+    }
+  ]
+}

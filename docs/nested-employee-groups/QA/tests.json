@@ -1,0 +1,69 @@
+{
+  "task_id": 9,
+  "feature": "Вложенные группы сотрудников + графики + метрики (#27)",
+  "test_cases": [
+    {
+      "id": "TC-27-01",
+      "title": "GET groups возвращает дерево с children[]",
+      "status": "Pass",
+      "priority": "High",
+      "blocking": true
+    },
+    {
+      "id": "TC-27-02",
+      "title": "POST group с parent_id создаёт подгруппу",
+      "status": "Pass",
+      "priority": "High",
+      "blocking": true
+    },
+    {
+      "id": "TC-27-03",
+      "title": "Попытка 3-го уровня вложенности → 400",
+      "status": "Pass",
+      "priority": "High",
+      "blocking": true
+    },
+    {
+      "id": "TC-27-04",
+      "title": "GET metrics возвращает total/active employees",
+      "status": "Pass",
+      "priority": "High",
+      "blocking": true
+    },
+    {
+      "id": "TC-27-05",
+      "title": "GET users показывает groups[] badges",
+      "status": "Pass",
+      "priority": "Medium",
+      "blocking": false
+    },
+    {
+      "id": "TC-27-06",
+      "title": "member_count и total_member_count корректны",
+      "status": "Pass",
+      "priority": "Medium",
+      "blocking": false
+    },
+    {
+      "id": "TC-27-07",
+      "title": "Sidebar дерево expand/collapse",
+      "status": "Not Run",
+      "priority": "High",
+      "blocking": false
+    },
+    {
+      "id": "TC-27-08",
+      "title": "Графики APP/SITE фильтруются по employee_group_id",
+      "status": "Not Run",
+      "priority": "High",
+      "blocking": false
+    },
+    {
+      "id": "TC-27-09",
+      "title": "Селектор периода 7/14/30 дней работает",
+      "status": "Not Run",
+      "priority": "Medium",
+      "blocking": false
+    }
+  ]
+}

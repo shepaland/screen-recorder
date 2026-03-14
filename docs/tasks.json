@@ -383,6 +383,11 @@
           "ts": "2026-03-14T13:01:00Z",
           "role": "SA",
           "action": "Системный анализ завершён: 8 типов метаданных, 3 фазы, 11 agent tasks + 7 server tasks. Документ: docs/screen-action-analysis/SA/metadata-enrichment-spec.md"
+        },
+        {
+          "ts": "2026-03-14T15:30:00Z",
+          "role": "SA",
+          "action": "Дополнен SA: секция 11 'Video Timecode Binding' — segment_id + segment_offset_ms для каждого действия, SEGMENT_CONTEXT IPC, frame-level mapping, server-side fallback correlation, расширение БД и DTO. Acceptance criteria обновлены."
         }
       ]
     },
@@ -398,12 +403,13 @@
         "SA": "Done",
         "BE": "Done",
         "FE": "Done",
-        "QA": "New"
+        "QA": "In Progress"
       },
       "artifacts": {
         "sa": "docs/nested-employee-groups-spec.md",
         "be": "V37 миграция (parent_id, multi-group), EmployeeGroup entity, EmployeeGroupService (дерево, метрики, addMember leaf-only), getUsers иерархический фильтр, DashboardService employee_group_id фильтр",
-        "fe": "EmployeeGroupSidebar (дерево expand/collapse), EmployeeListPage (метрики, 2 графика APP/SITE, колонка групп badges, селектор периода 7/14/30д), GroupTimelineChart с employeeGroupId"
+        "fe": "EmployeeGroupSidebar (дерево expand/collapse), EmployeeListPage (метрики, 2 графика APP/SITE, колонка групп badges, селектор периода 7/14/30д), GroupTimelineChart с employeeGroupId",
+        "qa": "docs/nested-employee-groups/QA/tests.json — 6/9 Pass, 3 Not Run (UI тесты)"
       },
       "history": [
         {
@@ -425,6 +431,16 @@
           "ts": "2026-03-14T07:53:53Z",
           "role": "FE",
           "action": "Frontend полностью реализован: EmployeeGroupSidebar дерево, EmployeeListPage метрики+графики+badges+селектор периода 7/14/30д"
+        },
+        {
+          "ts": "2026-03-14T08:28:34Z",
+          "role": "QA",
+          "action": "API smoke-тесты пройдены: 6/9 Pass. UI тесты (sidebar, графики, период) ожидают ручной проверки."
+        },
+        {
+          "ts": "2026-03-14T08:28:34Z",
+          "role": "DevOps",
+          "action": "Deployed: auth-service (V36+V37 миграции), ingest-gateway, control-plane, web-dashboard на test-screen-record"
         }
       ]
     },
@@ -440,12 +456,13 @@
         "SA": "Done",
         "BE": "Done",
         "FE": "Done",
-        "QA": "New"
+        "QA": "In Progress"
       },
       "artifacts": {
         "sa": "docs/device-groups-spec.md",
         "be": "V36 миграция (device_groups, FK devices, DEVICES:MANAGE, depth trigger), DeviceGroup entity, DeviceGroupService (CRUD, stats с storage-stats из ingest-gw), DeviceGroupController, IngestServiceClient, StorageStatsController",
-        "fe": "DeviceGroupTree (sidebar дерево), DeviceGroupStats (3 карточки: total/online/video GB), DeviceGroupDialog (создание/редактирование), AssignGroupDropdown, DevicesListPage рефакторинг"
+        "fe": "DeviceGroupTree (sidebar дерево), DeviceGroupStats (3 карточки: total/online/video GB), DeviceGroupDialog (создание/редактирование), AssignGroupDropdown, DevicesListPage рефакторинг",
+        "qa": "docs/device-groups/QA/tests.json — 5/9 Pass, 4 Not Run (UI тесты)"
       },
       "history": [
         {
@@ -467,6 +484,16 @@
           "ts": "2026-03-14T07:53:53Z",
           "role": "FE",
           "action": "Frontend полностью реализован: DeviceGroupTree, DeviceGroupStats, DeviceGroupDialog, AssignGroupDropdown, DevicesListPage"
+        },
+        {
+          "ts": "2026-03-14T08:28:34Z",
+          "role": "QA",
+          "action": "API smoke-тесты пройдены: 5/9 Pass. UI тесты (sidebar, привязка, фильтр) ожидают ручной проверки."
+        },
+        {
+          "ts": "2026-03-14T08:28:34Z",
+          "role": "DevOps",
+          "action": "Deployed: V36 миграция (device_groups), control-plane с IngestServiceClient, web-dashboard на test-screen-record"
         }
       ]
     }
