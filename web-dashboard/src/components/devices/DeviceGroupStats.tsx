@@ -1,16 +1,16 @@
 import {
   ComputerDesktopIcon,
   SignalIcon,
-  CircleStackIcon,
+  VideoCameraIcon,
 } from '@heroicons/react/24/outline';
 
 interface Props {
   totalDevices: number;
   onlineDevices: number;
-  totalVideoGb: number;
+  recordingDevices: number;
 }
 
-export default function DeviceGroupStats({ totalDevices, onlineDevices, totalVideoGb }: Props) {
+export default function DeviceGroupStats({ totalDevices, onlineDevices, recordingDevices }: Props) {
   const stats = [
     {
       label: 'Всего устройств',
@@ -25,10 +25,10 @@ export default function DeviceGroupStats({ totalDevices, onlineDevices, totalVid
       color: 'text-green-600 bg-green-50',
     },
     {
-      label: 'Объём видео',
-      value: `${totalVideoGb.toFixed(1)} ГБ`,
-      icon: CircleStackIcon,
-      color: 'text-purple-600 bg-purple-50',
+      label: 'Ведётся запись',
+      value: recordingDevices,
+      icon: VideoCameraIcon,
+      color: 'text-red-600 bg-red-50',
     },
   ];
 

@@ -6,6 +6,7 @@ import {
   createDeviceGroup,
   updateDeviceGroup,
   deleteDeviceGroup,
+  assignDeviceToGroup,
 } from '../api/device-groups';
 import type { DeviceResponse } from '../types/device';
 import type { DeviceGroupResponse, CreateDeviceGroupRequest, UpdateDeviceGroupRequest } from '../types/device-groups';
@@ -21,6 +22,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   MagnifyingGlassIcon,
+  EllipsisVerticalIcon,
 } from '@heroicons/react/24/outline';
 
 const PAGE_SIZE = 24;
@@ -63,6 +65,9 @@ export default function DeviceGridPage() {
   const [editingGroup, setEditingGroup] = useState<DeviceGroupResponse | null>(null);
   const [createParentId, setCreateParentId] = useState<string | null>(null);
   const [deleteGroupTarget, setDeleteGroupTarget] = useState<DeviceGroupResponse | null>(null);
+
+  // Context menu
+  const [contextMenu, setContextMenu] = useState<{ device: DeviceResponse; x: number; y: number } | null>(null);
 
   const isAutoRefresh = useRef(false);
 
@@ -126,28 +131,9 @@ export default function DeviceGridPage() {
     return () => clearInterval(interval);
   }, [fetchDevices]);
 
-  // Compute stats for selected group
-  const computedStats = (() => {
-    if (selectedGroupId === null) {
-      const online = groups.reduce((sum, g) => {
-        if (g.parent_id === null) return sum + (g.stats?.online_devices ?? 0);
-        return sum;
-      }, 0);
-      return { totalDevices: totalElements, onlineDevices: online, totalVideoGb: 0 };
-    }
-    if (selectedGroupId === 'ungrouped') {
-      return { totalDevices: totalElements, onlineDevices: 0, totalVideoGb: 0 };
-    }
-    const group = groups.find((g) => g.id === selectedGroupId);
-    if (group?.stats) {
-      return {
-        totalDevices: group.stats.total_devices,
-        onlineDevices: group.stats.online_devices,
-        totalVideoGb: group.stats.total_video_gb,
-      };
-    }
-    return { totalDevices: totalElements, onlineDevices: 0, totalVideoGb: 0 };
-  })();
+  // Compute stats from loaded devices
+  const onlineCount = devices.filter((d) => d.status === 'online').length;
+  const recordingCount = devices.filter((d) => d.status === 'recording').length;
 
   const handleDeviceClick = (deviceId: string) => {
     navigate(`/archive/devices/${deviceId}`);
@@ -200,7 +186,40 @@ export default function DeviceGridPage() {
     setDeleteGroupTarget(null);
   };
 
+  // Assign device to group
+  const handleAssignToGroup = async (deviceId: string, groupId: string | null) => {
+    try {
+      await assignDeviceToGroup(deviceId, groupId);
+      setContextMenu(null);
+      fetchDevices();
+      fetchGroups();
+    } catch {
+      addToast('error', 'Не удалось назначить группу');
+    }
+  };
+
+  // Close context menu on click outside
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handler = () => setContextMenu(null);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [contextMenu]);
+
   const rootGroups = groups.filter((g) => g.parent_id === null);
+
+  // Build flat list of leaf groups for context menu
+  const leafGroups: { id: string; name: string; parentName?: string }[] = [];
+  for (const g of groups) {
+    const children = groups.filter((c) => c.parent_id === g.id);
+    if (children.length > 0) {
+      for (const c of children) {
+        leafGroups.push({ id: c.id, name: c.name, parentName: g.name });
+      }
+    } else if (g.parent_id === null) {
+      leafGroups.push({ id: g.id, name: g.name });
+    }
+  }
 
   return (
     <div className="flex h-[calc(100vh-4rem)]">
@@ -231,9 +250,9 @@ export default function DeviceGridPage() {
 
         {/* Stats cards */}
         <DeviceGroupStats
-          totalDevices={computedStats.totalDevices}
-          onlineDevices={computedStats.onlineDevices}
-          totalVideoGb={computedStats.totalVideoGb}
+          totalDevices={totalElements}
+          onlineDevices={onlineCount}
+          recordingDevices={recordingCount}
         />
 
         {/* Search */}
@@ -274,6 +293,19 @@ export default function DeviceGridPage() {
                   onClick={() => handleDeviceClick(device.id)}
                   className="relative flex flex-col items-center p-4 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-red-300 transition-all cursor-pointer group"
                 >
+                  {/* 3-dot menu button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setContextMenu({ device, x: rect.right, y: rect.bottom });
+                    }}
+                    className="absolute top-1 left-1 p-0.5 rounded-full text-gray-300 hover:text-gray-600 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    title="Действия"
+                  >
+                    <EllipsisVerticalIcon className="h-4 w-4" />
+                  </button>
+
                   {/* Status indicator dot */}
                   <div
                     className={`absolute top-2 right-2 w-2.5 h-2.5 rounded-full ${
@@ -349,6 +381,59 @@ export default function DeviceGridPage() {
           </div>
         )}
       </div>
+
+      {/* Device context menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[200px] max-h-[350px] overflow-y-auto"
+          style={{
+            left: Math.min(contextMenu.x, window.innerWidth - 220),
+            top: Math.min(contextMenu.y, window.innerHeight - 350),
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {contextMenu.device.device_group_id ? (
+            <>
+              <div className="px-3 py-1.5 text-xs font-medium text-gray-500 uppercase">
+                Перенести в...
+              </div>
+              {leafGroups
+                .filter((g) => g.id !== contextMenu.device.device_group_id)
+                .map((g) => (
+                  <button
+                    key={g.id}
+                    onClick={() => handleAssignToGroup(contextMenu.device.id, g.id)}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    {g.parentName ? `${g.parentName} / ${g.name}` : g.name}
+                  </button>
+                ))}
+              <div className="border-t border-gray-200 my-1" />
+              <button
+                onClick={() => handleAssignToGroup(contextMenu.device.id, null)}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
+              >
+                Удалить из группы
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="px-3 py-1.5 text-xs font-medium text-gray-500 uppercase">
+                Добавить в группу
+              </div>
+              {leafGroups.map((g) => (
+                <button
+                  key={g.id}
+                  onClick={() => handleAssignToGroup(contextMenu.device.id, g.id)}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  {g.parentName ? `${g.parentName} / ${g.name}` : g.name}
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Group create/edit dialog */}
       <DeviceGroupDialog

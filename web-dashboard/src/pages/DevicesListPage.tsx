@@ -123,29 +123,9 @@ export default function DevicesListPage() {
     return () => clearInterval(interval);
   }, [fetchDevices]);
 
-  // Compute stats for selected group
-  const computedStats = (() => {
-    if (selectedGroupId === null) {
-      // All devices
-      const online = groups.reduce((sum, g) => {
-        if (g.parent_id === null) return sum + (g.stats?.online_devices ?? 0);
-        return sum;
-      }, 0);
-      return { totalDevices: totalElements, onlineDevices: online, totalVideoGb: 0 };
-    }
-    if (selectedGroupId === 'ungrouped') {
-      return { totalDevices: totalElements, onlineDevices: 0, totalVideoGb: 0 };
-    }
-    const group = groups.find((g) => g.id === selectedGroupId);
-    if (group?.stats) {
-      return {
-        totalDevices: group.stats.total_devices,
-        onlineDevices: group.stats.online_devices,
-        totalVideoGb: group.stats.total_video_gb,
-      };
-    }
-    return { totalDevices: totalElements, onlineDevices: 0, totalVideoGb: 0 };
-  })();
+  // Compute stats from current page devices
+  const onlineCount = devices.filter((d) => d.status === 'online').length;
+  const recordingCount = devices.filter((d) => d.status === 'recording').length;
 
   // Total devices across all groups (for sidebar "All" count)
   // We use the sum of root group stats + ungrouped
@@ -397,9 +377,9 @@ export default function DevicesListPage() {
         {/* Stats cards */}
         <div className="mt-6">
           <DeviceGroupStats
-            totalDevices={computedStats.totalDevices}
-            onlineDevices={computedStats.onlineDevices}
-            totalVideoGb={computedStats.totalVideoGb}
+            totalDevices={totalElements}
+            onlineDevices={onlineCount}
+            recordingDevices={recordingCount}
           />
         </div>
 
