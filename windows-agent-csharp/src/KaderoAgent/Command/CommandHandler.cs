@@ -367,88 +367,79 @@ public class CommandHandler
         await StopRecording(ct);
     }
 
-    /// <summary>Read log files from the last 24 hours and upload them to the server.</summary>
+    /// <summary>Read log files (tail, max 2MB each) and upload them to the server.</summary>
     private async Task UploadLogs(string baseUrl, CancellationToken ct)
     {
+        _logger.LogInformation("UPLOAD_LOGS: starting log collection");
+
         var logDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
             "Kadero", "logs");
 
         if (!Directory.Exists(logDir))
         {
-            _logger.LogWarning("Log directory not found: {Dir}", logDir);
+            _logger.LogWarning("UPLOAD_LOGS: log directory not found: {Dir}", logDir);
             return;
         }
 
         var logFiles = new[] { "kadero-agent.log", "kadero-http.log", "kadero-pipe.log" };
-        var cutoff = DateTime.UtcNow.AddHours(-24);
+        const int maxBytes = 2_000_000; // 2MB per file
         var entries = new List<object>();
 
         foreach (var logFile in logFiles)
         {
             var filePath = Path.Combine(logDir, logFile);
-            if (!File.Exists(filePath)) continue;
+            if (!File.Exists(filePath))
+            {
+                _logger.LogDebug("UPLOAD_LOGS: file not found: {File}", filePath);
+                continue;
+            }
 
             try
             {
-                // Read all lines, filter by timestamp (last 24h)
-                var lines = new List<string>();
-                using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                using var reader = new StreamReader(stream);
-
-                string? line;
-                while ((line = await reader.ReadLineAsync(ct)) != null)
+                // Read file with shared access (log4net uses MinimalLock)
+                string content;
+                using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var reader = new StreamReader(stream))
                 {
-                    // Parse timestamp from log line: "2026-03-14 13:45:00.123 ..."
-                    if (line.Length >= 23 && DateTime.TryParse(line[..23], out var ts))
-                    {
-                        if (ts.ToUniversalTime() >= cutoff)
-                            lines.Add(line);
-                    }
-                    else if (lines.Count > 0)
-                    {
-                        // Continuation line (stack trace, etc.) — include if within window
-                        lines.Add(line);
-                    }
+                    content = await reader.ReadToEndAsync(ct);
                 }
 
-                if (lines.Count == 0) continue;
+                if (string.IsNullOrEmpty(content)) continue;
 
-                var logType = Path.GetFileNameWithoutExtension(logFile); // "kadero-agent"
-                var content = string.Join("\n", lines);
+                // Take last 2MB (tail)
+                if (content.Length > maxBytes)
+                    content = content[^maxBytes..];
 
-                // Limit to ~2MB per log type to avoid massive uploads
-                if (content.Length > 2_000_000)
-                    content = content[^2_000_000..];
-
+                var logType = Path.GetFileNameWithoutExtension(logFile);
                 entries.Add(new
                 {
                     log_type = logType,
                     content,
-                    from_ts = cutoff.ToString("O"),
+                    from_ts = DateTime.UtcNow.AddHours(-24).ToString("O"),
                     to_ts = DateTime.UtcNow.ToString("O")
                 });
 
-                _logger.LogInformation("Prepared log upload: type={Type}, lines={Lines}, bytes={Bytes}",
-                    logType, lines.Count, content.Length);
+                _logger.LogInformation("UPLOAD_LOGS: prepared {Type}: {Bytes} bytes", logType, content.Length);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to read log file: {File}", logFile);
+                _logger.LogWarning(ex, "UPLOAD_LOGS: failed to read {File}", logFile);
             }
         }
 
         if (entries.Count == 0)
         {
-            _logger.LogInformation("No log data to upload");
+            _logger.LogInformation("UPLOAD_LOGS: no log data to upload");
             return;
         }
 
-        // Upload to server
+        // Upload to server via control-plane API
         var deviceId = _authManager.DeviceId;
         var url = $"{baseUrl}/api/cp/v1/devices/{deviceId}/logs";
+        _logger.LogInformation("UPLOAD_LOGS: posting {Count} logs to {Url}", entries.Count, url);
         await _apiClient.PostAsync<object>(url, entries, ct);
-        _logger.LogInformation("Uploaded {Count} log files to server", entries.Count);
+        _logger.LogInformation("UPLOAD_LOGS: uploaded {Count} log files to server", entries.Count);
     }
 
     private async Task RotateSessionAsync(string baseUrl, CancellationToken ct)
