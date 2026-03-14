@@ -21,14 +21,46 @@
         "qa": "docs/catalog-assign-group-modal/QA/tests.json — 5 тест-кейсов. API verified: groups 200, ungrouped 200, assign 201, dashboard top-ungrouped 200. Portal code in JS bundle confirmed."
       },
       "history": [
-        { "ts": "2026-03-13T00:00:00Z", "role": "BA", "action": "Задача создана и зарегистрирована" },
-        { "ts": "2026-03-13T00:00:01Z", "role": "SA", "action": "Анализ завершён: overflow-x-auto + отсутствующий endpoint" },
-        { "ts": "2026-03-13T00:00:02Z", "role": "FE", "action": "Portal fix реализован (ce1f4ab)" },
-        { "ts": "2026-03-13T17:30:00Z", "role": "BE", "action": "Обнаружен отсутствующий endpoint /catalogs/ungrouped. Реализован UngroupedPageResponse + CatalogService.getUngrouped + CatalogController endpoint" },
-        { "ts": "2026-03-13T17:40:00Z", "role": "BE", "action": "Fix ClassCastException: Instant vs Timestamp в native query result" },
-        { "ts": "2026-03-13T17:42:00Z", "role": "DevOps", "action": "Deployed web-dashboard + auth-service + ingest-gateway to test-screen-record" },
-        { "ts": "2026-03-13T17:45:00Z", "role": "QA", "action": "API тесты пройдены: ungrouped 200, groups 200, assign 201, dashboard 200. Portal code verified in JS bundle." },
-        { "ts": "2026-03-13T17:46:00Z", "role": "BA", "action": "Задача принята. Функционал доступен на test." }
+        {
+          "ts": "2026-03-13T00:00:00Z",
+          "role": "BA",
+          "action": "Задача создана и зарегистрирована"
+        },
+        {
+          "ts": "2026-03-13T00:00:01Z",
+          "role": "SA",
+          "action": "Анализ завершён: overflow-x-auto + отсутствующий endpoint"
+        },
+        {
+          "ts": "2026-03-13T00:00:02Z",
+          "role": "FE",
+          "action": "Portal fix реализован (ce1f4ab)"
+        },
+        {
+          "ts": "2026-03-13T17:30:00Z",
+          "role": "BE",
+          "action": "Обнаружен отсутствующий endpoint /catalogs/ungrouped. Реализован UngroupedPageResponse + CatalogService.getUngrouped + CatalogController endpoint"
+        },
+        {
+          "ts": "2026-03-13T17:40:00Z",
+          "role": "BE",
+          "action": "Fix ClassCastException: Instant vs Timestamp в native query result"
+        },
+        {
+          "ts": "2026-03-13T17:42:00Z",
+          "role": "DevOps",
+          "action": "Deployed web-dashboard + auth-service + ingest-gateway to test-screen-record"
+        },
+        {
+          "ts": "2026-03-13T17:45:00Z",
+          "role": "QA",
+          "action": "API тесты пройдены: ungrouped 200, groups 200, assign 201, dashboard 200. Portal code verified in JS bundle."
+        },
+        {
+          "ts": "2026-03-13T17:46:00Z",
+          "role": "BA",
+          "action": "Задача принята. Функционал доступен на test."
+        }
       ]
     },
     {
@@ -50,14 +82,46 @@
         "qa": "Verified: username определяется как AIR911D\\ashep (реальный пользователь через WTS) вместо WORKGROUP\\AIR911D$ (машинный аккаунт). Сервер недоступен с Windows-машины для полного E2E теста."
       },
       "history": [
-        { "ts": "2026-03-13T18:00:00Z", "role": "BA", "action": "Задача создана: агент шлёт события от системного пользователя после перезагрузки" },
-        { "ts": "2026-03-13T18:01:00Z", "role": "SA", "action": "Root cause: IsMachineAccount() не реализован, Environment fallback не фильтрует машинные аккаунты" },
-        { "ts": "2026-03-13T18:05:00Z", "role": "BE", "action": "UserSessionInfo.cs: добавлен IsMachineAccount(), GetCurrentUsername() возвращает null для системных аккаунтов, добавлен GetAllActiveUserSessions()" },
-        { "ts": "2026-03-13T18:06:00Z", "role": "BE", "action": "AuditEventSink.cs: skip upload при username==null, FocusIntervalSink.cs: SetUsername принимает string?" },
-        { "ts": "2026-03-13T18:10:00Z", "role": "BE", "action": "Сборка и установка на 192.168.1.135. Инсталлятор: C:\\kadero_install\\KaderoAgentSetup.exe" },
-        { "ts": "2026-03-13T18:12:00Z", "role": "QA", "action": "Verified: username=AIR911D\\ashep (WTS), не WORKGROUP\\AIR911D$ (machine). Сервер недоступен для E2E." },
-        { "ts": "2026-03-13T19:20:00Z", "role": "QA", "action": "E2E Pass после перезагрузки: deferred 3 цикла (null username), после логина shepaland → 38+16 events uploaded. Машинный аккаунт не используется." },
-        { "ts": "2026-03-13T19:21:00Z", "role": "BA", "action": "Задача принята. Фикс подтверждён на 192.168.1.135." }
+        {
+          "ts": "2026-03-13T18:00:00Z",
+          "role": "BA",
+          "action": "Задача создана: агент шлёт события от системного пользователя после перезагрузки"
+        },
+        {
+          "ts": "2026-03-13T18:01:00Z",
+          "role": "SA",
+          "action": "Root cause: IsMachineAccount() не реализован, Environment fallback не фильтрует машинные аккаунты"
+        },
+        {
+          "ts": "2026-03-13T18:05:00Z",
+          "role": "BE",
+          "action": "UserSessionInfo.cs: добавлен IsMachineAccount(), GetCurrentUsername() возвращает null для системных аккаунтов, добавлен GetAllActiveUserSessions()"
+        },
+        {
+          "ts": "2026-03-13T18:06:00Z",
+          "role": "BE",
+          "action": "AuditEventSink.cs: skip upload при username==null, FocusIntervalSink.cs: SetUsername принимает string?"
+        },
+        {
+          "ts": "2026-03-13T18:10:00Z",
+          "role": "BE",
+          "action": "Сборка и установка на 192.168.1.135. Инсталлятор: C:\\kadero_install\\KaderoAgentSetup.exe"
+        },
+        {
+          "ts": "2026-03-13T18:12:00Z",
+          "role": "QA",
+          "action": "Verified: username=AIR911D\\ashep (WTS), не WORKGROUP\\AIR911D$ (machine). Сервер недоступен для E2E."
+        },
+        {
+          "ts": "2026-03-13T19:20:00Z",
+          "role": "QA",
+          "action": "E2E Pass после перезагрузки: deferred 3 цикла (null username), после логина shepaland → 38+16 events uploaded. Машинный аккаунт не используется."
+        },
+        {
+          "ts": "2026-03-13T19:21:00Z",
+          "role": "BA",
+          "action": "Задача принята. Фикс подтверждён на 192.168.1.135."
+        }
       ]
     },
     {
@@ -78,12 +142,36 @@
         "fe": "AssignGroupDropdown: scroll/resize listeners, viewport bounds (open up/down), min 5 items, scroll shadow indicators, Escape to close. Один компонент — работает на дашборде и в справочниках."
       },
       "history": [
-        { "ts": "2026-03-13T19:30:00Z", "role": "BA", "action": "Задача создана: дропдаун не привязан к строке, выходит за viewport" },
-        { "ts": "2026-03-13T19:31:00Z", "role": "SA", "action": "Анализ: position:fixed без scroll listener, нет viewport bounds, max-h-48 недостаточно" },
-        { "ts": "2026-03-13T19:35:00Z", "role": "FE", "action": "Реализовано: scroll/resize event listeners, viewport bounds check, open up if no space below, min 5 items, scroll shadow indicators" },
-        { "ts": "2026-03-13T19:40:00Z", "role": "DevOps", "action": "Deployed web-dashboard to test-screen-record" },
-        { "ts": "2026-03-13T19:45:00Z", "role": "QA", "action": "Пользователь подтвердил: дропдаун работает корректно" },
-        { "ts": "2026-03-13T19:45:01Z", "role": "BA", "action": "Задача принята" }
+        {
+          "ts": "2026-03-13T19:30:00Z",
+          "role": "BA",
+          "action": "Задача создана: дропдаун не привязан к строке, выходит за viewport"
+        },
+        {
+          "ts": "2026-03-13T19:31:00Z",
+          "role": "SA",
+          "action": "Анализ: position:fixed без scroll listener, нет viewport bounds, max-h-48 недостаточно"
+        },
+        {
+          "ts": "2026-03-13T19:35:00Z",
+          "role": "FE",
+          "action": "Реализовано: scroll/resize event listeners, viewport bounds check, open up if no space below, min 5 items, scroll shadow indicators"
+        },
+        {
+          "ts": "2026-03-13T19:40:00Z",
+          "role": "DevOps",
+          "action": "Deployed web-dashboard to test-screen-record"
+        },
+        {
+          "ts": "2026-03-13T19:45:00Z",
+          "role": "QA",
+          "action": "Пользователь подтвердил: дропдаун работает корректно"
+        },
+        {
+          "ts": "2026-03-13T19:45:01Z",
+          "role": "BA",
+          "action": "Задача принята"
+        }
       ]
     },
     {
@@ -105,15 +193,51 @@
         "qa": "docs/macos-agent-parity/QA/tests.json — 12 тест-кейсов, 12 Pass. Build: 0 errors, 0 warnings. 44 файлов, 4479 LOC."
       },
       "history": [
-        { "ts": "2026-03-13T20:00:00Z", "role": "BA", "action": "Задача создана: 4 доработки macOS-агента для паритета с Windows" },
-        { "ts": "2026-03-13T20:01:00Z", "role": "SA", "action": "Системный анализ завершён: 4 подзадачи, декомпозиция на 10 файлов" },
-        { "ts": "2026-03-13T20:10:00Z", "role": "BE", "action": "BE-1: SessionManager 409 retry (99 LOC). catch .conflict → closeActiveSessionsForDevice → retry" },
-        { "ts": "2026-03-13T20:11:00Z", "role": "BE", "action": "BE-2: BrowserDomainParser 90 mappings + multi-strategy resolution (277 LOC)" },
-        { "ts": "2026-03-13T20:12:00Z", "role": "BE", "action": "BE-3: Session rotation timer + rotateSession() в AgentService" },
-        { "ts": "2026-03-13T20:13:00Z", "role": "BE", "action": "BE-4: ProcessWatcher (155 LOC): NSWorkspace notifications, 3s debounce, system filter" },
-        { "ts": "2026-03-13T20:14:00Z", "role": "BE", "action": "Статические проверки: swift build → Build complete! 0 errors, 0 warnings" },
-        { "ts": "2026-03-13T20:15:00Z", "role": "QA", "action": "12 тест-кейсов: 12 Pass. Code review: все 4 доработки корректны, Windows parity достигнут" },
-        { "ts": "2026-03-13T20:16:00Z", "role": "BA", "action": "Задача принята. Все 4 доработки реализованы и протестированы." }
+        {
+          "ts": "2026-03-13T20:00:00Z",
+          "role": "BA",
+          "action": "Задача создана: 4 доработки macOS-агента для паритета с Windows"
+        },
+        {
+          "ts": "2026-03-13T20:01:00Z",
+          "role": "SA",
+          "action": "Системный анализ завершён: 4 подзадачи, декомпозиция на 10 файлов"
+        },
+        {
+          "ts": "2026-03-13T20:10:00Z",
+          "role": "BE",
+          "action": "BE-1: SessionManager 409 retry (99 LOC). catch .conflict → closeActiveSessionsForDevice → retry"
+        },
+        {
+          "ts": "2026-03-13T20:11:00Z",
+          "role": "BE",
+          "action": "BE-2: BrowserDomainParser 90 mappings + multi-strategy resolution (277 LOC)"
+        },
+        {
+          "ts": "2026-03-13T20:12:00Z",
+          "role": "BE",
+          "action": "BE-3: Session rotation timer + rotateSession() в AgentService"
+        },
+        {
+          "ts": "2026-03-13T20:13:00Z",
+          "role": "BE",
+          "action": "BE-4: ProcessWatcher (155 LOC): NSWorkspace notifications, 3s debounce, system filter"
+        },
+        {
+          "ts": "2026-03-13T20:14:00Z",
+          "role": "BE",
+          "action": "Статические проверки: swift build → Build complete! 0 errors, 0 warnings"
+        },
+        {
+          "ts": "2026-03-13T20:15:00Z",
+          "role": "QA",
+          "action": "12 тест-кейсов: 12 Pass. Code review: все 4 доработки корректны, Windows parity достигнут"
+        },
+        {
+          "ts": "2026-03-13T20:16:00Z",
+          "role": "BA",
+          "action": "Задача принята. Все 4 доработки реализованы и протестированы."
+        }
       ]
     },
     {
@@ -132,10 +256,26 @@
         "fe": "DeviceRecordingsPage.tsx: удалена правая панель (AuditEventTimeline), удалены импорты и состояния auditEvents/auditLoading/activeAuditEventId, удалён fetch audit events, удалён handleAuditEventClick. TypeScript: 0 ошибок."
       },
       "history": [
-        { "ts": "2026-03-14T00:00:00Z", "role": "BA", "action": "Задача создана: скрыть панель событий в плеере, данные остаются в БД" },
-        { "ts": "2026-03-14T00:01:00Z", "role": "FE", "action": "Удалена правая панель AuditEventTimeline, все связанные состояния и обработчики. tsc --noEmit: 0 ошибок" },
-        { "ts": "2026-03-14T00:02:00Z", "role": "QA", "action": "Статическая проверка: TypeScript компиляция без ошибок, неиспользуемых импортов нет" },
-        { "ts": "2026-03-14T00:03:00Z", "role": "BA", "action": "Задача принята. Панель событий скрыта, данные в БД сохраняются." }
+        {
+          "ts": "2026-03-14T00:00:00Z",
+          "role": "BA",
+          "action": "Задача создана: скрыть панель событий в плеере, данные остаются в БД"
+        },
+        {
+          "ts": "2026-03-14T00:01:00Z",
+          "role": "FE",
+          "action": "Удалена правая панель AuditEventTimeline, все связанные состояния и обработчики. tsc --noEmit: 0 ошибок"
+        },
+        {
+          "ts": "2026-03-14T00:02:00Z",
+          "role": "QA",
+          "action": "Статическая проверка: TypeScript компиляция без ошибок, неиспользуемых импортов нет"
+        },
+        {
+          "ts": "2026-03-14T00:03:00Z",
+          "role": "BA",
+          "action": "Задача принята. Панель событий скрыта, данные в БД сохраняются."
+        }
       ]
     },
     {
@@ -154,8 +294,16 @@
         "arch": "docs/screen-action-analysis/ARCH/pre-implementation-analysis.md"
       },
       "history": [
-        { "ts": "2026-03-14T12:00:00Z", "role": "BA", "action": "Задача зарегистрирована: pre-implementation analysis для сервиса распознавания действий" },
-        { "ts": "2026-03-14T12:01:00Z", "role": "ARCH", "action": "Полный архитектурный анализ завершён: AS-IS, readiness, gap analysis, 3 варианта, target design, risk register, roadmap. Документ: docs/screen-action-analysis/ARCH/pre-implementation-analysis.md" }
+        {
+          "ts": "2026-03-14T12:00:00Z",
+          "role": "BA",
+          "action": "Задача зарегистрирована: pre-implementation analysis для сервиса распознавания действий"
+        },
+        {
+          "ts": "2026-03-14T12:01:00Z",
+          "role": "ARCH",
+          "action": "Полный архитектурный анализ завершён: AS-IS, readiness, gap analysis, 3 варианта, target design, risk register, roadmap. Документ: docs/screen-action-analysis/ARCH/pre-implementation-analysis.md"
+        }
       ]
     },
     {
@@ -177,12 +325,36 @@
         "fe": "Фронтенд не менялся — is_active уже корректно отображается в EmployeeListPage, UserListPage, UsersListPage, UserDetailPage."
       },
       "history": [
-        { "ts": "2026-03-14T06:30:00Z", "role": "BA", "action": "Задача создана: статусная модель сотрудников Активен/Неактивен" },
-        { "ts": "2026-03-14T06:31:00Z", "role": "SA", "action": "Анализ: is_active никогда не сбрасывается. View v_tenant_users нужно пересчитывать по last_seen_ts" },
-        { "ts": "2026-03-14T06:32:00Z", "role": "BE", "action": "V36 миграция: v_tenant_users view — is_active = BOOL_OR(last_seen_ts > NOW() - 5 min). @JsonProperty fix для is_active" },
-        { "ts": "2026-03-14T06:35:00Z", "role": "DevOps", "action": "View применён через psql (Flyway отключён для ingest-gw). ingest-gateway пересобран и задеплоен." },
-        { "ts": "2026-03-14T06:36:00Z", "role": "QA", "action": "API verified: все 4 пользователя is_active=false (нет активности в последние 5 мин). Фильтр is_active=true/false работает." },
-        { "ts": "2026-03-14T06:37:00Z", "role": "BA", "action": "Задача принята. Статус динамический, отображается корректно." }
+        {
+          "ts": "2026-03-14T06:30:00Z",
+          "role": "BA",
+          "action": "Задача создана: статусная модель сотрудников Активен/Неактивен"
+        },
+        {
+          "ts": "2026-03-14T06:31:00Z",
+          "role": "SA",
+          "action": "Анализ: is_active никогда не сбрасывается. View v_tenant_users нужно пересчитывать по last_seen_ts"
+        },
+        {
+          "ts": "2026-03-14T06:32:00Z",
+          "role": "BE",
+          "action": "V36 миграция: v_tenant_users view — is_active = BOOL_OR(last_seen_ts > NOW() - 5 min). @JsonProperty fix для is_active"
+        },
+        {
+          "ts": "2026-03-14T06:35:00Z",
+          "role": "DevOps",
+          "action": "View применён через psql (Flyway отключён для ingest-gw). ingest-gateway пересобран и задеплоен."
+        },
+        {
+          "ts": "2026-03-14T06:36:00Z",
+          "role": "QA",
+          "action": "API verified: все 4 пользователя is_active=false (нет активности в последние 5 мин). Фильтр is_active=true/false работает."
+        },
+        {
+          "ts": "2026-03-14T06:37:00Z",
+          "role": "BA",
+          "action": "Задача принята. Статус динамический, отображается корректно."
+        }
       ]
     },
     {
@@ -202,8 +374,16 @@
         "sa": "docs/screen-action-analysis/SA/metadata-enrichment-spec.md"
       },
       "history": [
-        { "ts": "2026-03-14T13:00:00Z", "role": "BA", "action": "Задача зарегистрирована: обогащение метаданных Windows-агента" },
-        { "ts": "2026-03-14T13:01:00Z", "role": "SA", "action": "Системный анализ завершён: 8 типов метаданных, 3 фазы, 11 agent tasks + 7 server tasks. Документ: docs/screen-action-analysis/SA/metadata-enrichment-spec.md" }
+        {
+          "ts": "2026-03-14T13:00:00Z",
+          "role": "BA",
+          "action": "Задача зарегистрирована: обогащение метаданных Windows-агента"
+        },
+        {
+          "ts": "2026-03-14T13:01:00Z",
+          "role": "SA",
+          "action": "Системный анализ завершён: 8 типов метаданных, 3 фазы, 11 agent tasks + 7 server tasks. Документ: docs/screen-action-analysis/SA/metadata-enrichment-spec.md"
+        }
       ]
     },
     {
@@ -216,16 +396,36 @@
       "role_status": {
         "BA": "Done",
         "SA": "Done",
-        "BE": "New",
-        "FE": "New",
+        "BE": "Done",
+        "FE": "Done",
         "QA": "New"
       },
       "artifacts": {
-        "sa": "docs/nested-employee-groups-spec.md"
+        "sa": "docs/nested-employee-groups-spec.md",
+        "be": "V37 миграция (parent_id, multi-group), EmployeeGroup entity, EmployeeGroupService (дерево, метрики, addMember leaf-only), getUsers иерархический фильтр, DashboardService employee_group_id фильтр",
+        "fe": "EmployeeGroupSidebar (дерево expand/collapse), EmployeeListPage (метрики, 2 графика APP/SITE, колонка групп badges, селектор периода 7/14/30д), GroupTimelineChart с employeeGroupId"
       },
       "history": [
-        { "ts": "2026-03-14T14:00:00Z", "role": "BA", "action": "Задача создана: вложенные группы сотрудников + графики + метрики" },
-        { "ts": "2026-03-14T14:10:00Z", "role": "SA", "action": "Спецификация завершена: parent_id, 2 уровня, иерархический фильтр, метрики, графики. docs/nested-employee-groups-spec.md" }
+        {
+          "ts": "2026-03-14T14:00:00Z",
+          "role": "BA",
+          "action": "Задача создана: вложенные группы сотрудников + графики + метрики"
+        },
+        {
+          "ts": "2026-03-14T14:10:00Z",
+          "role": "SA",
+          "action": "Спецификация завершена: parent_id, 2 уровня, иерархический фильтр, метрики, графики. docs/nested-employee-groups-spec.md"
+        },
+        {
+          "ts": "2026-03-14T07:53:53Z",
+          "role": "BE",
+          "action": "Backend полностью реализован: V37 миграция, entity, repository, service, controller, metrics endpoint, иерархический фильтр users, dashboard employee_group_id"
+        },
+        {
+          "ts": "2026-03-14T07:53:53Z",
+          "role": "FE",
+          "action": "Frontend полностью реализован: EmployeeGroupSidebar дерево, EmployeeListPage метрики+графики+badges+селектор периода 7/14/30д"
+        }
       ]
     },
     {
@@ -238,16 +438,36 @@
       "role_status": {
         "BA": "Done",
         "SA": "Done",
-        "BE": "New",
-        "FE": "New",
+        "BE": "Done",
+        "FE": "Done",
         "QA": "New"
       },
       "artifacts": {
-        "sa": "docs/device-groups-spec.md"
+        "sa": "docs/device-groups-spec.md",
+        "be": "V36 миграция (device_groups, FK devices, DEVICES:MANAGE, depth trigger), DeviceGroup entity, DeviceGroupService (CRUD, stats с storage-stats из ingest-gw), DeviceGroupController, IngestServiceClient, StorageStatsController",
+        "fe": "DeviceGroupTree (sidebar дерево), DeviceGroupStats (3 карточки: total/online/video GB), DeviceGroupDialog (создание/редактирование), AssignGroupDropdown, DevicesListPage рефакторинг"
       },
       "history": [
-        { "ts": "2026-03-14T14:00:00Z", "role": "BA", "action": "Задача создана: группы устройств с вложенностью и статистикой" },
-        { "ts": "2026-03-14T14:10:00Z", "role": "SA", "action": "Спецификация завершена: device_groups + parent_id, stats endpoint, storage-stats, DEVICES:MANAGE. docs/device-groups-spec.md" }
+        {
+          "ts": "2026-03-14T14:00:00Z",
+          "role": "BA",
+          "action": "Задача создана: группы устройств с вложенностью и статистикой"
+        },
+        {
+          "ts": "2026-03-14T14:10:00Z",
+          "role": "SA",
+          "action": "Спецификация завершена: device_groups + parent_id, stats endpoint, storage-stats, DEVICES:MANAGE. docs/device-groups-spec.md"
+        },
+        {
+          "ts": "2026-03-14T07:53:53Z",
+          "role": "BE",
+          "action": "Backend полностью реализован: V36 миграция, entity, repository, service+IngestServiceClient для storage-stats, controller. totalVideoGb теперь вычисляется через cross-service вызов к ingest-gateway"
+        },
+        {
+          "ts": "2026-03-14T07:53:53Z",
+          "role": "FE",
+          "action": "Frontend полностью реализован: DeviceGroupTree, DeviceGroupStats, DeviceGroupDialog, AssignGroupDropdown, DevicesListPage"
+        }
       ]
     }
   ]

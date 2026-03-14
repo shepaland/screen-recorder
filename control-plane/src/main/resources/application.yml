@@ -40,6 +40,8 @@ prg:
   auth-service:
     base-url: ${AUTH_SERVICE_URL:http://localhost:8081}
     internal-api-key: ${INTERNAL_API_KEY}
+  ingest-service:
+    base-url: ${INGEST_SERVICE_URL:http://localhost:8084}
   security:
     internal-api-key: ${INTERNAL_API_KEY}
   device:

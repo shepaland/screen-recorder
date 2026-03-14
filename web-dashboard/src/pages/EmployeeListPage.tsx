@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUsers } from '../api/user-activity';
 import {
@@ -25,6 +25,18 @@ import {
 } from '@heroicons/react/24/outline';
 
 const PAGE_SIZE = 20;
+
+type DateRange = '7' | '14' | '30';
+
+function getDateRange(days: DateRange): { from: string; to: string } {
+  const to = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - parseInt(days));
+  return {
+    from: from.toISOString().slice(0, 10),
+    to: to.toISOString().slice(0, 10),
+  };
+}
 
 function formatTimeAgo(isoDate: string): string {
   const diff = Date.now() - new Date(isoDate).getTime();
@@ -79,6 +91,10 @@ export default function EmployeeListPage() {
 
   // Metrics
   const [metrics, setMetrics] = useState<GroupMetricsResponse | null>(null);
+
+  // Chart date range
+  const [dateRange, setDateRange] = useState<DateRange>('7');
+  const { from: chartFrom, to: chartTo } = useMemo(() => getDateRange(dateRange), [dateRange]);
 
   // Assign to group
   const [assigningUser, setAssigningUser] = useState<string | null>(null);
@@ -226,12 +242,6 @@ export default function EmployeeListPage() {
     }
   };
 
-  // Chart date range: last 7 days
-  const chartTo = new Date().toISOString().split('T')[0];
-  const chartFromDate = new Date();
-  chartFromDate.setDate(chartFromDate.getDate() - 6);
-  const chartFrom = chartFromDate.toISOString().split('T')[0];
-
   // Close assign menu on click outside
   useEffect(() => {
     if (!showAssignMenu) return;
@@ -299,7 +309,28 @@ export default function EmployeeListPage() {
           </div>
         )}
 
-        {/* Timeline charts */}
+        {/* Period selector + Timeline charts */}
+        <div className="flex items-center justify-end">
+          <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-1">
+            {([
+              { value: '7' as DateRange, label: '7 дней' },
+              { value: '14' as DateRange, label: '14 дней' },
+              { value: '30' as DateRange, label: '30 дней' },
+            ]).map(({ value, label }) => (
+              <button
+                key={value}
+                onClick={() => setDateRange(value)}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  dateRange === value
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <GroupTimelineChart
             groupType="APP"

@@ -1,5 +1,6 @@
 package com.prg.controlplane.service;
 
+import com.prg.controlplane.client.IngestServiceClient;
 import com.prg.controlplane.dto.request.BulkAssignDevicesRequest;
 import com.prg.controlplane.dto.request.CreateDeviceGroupRequest;
 import com.prg.controlplane.dto.request.UpdateDeviceGroupRequest;
@@ -26,6 +27,7 @@ public class DeviceGroupService {
 
     private final DeviceGroupRepository deviceGroupRepository;
     private final DeviceRepository deviceRepository;
+    private final IngestServiceClient ingestServiceClient;
 
     @Transactional(readOnly = true)
     public List<DeviceGroupResponse> getGroups(UUID tenantId, boolean includeStats) {
@@ -49,6 +51,21 @@ public class DeviceGroupService {
                 .collect(Collectors.groupingBy(DeviceGroup::getParentId,
                         Collectors.mapping(DeviceGroup::getId, Collectors.toList())));
 
+        // Fetch storage stats from ingest-gateway
+        List<UUID> allDeviceIds = allDevices.stream().map(Device::getId).toList();
+        Map<UUID, Long> storageBytesMap = new HashMap<>();
+        if (!allDeviceIds.isEmpty()) {
+            try {
+                List<IngestServiceClient.DeviceStorageStats> storageStats =
+                        ingestServiceClient.getStorageStats(tenantId, allDeviceIds);
+                for (var stat : storageStats) {
+                    storageBytesMap.put(stat.getDeviceId(), stat.getTotalBytes());
+                }
+            } catch (Exception e) {
+                log.warn("Failed to fetch storage stats, video_gb will be 0: {}", e.getMessage());
+            }
+        }
+
         return groups.stream().map(group -> {
             DeviceGroupResponse resp = toResponse(group);
 
@@ -68,10 +85,16 @@ public class DeviceGroupService {
                     .filter(d -> "online".equals(d.getStatus()) || "recording".equals(d.getStatus()))
                     .count();
 
+            // Sum storage bytes for all devices in this group
+            long totalBytes = groupDevices.stream()
+                    .mapToLong(d -> storageBytesMap.getOrDefault(d.getId(), 0L))
+                    .sum();
+            double totalVideoGb = Math.round(totalBytes / (1024.0 * 1024.0 * 1024.0) * 10.0) / 10.0;
+
             resp.setStats(DeviceGroupStatsResponse.builder()
                     .totalDevices(totalDevices)
                     .onlineDevices(onlineDevices)
-                    .totalVideoGb(0.0) // Will be populated by frontend via separate call if needed
+                    .totalVideoGb(totalVideoGb)
                     .build());
 
             return resp;

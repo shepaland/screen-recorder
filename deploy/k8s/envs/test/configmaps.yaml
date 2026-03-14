@@ -40,6 +40,7 @@ data:
   DB_PORT: "5432"
   DB_NAME: "prg_test"
   AUTH_SERVICE_URL: "http://auth-service:8081"
+  INGEST_SERVICE_URL: "http://ingest-gateway:8084"
   HEARTBEAT_TIMEOUT: "90"
   JAVA_OPTS: "-Xms256m -Xmx512m"
   SWAGGER_API_DOCS_URL: "/screenrecorder/docs/cp/v3/api-docs"
