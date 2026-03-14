@@ -297,13 +297,14 @@ export default function DeviceGridPage() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      e.preventDefault();
                       const rect = e.currentTarget.getBoundingClientRect();
-                      setContextMenu({ device, x: rect.right, y: rect.bottom });
+                      setContextMenu({ device, x: rect.right, y: rect.bottom + 4 });
                     }}
-                    className="absolute top-1 left-1 p-0.5 rounded-full text-gray-300 hover:text-gray-600 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    className="absolute top-1.5 left-1.5 p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-200 transition-colors z-10"
                     title="Действия"
                   >
-                    <EllipsisVerticalIcon className="h-4 w-4" />
+                    <EllipsisVerticalIcon className="h-5 w-5" />
                   </button>
 
                   {/* Status indicator dot */}
