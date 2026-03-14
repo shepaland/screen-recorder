@@ -5,12 +5,14 @@ import com.prg.controlplane.dto.request.UpdateDeviceRequest;
 import com.prg.controlplane.dto.response.*;
 import com.prg.controlplane.entity.Device;
 import com.prg.controlplane.entity.DeviceCommand;
+import com.prg.controlplane.entity.DeviceStatusLog;
 import com.prg.controlplane.exception.AccessDeniedException;
 import com.prg.controlplane.exception.ResourceNotFoundException;
 import com.prg.controlplane.entity.DeviceGroup;
 import com.prg.controlplane.repository.DeviceCommandRepository;
 import com.prg.controlplane.repository.DeviceGroupRepository;
 import com.prg.controlplane.repository.DeviceRepository;
+import com.prg.controlplane.repository.DeviceStatusLogRepository;
 import com.prg.controlplane.repository.RecordingSessionRepository;
 import com.prg.controlplane.security.DevicePrincipal;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,7 @@ public class DeviceService {
     private final DeviceGroupRepository deviceGroupRepository;
     private final DeviceCommandRepository deviceCommandRepository;
     private final RecordingSessionRepository recordingSessionRepository;
+    private final DeviceStatusLogRepository deviceStatusLogRepository;
 
     @Value("${prg.device.default-heartbeat-interval-sec:30}")
     private int defaultHeartbeatIntervalSec;
@@ -201,6 +204,20 @@ public class DeviceService {
             device.setIsActive(true);
             log.info("DEVICE_AUTO_RESTORED: device_id={}, tenant_id={}, trigger=heartbeat",
                     deviceId, principal.getTenantId());
+        }
+
+        // Log status change
+        String oldStatus = device.getStatus();
+        String newStatus = request.getStatus();
+        if (newStatus != null && !newStatus.equals(oldStatus)) {
+            deviceStatusLogRepository.save(DeviceStatusLog.builder()
+                    .tenantId(principal.getTenantId())
+                    .deviceId(deviceId)
+                    .previousStatus(oldStatus)
+                    .newStatus(newStatus)
+                    .changedTs(Instant.now())
+                    .trigger("heartbeat")
+                    .build());
         }
 
         // Update device fields
