@@ -17,3 +17,4 @@ deploy/k8s/envs/**/secrets.yaml
 control-plane/target/
 ingest-gateway/target/
 windows-agent/target/
+macos-agent/KaderoAgent/.build/
