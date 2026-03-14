@@ -20,24 +20,38 @@ public interface UserInputEventRepository extends JpaRepository<UserInputEvent, 
     @Query("SELECT e.id FROM UserInputEvent e WHERE e.id IN :ids")
     Set<UUID> findExistingIds(@Param("ids") Set<UUID> ids);
 
-    @Query("""
-        SELECT e FROM UserInputEvent e
-        WHERE e.tenantId = :tenantId
-          AND e.eventTs >= :from
-          AND e.eventTs < :to
-          AND (:eventTypes IS NULL OR e.eventType IN :eventTypes)
-          AND (:username IS NULL OR e.username = :username)
-          AND (:deviceId IS NULL OR e.deviceId = :deviceId)
-          AND (:search IS NULL
-               OR LOWER(e.processName) LIKE LOWER(CONCAT('%', :search, '%'))
-               OR LOWER(e.windowTitle) LIKE LOWER(CONCAT('%', :search, '%'))
-               OR LOWER(e.uiElementName) LIKE LOWER(CONCAT('%', :search, '%')))
-        """)
+    @Query(value = """
+        SELECT * FROM user_input_events e
+        WHERE e.tenant_id = :tenantId
+          AND e.event_ts >= :from
+          AND e.event_ts < :to
+          AND (CAST(:eventTypes AS text) IS NULL OR e.event_type = ANY(string_to_array(CAST(:eventTypes AS text), ',')))
+          AND (CAST(:username AS text) IS NULL OR e.username = CAST(:username AS text))
+          AND (CAST(:deviceId AS text) IS NULL OR e.device_id = CAST(:deviceId AS uuid))
+          AND (CAST(:search AS text) IS NULL
+               OR LOWER(COALESCE(e.process_name, '')) LIKE LOWER(CONCAT('%', CAST(:search AS text), '%'))
+               OR LOWER(COALESCE(e.window_title, '')) LIKE LOWER(CONCAT('%', CAST(:search AS text), '%'))
+               OR LOWER(COALESCE(e.ui_element_name, '')) LIKE LOWER(CONCAT('%', CAST(:search AS text), '%')))
+        """,
+        countQuery = """
+        SELECT COUNT(*) FROM user_input_events e
+        WHERE e.tenant_id = :tenantId
+          AND e.event_ts >= :from
+          AND e.event_ts < :to
+          AND (CAST(:eventTypes AS text) IS NULL OR e.event_type = ANY(string_to_array(CAST(:eventTypes AS text), ',')))
+          AND (CAST(:username AS text) IS NULL OR e.username = CAST(:username AS text))
+          AND (CAST(:deviceId AS text) IS NULL OR e.device_id = CAST(:deviceId AS uuid))
+          AND (CAST(:search AS text) IS NULL
+               OR LOWER(COALESCE(e.process_name, '')) LIKE LOWER(CONCAT('%', CAST(:search AS text), '%'))
+               OR LOWER(COALESCE(e.window_title, '')) LIKE LOWER(CONCAT('%', CAST(:search AS text), '%'))
+               OR LOWER(COALESCE(e.ui_element_name, '')) LIKE LOWER(CONCAT('%', CAST(:search AS text), '%')))
+        """,
+        nativeQuery = true)
     Page<UserInputEvent> findByFilters(
             @Param("tenantId") UUID tenantId,
             @Param("from") Instant from,
             @Param("to") Instant to,
-            @Param("eventTypes") List<String> eventTypes,
+            @Param("eventTypes") String eventTypes,
             @Param("username") String username,
             @Param("deviceId") UUID deviceId,
             @Param("search") String search,

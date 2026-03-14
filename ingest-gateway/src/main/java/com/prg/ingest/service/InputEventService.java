@@ -228,9 +228,12 @@ public class InputEventService {
                 mapSortField(sortBy));
         Pageable pageable = PageRequest.of(page, Math.min(size, 100), sort);
 
+        String eventTypesStr = (eventTypes != null && !eventTypes.isEmpty())
+                ? String.join(",", eventTypes) : null;
+
         Page<UserInputEvent> events = inputEventRepo.findByFilters(
                 tenantId, from, to,
-                eventTypes != null && !eventTypes.isEmpty() ? eventTypes : null,
+                eventTypesStr,
                 username,
                 deviceId,
                 search != null && !search.isBlank() ? search.trim() : null,
@@ -282,12 +285,13 @@ public class InputEventService {
     }
 
     private String mapSortField(String sortBy) {
+        // Native query uses SQL column names, not JPA field names
         return switch (sortBy) {
-            case "event_ts", "time" -> "eventTs";
+            case "event_ts", "time" -> "event_ts";
             case "username", "employee" -> "username";
-            case "event_type", "type" -> "eventType";
-            case "device_id" -> "deviceId";
-            default -> "eventTs";
+            case "event_type", "type" -> "event_type";
+            case "device_id" -> "device_id";
+            default -> "event_ts";
         };
     }
 
