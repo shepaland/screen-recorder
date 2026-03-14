@@ -20,6 +20,7 @@ interface Props {
   onEditGroup: (group: DeviceGroupResponse) => void;
   onDeleteGroup: (group: DeviceGroupResponse) => void;
   totalDevices: number;
+  ungroupedDevices?: number;
 }
 
 export default function DeviceGroupTree({
@@ -32,6 +33,7 @@ export default function DeviceGroupTree({
   onEditGroup,
   onDeleteGroup,
   totalDevices,
+  ungroupedDevices,
 }: Props) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -50,9 +52,8 @@ export default function DeviceGroupTree({
     childrenByParent.set(parentId, list);
   });
 
-  // For root groups: stats include children, so we only count root stats
-  const rootDeviceCount = rootGroups.reduce((sum, g) => sum + (g.stats?.total_devices ?? 0), 0);
-  const ungroupedCount = Math.max(0, totalDevices - rootDeviceCount);
+  // Use explicit ungroupedDevices if provided, otherwise compute from stats
+  const ungroupedCount = ungroupedDevices ?? Math.max(0, totalDevices - rootGroups.reduce((sum, g) => sum + (g.stats?.total_devices ?? 0), 0));
 
   const toggleExpand = (groupId: string) => {
     setExpandedIds((prev) => {

@@ -60,6 +60,10 @@ export default function DeviceGridPage() {
   const [groups, setGroups] = useState<DeviceGroupResponse[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
+  // Sidebar counts — always reflect real totals, independent of current filter
+  const [allDevicesCount, setAllDevicesCount] = useState(0);
+  const [ungroupedCount, setUngroupedCount] = useState(0);
+
   // Group dialog
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<DeviceGroupResponse | null>(null);
@@ -90,9 +94,24 @@ export default function DeviceGridPage() {
     }
   }, []);
 
+  // Fetch sidebar counts (all devices + ungrouped) — independent of current filter
+  const fetchSidebarCounts = useCallback(async () => {
+    try {
+      const [allResp, ungroupedResp] = await Promise.all([
+        getDevices({ page: 0, size: 1, include_deleted: false }),
+        getDevices({ page: 0, size: 1, include_deleted: false, device_group_id: 'ungrouped' }),
+      ]);
+      setAllDevicesCount(allResp.total_elements);
+      setUngroupedCount(ungroupedResp.total_elements);
+    } catch {
+      // silently fail
+    }
+  }, []);
+
   useEffect(() => {
     fetchGroups();
-  }, [fetchGroups]);
+    fetchSidebarCounts();
+  }, [fetchGroups, fetchSidebarCounts]);
 
   // Fetch devices
   const fetchDevices = useCallback(async () => {
@@ -127,9 +146,10 @@ export default function DeviceGridPage() {
     const interval = setInterval(() => {
       isAutoRefresh.current = true;
       fetchDevices();
+      fetchSidebarCounts();
     }, AUTO_REFRESH_INTERVAL);
     return () => clearInterval(interval);
-  }, [fetchDevices]);
+  }, [fetchDevices, fetchSidebarCounts]);
 
   // Compute stats from loaded devices
   const onlineCount = devices.filter((d) => d.status === 'online').length;
@@ -180,6 +200,7 @@ export default function DeviceGridPage() {
       if (selectedGroupId === deleteGroupTarget.id) setSelectedGroupId(null);
       fetchGroups();
       fetchDevices();
+      fetchSidebarCounts();
     } catch {
       addToast('error', 'Не удалось удалить группу');
     }
@@ -193,6 +214,7 @@ export default function DeviceGridPage() {
       setContextMenu(null);
       fetchDevices();
       fetchGroups();
+      fetchSidebarCounts();
     } catch {
       addToast('error', 'Не удалось назначить группу');
     }
@@ -233,7 +255,8 @@ export default function DeviceGridPage() {
         onCreateGroup={(parentId) => handleCreateGroup(parentId)}
         onEditGroup={handleEditGroup}
         onDeleteGroup={(group) => setDeleteGroupTarget(group)}
-        totalDevices={totalElements}
+        totalDevices={allDevicesCount}
+        ungroupedDevices={ungroupedCount}
       />
 
       {/* Main content */}
