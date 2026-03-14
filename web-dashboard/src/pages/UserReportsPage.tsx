@@ -4,15 +4,17 @@ import WorktimeReport from '../components/reports/WorktimeReport';
 import AppsDomainsReport from '../components/reports/AppsDomainsReport';
 import TimeReport from '../components/reports/TimeReport';
 import TimesheetReport from '../components/reports/TimesheetReport';
+import EmployeeRecordings from '../components/reports/EmployeeRecordings';
 import {
   ArrowLeftIcon,
   ClockIcon,
   ComputerDesktopIcon,
   ChartBarIcon,
   TableCellsIcon,
+  VideoCameraIcon,
 } from '@heroicons/react/24/outline';
 
-type TabId = 'worktime' | 'apps' | 'time' | 'timesheet';
+type TabId = 'worktime' | 'apps' | 'time' | 'timesheet' | 'recordings';
 
 interface Tab {
   id: TabId;
@@ -25,6 +27,7 @@ const TABS: Tab[] = [
   { id: 'apps', name: 'Приложения и сайты', icon: ComputerDesktopIcon },
   { id: 'time', name: 'Отчет по времени', icon: ChartBarIcon },
   { id: 'timesheet', name: 'Табель', icon: TableCellsIcon },
+  { id: 'recordings', name: 'Записи экранов', icon: VideoCameraIcon },
 ];
 
 function getDefaultDateRange(): { from: string; to: string } {
@@ -59,7 +62,7 @@ export default function UserReportsPage() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
-          onClick={() => navigate('/archive/users')}
+          onClick={() => navigate('/archive/employees')}
           className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
         >
           <ArrowLeftIcon className="h-5 w-5" />
@@ -133,6 +136,9 @@ export default function UserReportsPage() {
         )}
         {activeTab === 'timesheet' && (
           <TimesheetReport username={decodedUsername} month={month} />
+        )}
+        {activeTab === 'recordings' && (
+          <EmployeeRecordings username={decodedUsername} from={from} to={to} />
         )}
       </div>
     </div>

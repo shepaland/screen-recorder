@@ -6,6 +6,7 @@ import type {
   DomainsReportResponse,
   WorktimeResponse,
   TimesheetResponse,
+  UserRecordingsResponse,
 } from '../types/user-activity';
 import type { TimelineResponse } from '../types/timeline';
 
@@ -16,6 +17,8 @@ export async function getUsers(params?: {
   sortBy?: string;
   sortDir?: string;
   isActive?: boolean;
+  groupId?: string;
+  ungrouped?: boolean;
 }): Promise<UserListResponse> {
   const { data } = await ingestApiClient.get<UserListResponse>('/users', {
     params: {
@@ -25,6 +28,8 @@ export async function getUsers(params?: {
       sort_by: params?.sortBy,
       sort_dir: params?.sortDir,
       is_active: params?.isActive,
+      group_id: params?.groupId,
+      ungrouped: params?.ungrouped,
     },
   });
   return data;
@@ -111,6 +116,24 @@ export async function getUserTimesheet(
       work_end: params?.workEnd,
       timezone: params?.timezone ?? 'Europe/Moscow',
       device_id: params?.deviceId,
+    },
+  });
+  return data;
+}
+
+export async function getUserRecordings(
+  username: string,
+  from: string,
+  to: string,
+  params?: { page?: number; size?: number },
+): Promise<UserRecordingsResponse> {
+  const { data } = await ingestApiClient.get<UserRecordingsResponse>('/users/recordings', {
+    params: {
+      username,
+      from,
+      to,
+      page: params?.page ?? 0,
+      size: params?.size ?? 20,
     },
   });
   return data;

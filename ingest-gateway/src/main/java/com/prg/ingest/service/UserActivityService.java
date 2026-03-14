@@ -2,6 +2,7 @@ package com.prg.ingest.service;
 
 import com.prg.ingest.dto.response.*;
 import com.prg.ingest.dto.response.UserActivityResponse.*;
+import com.prg.ingest.dto.response.UserRecordingsResponse;
 import com.prg.ingest.repository.DeviceUserSessionRepository;
 import com.prg.ingest.security.DevicePrincipal;
 import jakarta.persistence.EntityManager;
@@ -36,6 +37,13 @@ public class UserActivityService {
     public UserListResponse getUsers(UUID tenantId, int page, int size,
                                      String search, String sortBy, String sortDir,
                                      Boolean isActive) {
+        return getUsers(tenantId, page, size, search, sortBy, sortDir, isActive, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public UserListResponse getUsers(UUID tenantId, int page, int size,
+                                     String search, String sortBy, String sortDir,
+                                     Boolean isActive, UUID groupId, Boolean ungrouped) {
         // Validate sort params via whitelist
         String safeSortColumn = ALLOWED_USER_SORT.getOrDefault(sortBy, "last_seen_ts");
         String safeSortDir = ALLOWED_SORT_DIR.contains(sortDir) ? sortDir : "desc";
@@ -70,6 +78,17 @@ public class UserActivityService {
             countSql.append(clause);
         }
 
+        // Filter by employee group
+        if (groupId != null) {
+            String clause = " AND LOWER(username) IN (SELECT LOWER(egm.username) FROM employee_group_members egm WHERE egm.group_id = :groupId AND egm.tenant_id = :tenantId)";
+            sql.append(clause);
+            countSql.append(clause);
+        } else if (Boolean.TRUE.equals(ungrouped)) {
+            String clause = " AND LOWER(username) NOT IN (SELECT LOWER(egm.username) FROM employee_group_members egm WHERE egm.tenant_id = :tenantId)";
+            sql.append(clause);
+            countSql.append(clause);
+        }
+
         sql.append(" ORDER BY ").append(safeSortColumn).append(" ").append(safeSortDir);
         sql.append(" LIMIT :lim OFFSET :off");
 
@@ -90,6 +109,11 @@ public class UserActivityService {
         if (isActive != null) {
             query.setParameter("isActive", isActive);
             countQuery.setParameter("isActive", isActive);
+        }
+
+        if (groupId != null) {
+            query.setParameter("groupId", groupId);
+            countQuery.setParameter("groupId", groupId);
         }
 
         @SuppressWarnings("unchecked")
@@ -683,6 +707,96 @@ public class UserActivityService {
                         .avgDepartureTime(avgDeparture)
                         .build())
                 .days(tsDays)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public UserRecordingsResponse getUserRecordings(UUID tenantId, String username,
+                                                     String from, String to,
+                                                     int page, int size) {
+        if (page < 0) page = 0;
+        if (size < 1) size = 1;
+        if (size > 100) size = 100;
+
+        // Recording sessions where the user actually had focus intervals
+        // (was actively using the device during the recording).
+        // This ensures only recordings belonging to the specific user are returned,
+        // not all recordings on a shared device.
+        String dataSql = """
+                SELECT DISTINCT rs.id, rs.device_id, d.hostname, rs.status,
+                       rs.started_ts, rs.ended_ts, rs.segment_count, rs.total_bytes, rs.total_duration_ms
+                FROM recording_sessions rs
+                LEFT JOIN devices d ON d.id = rs.device_id
+                WHERE rs.tenant_id = :tenantId
+                  AND rs.started_ts >= CAST(:from AS timestamptz)
+                  AND rs.started_ts < CAST(:to AS timestamptz) + INTERVAL '1 day'
+                  AND EXISTS (
+                    SELECT 1 FROM app_focus_intervals afi
+                    WHERE afi.device_id = rs.device_id
+                      AND afi.tenant_id = rs.tenant_id
+                      AND afi.username = :username
+                      AND afi.started_at >= rs.started_ts
+                      AND afi.started_at <= COALESCE(rs.ended_ts, NOW())
+                  )
+                ORDER BY rs.started_ts DESC
+                LIMIT :lim OFFSET :off
+                """;
+
+        String countSql = """
+                SELECT COUNT(DISTINCT rs.id)
+                FROM recording_sessions rs
+                WHERE rs.tenant_id = :tenantId
+                  AND rs.started_ts >= CAST(:from AS timestamptz)
+                  AND rs.started_ts < CAST(:to AS timestamptz) + INTERVAL '1 day'
+                  AND EXISTS (
+                    SELECT 1 FROM app_focus_intervals afi
+                    WHERE afi.device_id = rs.device_id
+                      AND afi.tenant_id = rs.tenant_id
+                      AND afi.username = :username
+                      AND afi.started_at >= rs.started_ts
+                      AND afi.started_at <= COALESCE(rs.ended_ts, NOW())
+                  )
+                """;
+
+        var query = em.createNativeQuery(dataSql)
+                .setParameter("tenantId", tenantId)
+                .setParameter("username", username)
+                .setParameter("from", from)
+                .setParameter("to", to)
+                .setParameter("lim", size)
+                .setParameter("off", page * size);
+
+        var countQuery = em.createNativeQuery(countSql)
+                .setParameter("tenantId", tenantId)
+                .setParameter("username", username)
+                .setParameter("from", from)
+                .setParameter("to", to);
+
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = query.getResultList();
+        long totalElements = ((Number) countQuery.getSingleResult()).longValue();
+
+        List<UserRecordingsResponse.RecordingItem> items = rows.stream()
+                .map(r -> UserRecordingsResponse.RecordingItem.builder()
+                        .id((UUID) r[0])
+                        .deviceId((UUID) r[1])
+                        .deviceHostname(r[2] != null ? r[2].toString() : null)
+                        .status((String) r[3])
+                        .startedTs(r[4] != null ? toInstant(r[4]).toString() : null)
+                        .endedTs(r[5] != null ? toInstant(r[5]).toString() : null)
+                        .segmentCount(r[6] != null ? ((Number) r[6]).intValue() : 0)
+                        .totalBytes(r[7] != null ? ((Number) r[7]).longValue() : 0)
+                        .totalDurationMs(r[8] != null ? ((Number) r[8]).longValue() : 0)
+                        .build())
+                .toList();
+
+        return UserRecordingsResponse.builder()
+                .username(username)
+                .content(items)
+                .page(page)
+                .size(size)
+                .totalElements(totalElements)
+                .totalPages((int) Math.ceil((double) totalElements / size))
                 .build();
     }
 

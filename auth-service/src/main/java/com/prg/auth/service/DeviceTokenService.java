@@ -227,7 +227,7 @@ public class DeviceTokenService {
                         "Device registration token not found", "TOKEN_NOT_FOUND"));
 
         boolean recordingChanged = false;
-        Map<String, String> auditDetails = new java.util.HashMap<>();
+        Map<String, Object> auditDetails = new java.util.HashMap<>();
 
         if (request.getName() != null) {
             auditDetails.put("old_name", token.getName());

@@ -130,9 +130,15 @@ public class DashboardController {
         return principal;
     }
 
+    /**
+     * For dashboard operations that may trigger catalog seed (group-timeline, top-ungrouped),
+     * tenantId must not be null to avoid NOT NULL constraint violations on INSERT.
+     * For pure read-only aggregations (metrics), null=all tenants is fine.
+     * Global-scope users can specify tenant_id param; if not specified, fall back to their own tenant.
+     */
     private UUID resolveEffectiveTenantId(DevicePrincipal principal, UUID tenantIdParam) {
         if (principal.hasScope("global")) {
-            return tenantIdParam;
+            return tenantIdParam != null ? tenantIdParam : principal.getTenantId();
         }
         return principal.getTenantId();
     }

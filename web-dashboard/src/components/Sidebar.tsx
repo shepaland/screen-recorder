@@ -38,7 +38,7 @@ interface NavItem {
 
 const archiveSubmenu: NavItem[] = [
   { name: 'Устройства', href: '/archive/devices', icon: ComputerDesktopIcon },
-  { name: 'Пользователи', href: '/archive/users', icon: UserGroupIcon },
+  { name: 'Сотрудники', href: '/archive/employees', icon: UserGroupIcon },
   { name: 'Таймлайны', href: '/archive/timelines', icon: ClockIcon },
 ];
 

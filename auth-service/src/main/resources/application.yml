@@ -29,6 +29,8 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+    out-of-order: true
+    ignore-migration-patterns: "*:missing"
 
   mail:
     host: ${SMTP_HOST:sm16.hosting.reg.ru}

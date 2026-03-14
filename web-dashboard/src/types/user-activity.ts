@@ -133,6 +133,27 @@ export interface TimesheetDay {
   overtime_hours: number
 }
 
+export interface RecordingItem {
+  id: string
+  device_id: string
+  device_hostname: string | null
+  status: string
+  started_ts: string | null
+  ended_ts: string | null
+  segment_count: number
+  total_bytes: number
+  total_duration_ms: number
+}
+
+export interface UserRecordingsResponse {
+  username: string
+  content: RecordingItem[]
+  page: number
+  size: number
+  total_elements: number
+  total_pages: number
+}
+
 export interface TimesheetResponse {
   username: string
   display_name: string | null

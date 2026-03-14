@@ -1,6 +1,7 @@
 package com.prg.ingest.controller;
 
 import com.prg.ingest.dto.response.*;
+import com.prg.ingest.dto.response.UserRecordingsResponse;
 import com.prg.ingest.exception.AccessDeniedException;
 import com.prg.ingest.filter.JwtValidationFilter;
 import com.prg.ingest.security.DevicePrincipal;
@@ -37,16 +38,18 @@ public class UserActivityController {
             @RequestParam(name = "sort_by", defaultValue = "last_seen_ts") String sortBy,
             @RequestParam(name = "sort_dir", defaultValue = "desc") String sortDir,
             @RequestParam(name = "is_active", required = false) Boolean isActive,
+            @RequestParam(name = "group_id", required = false) UUID groupId,
+            @RequestParam(name = "ungrouped", required = false) Boolean ungrouped,
             @RequestParam(name = "tenant_id", required = false) UUID tenantIdParam,
             HttpServletRequest httpRequest) {
 
         DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_RECORDINGS_READ);
         UUID tenantId = resolveEffectiveTenantId(principal, tenantIdParam);
 
-        log.debug("Getting users list: tenant={} page={} size={}", tenantId, page, size);
+        log.debug("Getting users list: tenant={} page={} size={} group={} ungrouped={}", tenantId, page, size, groupId, ungrouped);
 
         UserListResponse response = userActivityService.getUsers(
-                tenantId, page, size, search, sortBy, sortDir, isActive);
+                tenantId, page, size, search, sortBy, sortDir, isActive, groupId, ungrouped);
         return ResponseEntity.ok(response);
     }
 
@@ -159,6 +162,28 @@ public class UserActivityController {
 
         TimesheetResponse response = userActivityService.getUserTimesheet(
                 tenantId, username, month, workStart, workEnd, timezone, deviceId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/v1/ingest/users/recordings?username=...&from=...&to=...
+     * Returns recording sessions for the user based on temporal overlap with device_user_sessions.
+     */
+    @GetMapping("/recordings")
+    public ResponseEntity<UserRecordingsResponse> getUserRecordings(
+            @RequestParam String username,
+            @RequestParam String from,
+            @RequestParam String to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(name = "tenant_id", required = false) UUID tenantIdParam,
+            HttpServletRequest httpRequest) {
+
+        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_RECORDINGS_READ);
+        UUID tenantId = resolveEffectiveTenantId(principal, tenantIdParam);
+
+        UserRecordingsResponse response = userActivityService.getUserRecordings(
+                tenantId, username, from, to, page, size);
         return ResponseEntity.ok(response);
     }
 
