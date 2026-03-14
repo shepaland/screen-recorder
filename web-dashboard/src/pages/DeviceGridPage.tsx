@@ -152,7 +152,7 @@ export default function DeviceGridPage() {
   }, [fetchDevices, fetchSidebarCounts]);
 
   // Compute stats from loaded devices
-  const onlineCount = devices.filter((d) => d.status === 'online').length;
+  const onlineCount = devices.filter((d) => d.status === 'online' || d.status === 'recording').length;
   const recordingCount = devices.filter((d) => d.status === 'recording').length;
 
   const handleDeviceClick = (deviceId: string) => {

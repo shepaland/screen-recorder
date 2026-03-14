@@ -124,7 +124,7 @@ export default function DevicesListPage() {
   }, [fetchDevices]);
 
   // Compute stats from current page devices
-  const onlineCount = devices.filter((d) => d.status === 'online').length;
+  const onlineCount = devices.filter((d) => d.status === 'online' || d.status === 'recording').length;
   const recordingCount = devices.filter((d) => d.status === 'recording').length;
 
   // Total devices across all groups (for sidebar "All" count)
