@@ -383,7 +383,7 @@ public class CommandHandler
         }
 
         var logFiles = new[] { "kadero-agent.log", "kadero-http.log", "kadero-pipe.log" };
-        const int maxBytes = 2_000_000; // 2MB per file
+        const int maxBytes = 500_000; // 500KB per file (total ~1.5MB to avoid nginx limits)
         var entries = new List<object>();
 
         foreach (var logFile in logFiles)
