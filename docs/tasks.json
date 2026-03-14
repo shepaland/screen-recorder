@@ -367,11 +367,19 @@
       "role_status": {
         "BA": "Done",
         "SA": "Done",
+<<<<<<< Updated upstream
+        "FE": "New",
         "BE": "New",
+=======
+        "FE": "Done",
+        "BE": "Done",
+>>>>>>> Stashed changes
         "QA": "New"
       },
       "artifacts": {
-        "sa": "docs/screen-action-analysis/SA/metadata-enrichment-spec.md"
+        "sa": "docs/screen-action-analysis/SA/metadata-enrichment-spec.md",
+        "be": "V38 миграция (user_input_events partitioned, ALTER app_focus_intervals +geometry). UserInputEvent entity+repo. InputEventService (batch insert+dedup, query with filters). InputEventController (POST device JWT + GET user JWT role check). FocusIntervalItem/Entity +geometry fields.",
+        "fe": "BehaviorAuditPage.tsx (таблица, 6 фильтров, expandable rows, 'Перейти к записи'). API client behavior-audit.ts. Sidebar: 'Аудит поведения' в Settings (AUDIT:READ). Route /settings/behavior-audit."
       },
       "history": [
         {
@@ -388,6 +396,25 @@
           "ts": "2026-03-14T15:30:00Z",
           "role": "SA",
           "action": "Дополнен SA: секция 11 'Video Timecode Binding' — segment_id + segment_offset_ms для каждого действия, SEGMENT_CONTEXT IPC, frame-level mapping, server-side fallback correlation, расширение БД и DTO. Acceptance criteria обновлены."
+        },
+        {
+          "ts": "2026-03-14T16:00:00Z",
+          "role": "SA",
+<<<<<<< Updated upstream
+          "action": "Дополнен SA: секция 12 'Настройки → Аудит поведения' — UI таблица input events с фильтрацией (дата, время, тип, сотрудник, устройство), expandable rows, кнопка 'Перейти к записи'. Доступ: SUPER_ADMIN, TENANT_OWNER, TENANT_ADMIN. GET endpoint с пагинацией. Декомпозиция: U1-U5 (FE) + S8 (BE)."
+=======
+          "action": "Дополнен SA: секция 12 'Настройки → Аудит поведения' UI spec"
+        },
+        {
+          "ts": "2026-03-14T17:00:00Z",
+          "role": "BE",
+          "action": "Server Phase 1 реализован: V38 миграция (user_input_events + geometry на app_focus_intervals), Entity/Repo/Service/Controller. POST /input-events (device JWT) + GET /input-events (user JWT, role check SUPER_ADMIN/OWNER/TENANT_ADMIN). Статическая проверка: 0 ошибок в новом коде (предсущ. ошибки в CatalogService не затронуты)."
+        },
+        {
+          "ts": "2026-03-14T17:30:00Z",
+          "role": "FE",
+          "action": "Frontend реализован: BehaviorAuditPage (таблица с фильтрами, expandable rows, кнопка 'Перейти к записи'), API client, Sidebar пункт 'Аудит поведения'. tsc --noEmit: 0 ошибок, eslint: 0 ошибок."
+>>>>>>> Stashed changes
         }
       ]
     },

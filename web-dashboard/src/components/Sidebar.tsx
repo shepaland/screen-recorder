@@ -20,6 +20,7 @@ import {
   GlobeAltIcon,
   ClockIcon,
   BookOpenIcon,
+  EyeIcon,
 } from '@heroicons/react/24/outline';
 import PermissionGate from './PermissionGate';
 import TenantSwitcher from './TenantSwitcher';
@@ -54,6 +55,7 @@ const tenantSettingsSubmenu: NavItem[] = [
   { name: 'Пользователи', href: '/users', icon: UsersIcon, permission: 'USERS:READ' },
   { name: 'Токены', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
   { name: 'Настройки записи', href: '/recording-settings', icon: AdjustmentsHorizontalIcon, permission: 'DEVICES:READ' },
+  { name: 'Аудит поведения', href: '/settings/behavior-audit', icon: EyeIcon, permission: 'AUDIT:READ' },
 ];
 
 /** Settings submenu for superadmin. */
@@ -63,6 +65,7 @@ const superAdminSettingsSubmenu: NavItem[] = [
   { name: 'Агенты', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
   { name: 'Настройки записи', href: '/recording-settings', icon: AdjustmentsHorizontalIcon, permission: 'DEVICES:READ' },
   { name: 'Токены регистрации', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
+  { name: 'Аудит поведения', href: '/settings/behavior-audit', icon: EyeIcon, permission: 'AUDIT:READ' },
 ];
 
 /** Global items outside the company scope. */
@@ -122,7 +125,8 @@ export default function Sidebar({ onClose }: SidebarProps) {
     location.pathname.startsWith('/users') ||
     location.pathname.startsWith('/device-tokens') ||
     location.pathname.startsWith('/recording-settings') ||
-    location.pathname.startsWith('/roles'),
+    location.pathname.startsWith('/roles') ||
+    location.pathname.startsWith('/settings/behavior-audit'),
   );
 
   const handleClick = () => {
@@ -137,7 +141,8 @@ export default function Sidebar({ onClose }: SidebarProps) {
     location.pathname.startsWith('/users') ||
     location.pathname.startsWith('/device-tokens') ||
     location.pathname.startsWith('/recording-settings') ||
-    location.pathname.startsWith('/roles');
+    location.pathname.startsWith('/roles') ||
+    location.pathname.startsWith('/settings/behavior-audit');
 
   return (
     <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-gray-950 px-6 pb-4">

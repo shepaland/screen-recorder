@@ -31,6 +31,7 @@ import RecordingSettingsPage from './pages/RecordingSettingsPage';
 import AppGroupsPage from './pages/AppGroupsPage';
 import SiteGroupsPage from './pages/SiteGroupsPage';
 import TimelinesPage from './pages/TimelinesPage';
+import BehaviorAuditPage from './pages/BehaviorAuditPage';
 
 function App() {
   return (
@@ -200,6 +201,16 @@ function App() {
           element={
             <ProtectedRoute permission="AUDIT:READ">
               <AuditLogPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Behavior Audit */}
+        <Route
+          path="/settings/behavior-audit"
+          element={
+            <ProtectedRoute permission="AUDIT:READ">
+              <BehaviorAuditPage />
             </ProtectedRoute>
           }
         />
