@@ -165,6 +165,9 @@ public class CommandHandler
                 case "RESTART_AGENT":
                     Environment.Exit(0); // Service will auto-restart
                     break;
+                case "UPLOAD_LOGS":
+                    await UploadLogs(baseUrl, ct);
+                    break;
             }
 
             // Acknowledge
@@ -362,6 +365,90 @@ public class CommandHandler
     public async Task StopRecordingExternalAsync(CancellationToken ct)
     {
         await StopRecording(ct);
+    }
+
+    /// <summary>Read log files from the last 24 hours and upload them to the server.</summary>
+    private async Task UploadLogs(string baseUrl, CancellationToken ct)
+    {
+        var logDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "Kadero", "logs");
+
+        if (!Directory.Exists(logDir))
+        {
+            _logger.LogWarning("Log directory not found: {Dir}", logDir);
+            return;
+        }
+
+        var logFiles = new[] { "kadero-agent.log", "kadero-http.log", "kadero-pipe.log" };
+        var cutoff = DateTime.UtcNow.AddHours(-24);
+        var entries = new List<object>();
+
+        foreach (var logFile in logFiles)
+        {
+            var filePath = Path.Combine(logDir, logFile);
+            if (!File.Exists(filePath)) continue;
+
+            try
+            {
+                // Read all lines, filter by timestamp (last 24h)
+                var lines = new List<string>();
+                using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(stream);
+
+                string? line;
+                while ((line = await reader.ReadLineAsync(ct)) != null)
+                {
+                    // Parse timestamp from log line: "2026-03-14 13:45:00.123 ..."
+                    if (line.Length >= 23 && DateTime.TryParse(line[..23], out var ts))
+                    {
+                        if (ts.ToUniversalTime() >= cutoff)
+                            lines.Add(line);
+                    }
+                    else if (lines.Count > 0)
+                    {
+                        // Continuation line (stack trace, etc.) — include if within window
+                        lines.Add(line);
+                    }
+                }
+
+                if (lines.Count == 0) continue;
+
+                var logType = Path.GetFileNameWithoutExtension(logFile); // "kadero-agent"
+                var content = string.Join("\n", lines);
+
+                // Limit to ~2MB per log type to avoid massive uploads
+                if (content.Length > 2_000_000)
+                    content = content[^2_000_000..];
+
+                entries.Add(new
+                {
+                    log_type = logType,
+                    content,
+                    from_ts = cutoff.ToString("O"),
+                    to_ts = DateTime.UtcNow.ToString("O")
+                });
+
+                _logger.LogInformation("Prepared log upload: type={Type}, lines={Lines}, bytes={Bytes}",
+                    logType, lines.Count, content.Length);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to read log file: {File}", logFile);
+            }
+        }
+
+        if (entries.Count == 0)
+        {
+            _logger.LogInformation("No log data to upload");
+            return;
+        }
+
+        // Upload to server
+        var deviceId = _authManager.DeviceId;
+        var url = $"{baseUrl}/api/cp/v1/devices/{deviceId}/logs";
+        await _apiClient.PostAsync<object>(url, entries, ct);
+        _logger.LogInformation("Uploaded {Count} log files to server", entries.Count);
     }
 
     private async Task RotateSessionAsync(string baseUrl, CancellationToken ct)

@@ -59,6 +59,20 @@ export async function getDeviceStatusLog(
   return response.data;
 }
 
+export interface DeviceLogEntry {
+  id: string;
+  log_type: string;
+  content: string;
+  log_from_ts: string | null;
+  log_to_ts: string | null;
+  uploaded_at: string;
+}
+
+export async function getDeviceLogs(deviceId: string): Promise<DeviceLogEntry[]> {
+  const response = await cpApiClient.get<DeviceLogEntry[]>(`/devices/${deviceId}/logs`);
+  return response.data;
+}
+
 export async function getDeviceCommands(
   deviceId: string,
   params?: { page?: number; size?: number },

@@ -102,7 +102,7 @@ export interface RecordingSessionResponse {
 }
 
 export interface CreateCommandRequest {
-  command_type: 'START_RECORDING' | 'STOP_RECORDING' | 'UPDATE_SETTINGS' | 'RESTART_AGENT' | 'UNREGISTER';
+  command_type: 'START_RECORDING' | 'STOP_RECORDING' | 'UPDATE_SETTINGS' | 'RESTART_AGENT' | 'UNREGISTER' | 'UPLOAD_LOGS';
   payload?: Record<string, unknown>;
 }
 

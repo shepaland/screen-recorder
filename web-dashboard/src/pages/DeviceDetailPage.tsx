@@ -18,6 +18,7 @@ import DeviceStatusBadge from '../components/DeviceStatusBadge';
 import StatusBadge from '../components/StatusBadge';
 import PermissionGate from '../components/PermissionGate';
 import ConfirmDialog from '../components/ConfirmDialog';
+import DeviceLogs from '../components/devices/DeviceLogs';
 import DeviceSettingsForm from '../components/DeviceSettingsForm';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useToast } from '../contexts/ToastContext';
@@ -615,6 +616,9 @@ export default function DeviceDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Device Logs */}
+      <DeviceLogs deviceId={id!} />
 
       {/* Delete confirmation dialog */}
       <ConfirmDialog
