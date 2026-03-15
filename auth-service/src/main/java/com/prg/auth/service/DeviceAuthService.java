@@ -34,6 +34,7 @@ public class DeviceAuthService {
     private final JwtConfig jwtConfig;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
+    private final javax.sql.DataSource dataSource;
 
     @Value("${prg.security.max-login-attempts}")
     private int maxLoginAttempts;
@@ -444,12 +445,9 @@ public class DeviceAuthService {
         }
 
         if (shouldBlock) {
-            // Mark device as blocked in DB so UI reflects correct status
-            device.setStatus("blocked");
-            device.setIsActive(false);
-            deviceRepository.save(device);
-            log.info("DEVICE_REFRESH_BLOCKED: device_id={}, reason={}, marked as blocked",
-                    device.getId(), blockReason);
+            log.info("DEVICE_REFRESH_BLOCKED: device_id={}, reason={}", device.getId(), blockReason);
+            // Mark device blocked via native JDBC (independent of JPA transaction rollback)
+            markDeviceBlockedNative(device.getId());
             throw new InvalidCredentialsException(
                     "Registration token is no longer valid (" + blockReason + "). Contact your administrator.",
                     "REGISTRATION_TOKEN_INVALID");
@@ -597,5 +595,23 @@ public class DeviceAuthService {
         if (value instanceof Boolean) return (Boolean) value;
         if (value instanceof String) return Boolean.parseBoolean((String) value);
         return null;
+    }
+
+    /**
+     * Mark device as blocked via direct JDBC — independent of JPA transaction rollback.
+     * This ensures the DB update persists even when the calling method throws an exception.
+     */
+    private void markDeviceBlockedNative(UUID deviceId) {
+        try (var conn = dataSource.getConnection();
+             var stmt = conn.prepareStatement(
+                     "UPDATE devices SET status = 'blocked', is_active = false, updated_ts = NOW() WHERE id = ?::uuid")) {
+            stmt.setString(1, deviceId.toString());
+            int updated = stmt.executeUpdate();
+            if (updated > 0) {
+                log.info("Device {} marked as blocked via native JDBC", deviceId);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to mark device {} as blocked: {}", deviceId, e.getMessage());
+        }
     }
 }
