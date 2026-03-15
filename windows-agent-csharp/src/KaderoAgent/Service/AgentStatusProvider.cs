@@ -3,6 +3,7 @@ namespace KaderoAgent.Service;
 using KaderoAgent.Audit;
 using KaderoAgent.Auth;
 using KaderoAgent.Capture;
+using KaderoAgent.Command;
 using KaderoAgent.Configuration;
 using KaderoAgent.Ipc;
 using KaderoAgent.Upload;
@@ -19,9 +20,10 @@ public class AgentStatusProvider : IStatusProvider
     private readonly IAuditEventSink _auditSink;
     private readonly IOptions<AgentConfig> _config;
 
-    // AgentService is resolved lazily to avoid circular DI
+    // Lazy-resolved to avoid circular DI
     private readonly IServiceProvider _serviceProvider;
     private AgentService? _agentService;
+    private CommandHandler? _commandHandler;
 
     private readonly object _lock = new();
     private string _connectionStatus = "disconnected";
@@ -45,7 +47,6 @@ public class AgentStatusProvider : IStatusProvider
         _serviceProvider = serviceProvider;
     }
 
-    /// <summary>Lazy-resolve AgentService to avoid circular DI.</summary>
     private AgentService? GetAgentService()
     {
         if (_agentService == null)
@@ -54,6 +55,16 @@ public class AgentStatusProvider : IStatusProvider
             catch { /* non-fatal */ }
         }
         return _agentService;
+    }
+
+    private CommandHandler? GetCommandHandler()
+    {
+        if (_commandHandler == null)
+        {
+            try { _commandHandler = _serviceProvider.GetService(typeof(CommandHandler)) as CommandHandler; }
+            catch { /* non-fatal */ }
+        }
+        return _commandHandler;
     }
 
     public void SetConnectionStatus(string status) { lock (_lock) _connectionStatus = status; }
@@ -111,5 +122,14 @@ public class AgentStatusProvider : IStatusProvider
             LastHeartbeatTs = lastHb,
             LastError = lastError
         };
+
+        // Segment context for video timecode binding
+        var cmdHandler = GetCommandHandler();
+        if (cmdHandler?.LastSegmentStartTs > DateTime.MinValue)
+        {
+            status.SegmentStartTs = cmdHandler.LastSegmentStartTs.ToString("o");
+        }
+
+        return status;
     }
 }

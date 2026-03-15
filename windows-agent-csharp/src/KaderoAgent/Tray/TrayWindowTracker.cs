@@ -23,6 +23,35 @@ public class TrayWindowTracker : IDisposable
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsZoomed(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    private const uint MONITOR_DEFAULTTONEAREST = 2;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT { public int Left, Top, Right, Bottom; }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct MONITORINFO
+    {
+        public int cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+    }
+
     private const int PollIntervalMs  = 5_000;
     private const int MinIntervalMs   = 3_000;
     private const int SendIntervalMs  = 30_000;
@@ -44,6 +73,11 @@ public class TrayWindowTracker : IDisposable
     // Browser domain captured at interval START (not end) to avoid tab-switch lag
     private string? _lastBrowserName;
     private string? _lastDomain;
+
+    // Window geometry captured at interval START
+    private int _lastWinX, _lastWinY, _lastWinW, _lastWinH;
+    private bool _lastIsMaximized, _lastIsFullscreen;
+    private int _lastMonitorIndex;
 
     // Pending intervals (shared between poll and send timers — use lock)
     private readonly List<FocusIntervalData> _pending = new();
@@ -105,6 +139,9 @@ public class TrayWindowTracker : IDisposable
             _lastWindowTitle = title;
             _focusStartedAt  = now;
 
+            // Capture window geometry at interval start
+            CaptureWindowGeometry(hwnd);
+
             // Capture browser domain NOW (at interval start) so it's correct
             _lastBrowserName = null;
             _lastDomain = null;
@@ -122,6 +159,36 @@ public class TrayWindowTracker : IDisposable
     /// <summary>
     /// Capture browser domain at interval START via UI Automation + title parser.
     /// </summary>
+    private void CaptureWindowGeometry(IntPtr hwnd)
+    {
+        try
+        {
+            if (GetWindowRect(hwnd, out var rect))
+            {
+                _lastWinX = rect.Left;
+                _lastWinY = rect.Top;
+                _lastWinW = rect.Right - rect.Left;
+                _lastWinH = rect.Bottom - rect.Top;
+            }
+            _lastIsMaximized = IsZoomed(hwnd);
+
+            // Check fullscreen: window rect == monitor rect
+            var hMonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            if (hMonitor != IntPtr.Zero)
+            {
+                var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+                if (GetMonitorInfo(hMonitor, ref mi))
+                {
+                    _lastIsFullscreen = _lastWinX <= mi.rcMonitor.Left && _lastWinY <= mi.rcMonitor.Top
+                        && _lastWinX + _lastWinW >= mi.rcMonitor.Right && _lastWinY + _lastWinH >= mi.rcMonitor.Bottom;
+                    // Monitor index: use pointer as simple index (0-based not available directly)
+                    _lastMonitorIndex = 0; // TODO: enumerate monitors for proper index
+                }
+            }
+        }
+        catch { }
+    }
+
     private void CaptureBrowserDomain(IntPtr hwnd, string title, string processName)
     {
         // Invalidate URL cache on every tab/window change so stale URLs aren't returned
@@ -184,7 +251,14 @@ public class TrayWindowTracker : IDisposable
             Domain       = isBrowser ? _lastDomain : null,
             StartedAt    = _focusStartedAt.ToString("o"),
             EndedAt      = now.ToString("o"),
-            DurationMs   = durationMs
+            DurationMs   = durationMs,
+            WindowX      = _lastWinX,
+            WindowY      = _lastWinY,
+            WindowWidth  = _lastWinW,
+            WindowHeight = _lastWinH,
+            IsMaximized  = _lastIsMaximized,
+            IsFullscreen = _lastIsFullscreen,
+            MonitorIndex = _lastMonitorIndex
         };
 
         lock (_pendingLock) { _pending.Add(interval); }
@@ -212,7 +286,14 @@ public class TrayWindowTracker : IDisposable
             Domain       = isBrowser ? _lastDomain : null,
             StartedAt    = _focusStartedAt.ToString("o"),
             EndedAt      = now.ToString("o"),
-            DurationMs   = durationMs
+            DurationMs   = durationMs,
+            WindowX      = _lastWinX,
+            WindowY      = _lastWinY,
+            WindowWidth  = _lastWinW,
+            WindowHeight = _lastWinH,
+            IsMaximized  = _lastIsMaximized,
+            IsFullscreen = _lastIsFullscreen,
+            MonitorIndex = _lastMonitorIndex
         };
 
         lock (_pendingLock) { _pending.Add(interval); }
@@ -268,6 +349,7 @@ public class TrayWindowTracker : IDisposable
         if (_inputTracker == null) return;
 
         var inputBatch = _inputTracker.DrainPending();
+        _log.Debug($"SendInputEvents: drained {inputBatch.Count} events from InputTracker");
         if (inputBatch.Count == 0) return;
 
         try

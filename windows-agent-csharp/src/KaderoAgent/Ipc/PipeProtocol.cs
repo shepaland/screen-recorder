@@ -27,6 +27,15 @@ public class FocusIntervalData
     public string? EndedAt { get; set; }
     public int DurationMs { get; set; }
     public string? SessionId { get; set; }
+
+    // Window geometry (nullable, backwards compatible)
+    public int? WindowX { get; set; }
+    public int? WindowY { get; set; }
+    public int? WindowWidth { get; set; }
+    public int? WindowHeight { get; set; }
+    public bool? IsMaximized { get; set; }
+    public bool? IsFullscreen { get; set; }
+    public int? MonitorIndex { get; set; }
 }
 
 public class PipeResponse
@@ -101,6 +110,10 @@ public class AgentStatus
     public bool SessionLocked { get; set; }
     public int AuditEventsQueued { get; set; }
     public string AgentVersion { get; set; } = "1.0.0";
+
+    // Segment context for video timecode binding (Tray reads via get_status)
+    public string? CurrentSegmentId { get; set; }
+    public string? SegmentStartTs { get; set; } // ISO 8601
     public DateTime? LastHeartbeatTs { get; set; }
     public string? LastError { get; set; }
 }

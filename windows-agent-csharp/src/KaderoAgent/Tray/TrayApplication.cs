@@ -151,6 +151,9 @@ public class TrayApplication : ApplicationContext
             var status = _pipeClient.GetStatusAsync().GetAwaiter().GetResult();
             if (status != null)
             {
+                // Update InputTracker with segment context for video timecode binding
+                _inputTracker.UpdateSegmentContext(status.SegmentStartTs);
+
                 // Use AgentStateName for richer tray icon states; fallback to RecordingStatus
                 var effectiveState = !string.IsNullOrEmpty(status.AgentStateName)
                     ? status.AgentStateName

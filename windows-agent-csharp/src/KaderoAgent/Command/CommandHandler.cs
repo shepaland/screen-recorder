@@ -51,6 +51,12 @@ public class CommandHandler
     public string? CurrentSessionId => _sessionManager.CurrentSessionId;
     public bool IsPausedByLock => _isPausedByLock;
 
+    // Segment context for video timecode binding
+    private int _lastSegmentSequence = -1;
+    private DateTime _lastSegmentStartTs = DateTime.MinValue;
+    public int LastSegmentSequence => _lastSegmentSequence;
+    public DateTime LastSegmentStartTs => _lastSegmentStartTs;
+
     public async Task PauseRecordingAsync(CancellationToken ct)
     {
         if (!_captureManager.IsRecording && !_isPausedByLock) return;
@@ -561,6 +567,10 @@ public class CommandHandler
                     _logger.LogInformation("First segment produced, resetting crash counter from {Count}", _consecutiveFailures);
                     _consecutiveFailures = 0;
                 }
+
+                // Track segment context for video timecode binding
+                _lastSegmentSequence = sequenceNum;
+                _lastSegmentStartTs = fileInfo.CreationTimeUtc;
 
                 await _uploadQueue.EnqueueAsync(new SegmentInfo
                 {

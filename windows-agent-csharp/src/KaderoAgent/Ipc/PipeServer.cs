@@ -231,7 +231,14 @@ public class PipeServer : BackgroundService
                 EndedAt = data.EndedAt != null && DateTime.TryParse(data.EndedAt, null,
                     System.Globalization.DateTimeStyles.RoundtripKind, out var e) ? e : null,
                 DurationMs = data.DurationMs,
-                SessionId = data.SessionId ?? fallbackSessionId
+                SessionId = data.SessionId ?? fallbackSessionId,
+                WindowX = data.WindowX,
+                WindowY = data.WindowY,
+                WindowWidth = data.WindowWidth,
+                WindowHeight = data.WindowHeight,
+                IsMaximized = data.IsMaximized,
+                IsFullscreen = data.IsFullscreen,
+                MonitorIndex = data.MonitorIndex
             });
         }
 

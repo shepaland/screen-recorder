@@ -107,7 +107,14 @@ public class FocusIntervalSink : BackgroundService
                 started_at = i.StartedAt.ToString("o"),
                 ended_at = i.EndedAt?.ToString("o"),
                 duration_ms = i.DurationMs,
-                session_id = i.SessionId
+                session_id = i.SessionId,
+                window_x = i.WindowX,
+                window_y = i.WindowY,
+                window_width = i.WindowWidth,
+                window_height = i.WindowHeight,
+                is_maximized = i.IsMaximized,
+                is_fullscreen = i.IsFullscreen,
+                monitor_index = i.MonitorIndex
             }).ToList()
         };
 

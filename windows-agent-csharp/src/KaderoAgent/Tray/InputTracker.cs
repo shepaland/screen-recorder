@@ -86,6 +86,9 @@ public class InputTracker : IDisposable
     // Output queue
     private readonly ConcurrentQueue<InputEventData> _pending = new();
 
+    // Segment context (updated from AgentStatus via TrayApplication status polling)
+    private volatile string? _currentSegmentStartTs;
+
     // Mouse click state
     private int _clicksThisSecond;
     private long _lastClickSecond;
@@ -135,6 +138,12 @@ public class InputTracker : IDisposable
 
         // Keyboard flush timer (every 10 seconds)
         _keyboardFlushTimer = new System.Threading.Timer(_ => FlushKeyboardMetric(), null, KeyboardIntervalMs, KeyboardIntervalMs);
+    }
+
+    /// <summary>Update segment context from AgentStatus (called by TrayApplication on status poll).</summary>
+    public void UpdateSegmentContext(string? segmentStartTs)
+    {
+        _currentSegmentStartTs = segmentStartTs;
     }
 
     /// <summary>Drain all pending input events. Called by TrayWindowTracker.</summary>
@@ -216,7 +225,7 @@ public class InputTracker : IDisposable
 
         var (processName, windowTitle) = GetForegroundContext();
 
-        _pending.Enqueue(new InputEventData
+        var clickEvent = new InputEventData
         {
             Id = Guid.NewGuid().ToString(),
             EventType = "mouse_click",
@@ -226,7 +235,22 @@ public class InputTracker : IDisposable
             ClickButton = button,
             ClickType = clickType,
             ProcessName = processName,
-            WindowTitle = windowTitle.Length > 200 ? windowTitle[..200] : windowTitle
+            WindowTitle = windowTitle.Length > 200 ? windowTitle[..200] : windowTitle,
+            SegmentOffsetMs = ComputeSegmentOffsetMs(now)
+        };
+
+        // Resolve UI element async (200ms timeout, doesn't block hook)
+        var cx = hookStruct.X;
+        var cy = hookStruct.Y;
+        Task.Run(() =>
+        {
+            var elem = UIElementResolver.GetElementAt(cx, cy);
+            if (elem != null)
+            {
+                clickEvent.UiElementType = elem.ElementType;
+                clickEvent.UiElementName = elem.ElementName;
+            }
+            _pending.Enqueue(clickEvent);
         });
     }
 
@@ -292,7 +316,8 @@ public class InputTracker : IDisposable
             ScrollDirection = direction,
             ScrollTotalDelta = delta,
             ScrollEventCount = count,
-            ProcessName = proc
+            ProcessName = proc,
+            SegmentOffsetMs = ComputeSegmentOffsetMs(start)
         });
     }
 
@@ -354,11 +379,22 @@ public class InputTracker : IDisposable
             KeystrokeCount = count,
             HasTypingBurst = hasBurst,
             ProcessName = _keyboardProcessName,
-            WindowTitle = _keyboardWindowTitle
+            WindowTitle = _keyboardWindowTitle,
+            SegmentOffsetMs = ComputeSegmentOffsetMs(intervalStart)
         });
     }
 
     // ── Helpers ──────────────────────────────────────────────────────
+
+    private int? ComputeSegmentOffsetMs(DateTime eventTs)
+    {
+        var startTs = _currentSegmentStartTs;
+        if (startTs == null) return null;
+        if (!DateTime.TryParse(startTs, null, System.Globalization.DateTimeStyles.RoundtripKind, out var segStart))
+            return null;
+        var offset = (int)(eventTs - segStart).TotalMilliseconds;
+        return offset >= 0 ? offset : null;
+    }
 
     private (string processName, string windowTitle) GetForegroundContext()
     {
