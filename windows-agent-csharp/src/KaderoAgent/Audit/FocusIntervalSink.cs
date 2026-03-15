@@ -11,6 +11,7 @@ public class FocusIntervalSink : BackgroundService
     private readonly ConcurrentQueue<FocusInterval> _queue = new();
     private readonly ApiClient _apiClient;
     private readonly AuthManager _authManager;
+    private readonly UserSessionInfo _userSessionInfo;
     private readonly ILogger<FocusIntervalSink> _logger;
 
     private const int FlushIntervalSeconds = 30;
@@ -23,10 +24,12 @@ public class FocusIntervalSink : BackgroundService
     public FocusIntervalSink(
         ApiClient apiClient,
         AuthManager authManager,
+        UserSessionInfo userSessionInfo,
         ILogger<FocusIntervalSink> logger)
     {
         _apiClient = apiClient;
         _authManager = authManager;
+        _userSessionInfo = userSessionInfo;
         _logger = logger;
     }
 
@@ -62,6 +65,13 @@ public class FocusIntervalSink : BackgroundService
 
     private async Task FlushAsync(CancellationToken ct)
     {
+        if (_currentUsername == null)
+        {
+            _currentUsername = _userSessionInfo.GetCurrentUsername();
+            if (_currentUsername != null)
+                _logger.LogInformation("FocusIntervalSink: auto-resolved username to {Username}", _currentUsername);
+        }
+
         if (_queue.IsEmpty || _currentUsername == null) return;
 
         var batch = new List<FocusInterval>();

@@ -16,6 +16,7 @@ public class InputEventSink : BackgroundService
     private readonly ConcurrentQueue<InputEvent> _queue = new();
     private readonly ApiClient _apiClient;
     private readonly AuthManager _authManager;
+    private readonly UserSessionInfo _userSessionInfo;
     private readonly ILogger<InputEventSink> _logger;
 
     private const int FlushIntervalSeconds = 30;
@@ -28,10 +29,12 @@ public class InputEventSink : BackgroundService
     public InputEventSink(
         ApiClient apiClient,
         AuthManager authManager,
+        UserSessionInfo userSessionInfo,
         ILogger<InputEventSink> logger)
     {
         _apiClient = apiClient;
         _authManager = authManager;
+        _userSessionInfo = userSessionInfo;
         _logger = logger;
     }
 
@@ -72,6 +75,14 @@ public class InputEventSink : BackgroundService
 
     private async Task FlushAsync(CancellationToken ct)
     {
+        // Auto-resolve username if not set (e.g. service started before user logon)
+        if (_currentUsername == null)
+        {
+            _currentUsername = _userSessionInfo.GetCurrentUsername();
+            if (_currentUsername != null)
+                _logger.LogInformation("InputEventSink: auto-resolved username to {Username}", _currentUsername);
+        }
+
         if (_queue.IsEmpty || _currentUsername == null) return;
 
         var batch = new List<InputEvent>();
