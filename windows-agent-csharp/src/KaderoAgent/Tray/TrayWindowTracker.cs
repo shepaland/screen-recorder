@@ -308,43 +308,46 @@ public class TrayWindowTracker : IDisposable
 
     private void SendIntervals()
     {
+        // Send focus intervals if any
         List<FocusIntervalData> batch;
         lock (_pendingLock)
         {
-            if (_pending.Count == 0) return;
             batch = new List<FocusIntervalData>(_pending);
             _pending.Clear();
         }
 
-        try
+        if (batch.Count > 0)
         {
-            if (!_pipe.IsConnected)
-                _pipe.ConnectAsync(1000).GetAwaiter().GetResult();
-
-            var request = new PipeRequest
+            try
             {
-                Command        = "report_focus_intervals",
-                FocusIntervals = batch
-            };
+                if (!_pipe.IsConnected)
+                    _pipe.ConnectAsync(1000).GetAwaiter().GetResult();
 
-            var response = _pipe.SendAsync(request).GetAwaiter().GetResult();
-            if (response?.Success == true)
-            {
-                _log.Info($"TrayWindowTracker: sent {batch.Count} focus intervals to service");
+                var request = new PipeRequest
+                {
+                    Command        = "report_focus_intervals",
+                    FocusIntervals = batch
+                };
+
+                var response = _pipe.SendAsync(request).GetAwaiter().GetResult();
+                if (response?.Success == true)
+                {
+                    _log.Info($"TrayWindowTracker: sent {batch.Count} focus intervals to service");
+                }
+                else
+                {
+                    _log.Warn($"TrayWindowTracker: service rejected intervals: {response?.Error}. Re-queuing.");
+                    lock (_pendingLock) { _pending.InsertRange(0, batch); }
+                }
             }
-            else
+            catch (Exception ex)
             {
-                _log.Warn($"TrayWindowTracker: service rejected intervals: {response?.Error}. Re-queuing.");
+                _log.Warn($"TrayWindowTracker.SendIntervals error: {ex.Message}. Re-queuing {batch.Count} intervals.");
                 lock (_pendingLock) { _pending.InsertRange(0, batch); }
             }
         }
-        catch (Exception ex)
-        {
-            _log.Warn($"TrayWindowTracker.SendIntervals error: {ex.Message}. Re-queuing {batch.Count} intervals.");
-            lock (_pendingLock) { _pending.InsertRange(0, batch); }
-        }
 
-        // Send input events (mouse clicks) via same pipe connection
+        // Always send input events (independent of focus intervals)
         SendInputEvents();
     }
 
