@@ -90,6 +90,13 @@ public class FocusIntervalService {
                     .endedAt(item.getEndedAt())
                     .durationMs(item.getDurationMs())
                     .correlationId(correlationId)
+                    .windowX(item.getWindowX())
+                    .windowY(item.getWindowY())
+                    .windowWidth(item.getWindowWidth())
+                    .windowHeight(item.getWindowHeight())
+                    .isMaximized(item.getIsMaximized() != null ? item.getIsMaximized() : false)
+                    .isFullscreen(item.getIsFullscreen() != null ? item.getIsFullscreen() : false)
+                    .monitorIndex(item.getMonitorIndex() != null ? item.getMonitorIndex() : 0)
                     .build();
 
             entityManager.persist(entity);

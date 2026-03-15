@@ -47,4 +47,13 @@ public class FocusIntervalItem {
     private Integer durationMs;
 
     private UUID sessionId;
+
+    // Window geometry (nullable, backwards compatible)
+    private Integer windowX;
+    private Integer windowY;
+    private Integer windowWidth;
+    private Integer windowHeight;
+    private Boolean isMaximized;
+    private Boolean isFullscreen;
+    private Integer monitorIndex;
 }

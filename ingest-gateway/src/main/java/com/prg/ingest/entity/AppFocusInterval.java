@@ -68,6 +68,25 @@ public class AppFocusInterval {
     @Column(name = "correlation_id")
     private UUID correlationId;
 
+    // Window geometry
+    @Column(name = "window_x")
+    private Integer windowX;
+    @Column(name = "window_y")
+    private Integer windowY;
+    @Column(name = "window_width")
+    private Integer windowWidth;
+    @Column(name = "window_height")
+    private Integer windowHeight;
+    @Column(name = "is_maximized")
+    @Builder.Default
+    private Boolean isMaximized = false;
+    @Column(name = "is_fullscreen")
+    @Builder.Default
+    private Boolean isFullscreen = false;
+    @Column(name = "monitor_index")
+    @Builder.Default
+    private Integer monitorIndex = 0;
+
     @PrePersist
     protected void onCreate() {
         if (id == null) id = UUID.randomUUID();
