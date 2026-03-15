@@ -239,6 +239,10 @@ public class TrayWindowTracker : IDisposable
         var durationMs = (int)(now - _focusStartedAt).TotalMilliseconds;
         if (durationMs < FlushIntervalMs) return;
 
+        // Refresh geometry for current window
+        if (_lastHwnd != IntPtr.Zero)
+            CaptureWindowGeometry(_lastHwnd);
+
         bool isBrowser = BrowserDomainParser.IsBrowser(_lastProcessName);
 
         var interval = new FocusIntervalData
