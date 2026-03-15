@@ -524,6 +524,46 @@
           "action": "Deployed: V36 миграция (device_groups), control-plane с IngestServiceClient, web-dashboard на test-screen-record"
         }
       ]
+    },
+    {
+      "id": 11,
+      "created_at": "2026-03-15T12:00:00Z",
+      "title": "Bug: агенты продолжают работать после удаления/деактивации регистрационного токена",
+      "description": "При удалении или деактивации registration token агенты продолжают подключаться к серверу. Причина: токен проверяется только при device-login, а не при каждом запросе. JWT и refresh token остаются валидны бессрочно.",
+      "feature_code": "token-revocation-fix",
+      "overall_status": "In Progress",
+      "role_status": {
+        "BA": "Done",
+        "SA": "Done",
+        "BE": "Done",
+        "QA": "Waiting: user verification on test"
+      },
+      "artifacts": {
+        "sa": "Root cause: reg token checked only at device-login, not at validate-token or device-refresh. Fix: embed reg_token_id in JWT, check on every S2S validation.",
+        "be": "JwtTokenProvider: +reg_token_id claim. InternalController.validateToken: check token active+not expired. DeviceAuthService.deviceRefresh: block if token deactivated/expired. DeviceAuthServiceTest: updated mocks."
+      },
+      "history": [
+        {
+          "ts": "2026-03-15T12:00:00Z",
+          "role": "BA",
+          "action": "Дефект зарегистрирован: агенты работают после удаления токена. Приоритет: Critical (безопасность)."
+        },
+        {
+          "ts": "2026-03-15T12:01:00Z",
+          "role": "SA",
+          "action": "Root cause: JWT stateless, reg token проверяется только при device-login. Fix: embed reg_token_id в JWT claims, проверять при каждом validate-token (S2S) и device-refresh."
+        },
+        {
+          "ts": "2026-03-15T12:30:00Z",
+          "role": "BE",
+          "action": "Fix реализован: 3 файла (JwtTokenProvider, InternalController, DeviceAuthService) + тесты. Deployed на test."
+        },
+        {
+          "ts": "2026-03-15T12:35:00Z",
+          "role": "DevOps",
+          "action": "auth-service deployed на test-screen-record. Flyway validation fixed (V37 checksum NULL)."
+        }
+      ]
     }
   ]
 }
