@@ -48,11 +48,12 @@ public class JwtTokenProvider {
 
     public String generateDeviceAccessToken(UUID userId, UUID tenantId, String username, String email,
                                                List<String> roles, List<String> permissions,
-                                               List<String> scopes, UUID deviceId) {
+                                               List<String> scopes, UUID deviceId,
+                                               UUID registrationTokenId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtConfig.getAccessTokenTtl() * 1000L);
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .id(UUID.randomUUID().toString())
                 .subject(userId.toString())
                 .claim("tenant_id", tenantId.toString())
@@ -61,7 +62,13 @@ public class JwtTokenProvider {
                 .claim("roles", roles)
                 .claim("permissions", permissions)
                 .claim("scopes", scopes)
-                .claim("device_id", deviceId.toString())
+                .claim("device_id", deviceId.toString());
+
+        if (registrationTokenId != null) {
+            builder.claim("reg_token_id", registrationTokenId.toString());
+        }
+
+        return builder
                 .issuer(jwtConfig.getIssuer())
                 .issuedAt(now)
                 .expiration(expiryDate)

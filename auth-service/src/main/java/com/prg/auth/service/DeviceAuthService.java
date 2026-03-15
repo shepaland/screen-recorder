@@ -274,9 +274,10 @@ public class DeviceAuthService {
                 .distinct().sorted().toList();
         List<String> scopes = determineScopesForRoles(roles);
 
+        UUID regTokenId = device.getRegistrationToken() != null ? device.getRegistrationToken().getId() : null;
         String accessToken = jwtTokenProvider.generateDeviceAccessToken(
                 user.getId(), tenantId, user.getUsername(), user.getEmail(),
-                roles, permissions, scopes, device.getId());
+                roles, permissions, scopes, device.getId(), regTokenId);
 
         // 10. Generate refresh token, store hash
         String rawRefreshToken = UUID.randomUUID().toString();
@@ -426,6 +427,25 @@ public class DeviceAuthService {
             throw new InvalidCredentialsException("Account or tenant is disabled", "ACCOUNT_DISABLED");
         }
 
+        // Check registration token is still valid (security: deleted/expired token = no access)
+        DeviceRegistrationToken regToken = device.getRegistrationToken();
+        if (regToken != null) {
+            if (!regToken.getIsActive()) {
+                log.info("DEVICE_REFRESH_BLOCKED: device_id={}, reason=token_deactivated, token_id={}",
+                        device.getId(), regToken.getId());
+                throw new InvalidCredentialsException(
+                        "Registration token has been deactivated. Contact your administrator.",
+                        "REGISTRATION_TOKEN_DEACTIVATED");
+            }
+            if (regToken.getExpiresAt() != null && regToken.getExpiresAt().isBefore(Instant.now())) {
+                log.info("DEVICE_REFRESH_BLOCKED: device_id={}, reason=token_expired, token_id={}",
+                        device.getId(), regToken.getId());
+                throw new InvalidCredentialsException(
+                        "Registration token has expired. Contact your administrator.",
+                        "REGISTRATION_TOKEN_EXPIRED");
+            }
+        }
+
         // Generate new tokens
         List<String> roles = user.getRoles().stream().map(Role::getCode).toList();
         List<String> permissions = user.getRoles().stream()
@@ -434,9 +454,10 @@ public class DeviceAuthService {
                 .distinct().sorted().toList();
         List<String> scopes = determineScopesForRoles(roles);
 
+        UUID refreshRegTokenId = regToken != null ? regToken.getId() : null;
         String accessToken = jwtTokenProvider.generateDeviceAccessToken(
                 user.getId(), tenantId, user.getUsername(), user.getEmail(),
-                roles, permissions, scopes, device.getId());
+                roles, permissions, scopes, device.getId(), refreshRegTokenId);
 
         String newRawRefreshToken = UUID.randomUUID().toString();
         String newTokenHash = AuthService.sha256(newRawRefreshToken);
