@@ -429,7 +429,13 @@ public class DeviceAuthService {
 
         // Check registration token is still valid (security: deleted/expired token = no access)
         DeviceRegistrationToken regToken = device.getRegistrationToken();
-        if (regToken != null) {
+        if (regToken == null) {
+            // Token unlinked (hard-deleted) → device must not operate
+            log.info("DEVICE_REFRESH_BLOCKED: device_id={}, reason=token_removed", device.getId());
+            throw new InvalidCredentialsException(
+                    "Device registration token has been removed. Contact your administrator.",
+                    "REGISTRATION_TOKEN_REMOVED");
+        } else {
             if (!regToken.getIsActive()) {
                 log.info("DEVICE_REFRESH_BLOCKED: device_id={}, reason=token_deactivated, token_id={}",
                         device.getId(), regToken.getId());

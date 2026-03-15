@@ -4,8 +4,10 @@ import com.prg.auth.dto.request.CheckAccessRequest;
 import com.prg.auth.dto.request.ValidateTokenRequest;
 import com.prg.auth.dto.response.CheckAccessResponse;
 import com.prg.auth.dto.response.ValidateTokenResponse;
+import com.prg.auth.entity.Device;
 import com.prg.auth.entity.DeviceRegistrationToken;
 import com.prg.auth.repository.DeviceRegistrationTokenRepository;
+import com.prg.auth.repository.DeviceRepository;
 import com.prg.auth.security.JwtTokenProvider;
 import com.prg.auth.security.UserPrincipal;
 import com.prg.auth.service.AccessControlService;
@@ -29,6 +31,7 @@ public class InternalController {
     private final AccessControlService accessControlService;
     private final JwtTokenProvider jwtTokenProvider;
     private final DeviceRegistrationTokenRepository registrationTokenRepository;
+    private final DeviceRepository deviceRepository;
 
     @PostMapping("/check-access")
     public ResponseEntity<CheckAccessResponse> checkAccess(@Valid @RequestBody CheckAccessRequest request) {
@@ -47,32 +50,57 @@ public class InternalController {
                         .build());
             }
 
-            // Check registration token status if present in JWT
+            // Check registration token status for device JWTs
             Claims claims = jwtTokenProvider.parseToken(request.getToken());
+            String deviceIdStr = claims.get("device_id", String.class);
             String regTokenIdStr = claims.get("reg_token_id", String.class);
-            if (regTokenIdStr != null) {
-                UUID regTokenId = UUID.fromString(regTokenIdStr);
-                var regToken = registrationTokenRepository.findById(regTokenId).orElse(null);
-                if (regToken == null) {
-                    log.info("JWT rejected: registration token {} deleted", regTokenId);
-                    return ResponseEntity.ok(ValidateTokenResponse.builder()
-                            .valid(false)
-                            .reason("Registration token has been deleted")
-                            .build());
+
+            if (deviceIdStr != null) {
+                // This is a device JWT — must have valid registration token
+                UUID regTokenId = null;
+
+                if (regTokenIdStr != null) {
+                    // New JWT format: reg_token_id embedded
+                    regTokenId = UUID.fromString(regTokenIdStr);
+                } else {
+                    // Old JWT format (before fix): look up device to find token
+                    UUID deviceId = UUID.fromString(deviceIdStr);
+                    var device = deviceRepository.findById(deviceId).orElse(null);
+                    if (device != null && device.getRegistrationToken() != null) {
+                        regTokenId = device.getRegistrationToken().getId();
+                    } else if (device != null && device.getRegistrationToken() == null) {
+                        // Device exists but token unlinked (hard-deleted) → block
+                        log.info("JWT rejected: device {} has no registration token (deleted)", deviceId);
+                        return ResponseEntity.ok(ValidateTokenResponse.builder()
+                                .valid(false)
+                                .reason("Device registration token has been removed")
+                                .build());
+                    }
                 }
-                if (!regToken.getIsActive()) {
-                    log.info("JWT rejected: registration token {} deactivated", regTokenId);
-                    return ResponseEntity.ok(ValidateTokenResponse.builder()
-                            .valid(false)
-                            .reason("Registration token has been deactivated")
-                            .build());
-                }
-                if (regToken.getExpiresAt() != null && regToken.getExpiresAt().isBefore(Instant.now())) {
-                    log.info("JWT rejected: registration token {} expired", regTokenId);
-                    return ResponseEntity.ok(ValidateTokenResponse.builder()
-                            .valid(false)
-                            .reason("Registration token has expired")
-                            .build());
+
+                if (regTokenId != null) {
+                    var regToken = registrationTokenRepository.findById(regTokenId).orElse(null);
+                    if (regToken == null) {
+                        log.info("JWT rejected: registration token {} deleted", regTokenId);
+                        return ResponseEntity.ok(ValidateTokenResponse.builder()
+                                .valid(false)
+                                .reason("Registration token has been deleted")
+                                .build());
+                    }
+                    if (!regToken.getIsActive()) {
+                        log.info("JWT rejected: registration token {} deactivated", regTokenId);
+                        return ResponseEntity.ok(ValidateTokenResponse.builder()
+                                .valid(false)
+                                .reason("Registration token has been deactivated")
+                                .build());
+                    }
+                    if (regToken.getExpiresAt() != null && regToken.getExpiresAt().isBefore(Instant.now())) {
+                        log.info("JWT rejected: registration token {} expired", regTokenId);
+                        return ResponseEntity.ok(ValidateTokenResponse.builder()
+                                .valid(false)
+                                .reason("Registration token has expired")
+                                .build());
+                    }
                 }
             }
 
