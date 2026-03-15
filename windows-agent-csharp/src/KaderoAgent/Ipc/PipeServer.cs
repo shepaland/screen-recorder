@@ -238,7 +238,8 @@ public class PipeServer : BackgroundService
                 WindowHeight = data.WindowHeight,
                 IsMaximized = data.IsMaximized,
                 IsFullscreen = data.IsFullscreen,
-                MonitorIndex = data.MonitorIndex
+                MonitorIndex = data.MonitorIndex,
+                IsIdle = data.IsIdle
             });
         }
 

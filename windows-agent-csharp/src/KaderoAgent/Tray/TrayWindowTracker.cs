@@ -38,6 +38,16 @@ public class TrayWindowTracker : IDisposable
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
+    [DllImport("user32.dll")]
+    private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LASTINPUTINFO
+    {
+        public uint cbSize;
+        public uint dwTime;
+    }
+
     private const uint MONITOR_DEFAULTTONEAREST = 2;
 
     [StructLayout(LayoutKind.Sequential)]
@@ -79,6 +89,10 @@ public class TrayWindowTracker : IDisposable
     private bool _lastIsMaximized, _lastIsFullscreen;
     private int _lastMonitorIndex;
 
+    // Idle tracking via GetLastInputInfo
+    private bool _hadInputDuringInterval;
+    private uint _lastInputTick;
+
     // Pending intervals (shared between poll and send timers — use lock)
     private readonly List<FocusIntervalData> _pending = new();
     private readonly object _pendingLock = new();
@@ -94,6 +108,7 @@ public class TrayWindowTracker : IDisposable
 
     public void Start()
     {
+        _lastInputTick = GetCurrentInputTick();
         _pollTimer = new System.Threading.Timer(_ => Poll(), null, 1_000, PollIntervalMs);
         _sendTimer = new System.Threading.Timer(_ => SendIntervals(), null, SendIntervalMs, SendIntervalMs);
         _log.Info("TrayWindowTracker started");
@@ -105,6 +120,9 @@ public class TrayWindowTracker : IDisposable
     {
         try
         {
+            // Check for user input activity on every poll
+            CheckInputActivity();
+
             var hwnd = GetForegroundWindow();
             if (hwnd == IntPtr.Zero) return;
 
@@ -138,6 +156,8 @@ public class TrayWindowTracker : IDisposable
             _lastProcessName = processName;
             _lastWindowTitle = title;
             _focusStartedAt  = now;
+            _hadInputDuringInterval = false;
+            _lastInputTick = GetCurrentInputTick();
 
             // Capture window geometry at interval start
             CaptureWindowGeometry(hwnd);
@@ -239,6 +259,9 @@ public class TrayWindowTracker : IDisposable
         var durationMs = (int)(now - _focusStartedAt).TotalMilliseconds;
         if (durationMs < FlushIntervalMs) return;
 
+        // Final input check before emitting
+        CheckInputActivity();
+
         // Refresh geometry for current window
         if (_lastHwnd != IntPtr.Zero)
             CaptureWindowGeometry(_lastHwnd);
@@ -262,13 +285,16 @@ public class TrayWindowTracker : IDisposable
             WindowHeight = _lastWinH,
             IsMaximized  = _lastIsMaximized,
             IsFullscreen = _lastIsFullscreen,
-            MonitorIndex = _lastMonitorIndex
+            MonitorIndex = _lastMonitorIndex,
+            IsIdle       = !_hadInputDuringInterval
         };
 
         lock (_pendingLock) { _pending.Add(interval); }
 
-        // Reset start time for the next chunk (same window continues)
+        // Reset start time and idle state for the next chunk (same window continues)
         _focusStartedAt = now;
+        _hadInputDuringInterval = false;
+        _lastInputTick = GetCurrentInputTick();
     }
 
     private void CompletePreviousInterval(DateTime now)
@@ -277,6 +303,9 @@ public class TrayWindowTracker : IDisposable
 
         var durationMs = (int)(now - _focusStartedAt).TotalMilliseconds;
         if (durationMs < MinIntervalMs) return;
+
+        // Final input check before completing
+        CheckInputActivity();
 
         bool isBrowser = BrowserDomainParser.IsBrowser(_lastProcessName);
 
@@ -297,11 +326,31 @@ public class TrayWindowTracker : IDisposable
             WindowHeight = _lastWinH,
             IsMaximized  = _lastIsMaximized,
             IsFullscreen = _lastIsFullscreen,
-            MonitorIndex = _lastMonitorIndex
+            MonitorIndex = _lastMonitorIndex,
+            IsIdle       = !_hadInputDuringInterval
         };
 
         lock (_pendingLock) { _pending.Add(interval); }
         _lastProcessName = "";
+    }
+
+    /// <summary>
+    /// Check if user input occurred since last check using GetLastInputInfo.
+    /// </summary>
+    private void CheckInputActivity()
+    {
+        uint currentTick = GetCurrentInputTick();
+        if (currentTick != _lastInputTick)
+        {
+            _hadInputDuringInterval = true;
+            _lastInputTick = currentTick;
+        }
+    }
+
+    private static uint GetCurrentInputTick()
+    {
+        var info = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
+        return GetLastInputInfo(ref info) ? info.dwTime : 0;
     }
 
     // ── Send (every 30 s) ─────────────────────────────────────────────────────

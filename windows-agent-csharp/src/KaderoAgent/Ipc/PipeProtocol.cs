@@ -36,6 +36,7 @@ public class FocusIntervalData
     public bool? IsMaximized { get; set; }
     public bool? IsFullscreen { get; set; }
     public int? MonitorIndex { get; set; }
+    public bool IsIdle { get; set; }
 }
 
 public class PipeResponse
