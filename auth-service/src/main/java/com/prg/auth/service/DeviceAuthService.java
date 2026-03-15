@@ -429,27 +429,30 @@ public class DeviceAuthService {
 
         // Check registration token is still valid (security: deleted/expired token = no access)
         DeviceRegistrationToken regToken = device.getRegistrationToken();
+        boolean shouldBlock = false;
+        String blockReason = "";
+
         if (regToken == null) {
-            // Token unlinked (hard-deleted) → device must not operate
-            log.info("DEVICE_REFRESH_BLOCKED: device_id={}, reason=token_removed", device.getId());
+            shouldBlock = true;
+            blockReason = "token_removed";
+        } else if (!regToken.getIsActive()) {
+            shouldBlock = true;
+            blockReason = "token_deactivated";
+        } else if (regToken.getExpiresAt() != null && regToken.getExpiresAt().isBefore(Instant.now())) {
+            shouldBlock = true;
+            blockReason = "token_expired";
+        }
+
+        if (shouldBlock) {
+            // Mark device as blocked in DB so UI reflects correct status
+            device.setStatus("blocked");
+            device.setIsActive(false);
+            deviceRepository.save(device);
+            log.info("DEVICE_REFRESH_BLOCKED: device_id={}, reason={}, marked as blocked",
+                    device.getId(), blockReason);
             throw new InvalidCredentialsException(
-                    "Device registration token has been removed. Contact your administrator.",
-                    "REGISTRATION_TOKEN_REMOVED");
-        } else {
-            if (!regToken.getIsActive()) {
-                log.info("DEVICE_REFRESH_BLOCKED: device_id={}, reason=token_deactivated, token_id={}",
-                        device.getId(), regToken.getId());
-                throw new InvalidCredentialsException(
-                        "Registration token has been deactivated. Contact your administrator.",
-                        "REGISTRATION_TOKEN_DEACTIVATED");
-            }
-            if (regToken.getExpiresAt() != null && regToken.getExpiresAt().isBefore(Instant.now())) {
-                log.info("DEVICE_REFRESH_BLOCKED: device_id={}, reason=token_expired, token_id={}",
-                        device.getId(), regToken.getId());
-                throw new InvalidCredentialsException(
-                        "Registration token has expired. Contact your administrator.",
-                        "REGISTRATION_TOKEN_EXPIRED");
-            }
+                    "Registration token is no longer valid (" + blockReason + "). Contact your administrator.",
+                    "REGISTRATION_TOKEN_INVALID");
         }
 
         // Generate new tokens
