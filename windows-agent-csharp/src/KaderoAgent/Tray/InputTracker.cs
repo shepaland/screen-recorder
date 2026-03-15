@@ -149,9 +149,19 @@ public class InputTracker : IDisposable
     /// <summary>Drain all pending input events. Called by TrayWindowTracker.</summary>
     public List<InputEventData> DrainPending()
     {
+        // Flush pending keyboard/scroll before drain
+        FlushKeyboardMetric();
+        FlushScrollWindow();
+
         var batch = new List<InputEventData>();
         while (batch.Count < 500 && _pending.TryDequeue(out var item))
             batch.Add(item);
+
+        if (batch.Count > 0)
+        {
+            var types = batch.GroupBy(e => e.EventType).Select(g => $"{g.Key}={g.Count()}");
+            _log.Info($"DrainPending: {batch.Count} events ({string.Join(", ", types)})");
+        }
         return batch;
     }
 
