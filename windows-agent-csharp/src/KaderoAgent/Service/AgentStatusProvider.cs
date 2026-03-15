@@ -96,7 +96,7 @@ public class AgentStatusProvider : IStatusProvider
             _ => "stopped"
         };
 
-        return new AgentStatus
+        var status = new AgentStatus
         {
             ConnectionStatus = _authManager.IsAuthenticated ? connStatus : "disconnected",
             RecordingStatus = recordingStatus,
