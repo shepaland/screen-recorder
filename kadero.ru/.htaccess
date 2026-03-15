@@ -1,0 +1,10 @@
+# Редирект с http на https создан автоматически при заказе бесплатного ssl-сертификата
+RewriteEngine On
+RewriteCond %{SERVER_PORT} !^443$
+RewriteRule .* https://kadero.ru%{REQUEST_URI} [R=301,L]
+# Конец редиректа
+
+# Редирект с www на без www
+RewriteCond %{HTTP_HOST} ^www\.kadero\.ru$ [NC]
+RewriteRule ^(.*)$ https://kadero.ru/$1 [R=301,L]
+# Конец редиректа с www

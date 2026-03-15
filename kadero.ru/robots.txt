@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Host: kadero.ru
+Sitemap: https://kadero.ru/sitemap.xml
