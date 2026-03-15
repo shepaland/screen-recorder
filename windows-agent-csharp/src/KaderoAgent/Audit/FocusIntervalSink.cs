@@ -124,7 +124,8 @@ public class FocusIntervalSink : BackgroundService
                 window_height = i.WindowHeight,
                 is_maximized = i.IsMaximized,
                 is_fullscreen = i.IsFullscreen,
-                monitor_index = i.MonitorIndex
+                monitor_index = i.MonitorIndex,
+                is_idle = i.IsIdle
             }).ToList()
         };
 

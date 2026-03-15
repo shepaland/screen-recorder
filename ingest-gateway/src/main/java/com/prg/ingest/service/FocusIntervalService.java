@@ -97,6 +97,7 @@ public class FocusIntervalService {
                     .isMaximized(item.getIsMaximized() != null ? item.getIsMaximized() : false)
                     .isFullscreen(item.getIsFullscreen() != null ? item.getIsFullscreen() : false)
                     .monitorIndex(item.getMonitorIndex() != null ? item.getMonitorIndex() : 0)
+                    .isIdle(item.getIsIdle() != null ? item.getIsIdle() : false)
                     .build();
 
             entityManager.persist(entity);

@@ -20,5 +20,8 @@ public class FocusInterval
     public int? WindowHeight { get; set; }
     public bool? IsMaximized { get; set; }
     public bool? IsFullscreen { get; set; }
+
+    // Idle detection — true if no user input during this interval
+    public bool IsIdle { get; set; }
     public int? MonitorIndex { get; set; }
 }

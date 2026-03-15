@@ -87,6 +87,10 @@ public class AppFocusInterval {
     @Builder.Default
     private Integer monitorIndex = 0;
 
+    @Column(name = "is_idle")
+    @Builder.Default
+    private Boolean isIdle = false;
+
     @PrePersist
     protected void onCreate() {
         if (id == null) id = UUID.randomUUID();

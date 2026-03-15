@@ -41,6 +41,7 @@ const archiveSubmenu: NavItem[] = [
   { name: 'Устройства', href: '/archive/devices', icon: ComputerDesktopIcon },
   { name: 'Сотрудники', href: '/archive/employees', icon: UserGroupIcon },
   { name: 'Таймлайны', href: '/archive/timelines', icon: ClockIcon },
+  { name: 'Аудит поведения', href: '/settings/behavior-audit', icon: EyeIcon, permission: 'AUDIT:READ' },
 ];
 
 /** Catalogs submenu — between Analytics and Settings. */
@@ -55,7 +56,6 @@ const tenantSettingsSubmenu: NavItem[] = [
   { name: 'Пользователи', href: '/users', icon: UsersIcon, permission: 'USERS:READ' },
   { name: 'Токены', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
   { name: 'Настройки записи', href: '/recording-settings', icon: AdjustmentsHorizontalIcon, permission: 'DEVICES:READ' },
-  { name: 'Аудит поведения', href: '/settings/behavior-audit', icon: EyeIcon, permission: 'AUDIT:READ' },
 ];
 
 /** Settings submenu for superadmin. */
@@ -65,7 +65,6 @@ const superAdminSettingsSubmenu: NavItem[] = [
   { name: 'Агенты', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
   { name: 'Настройки записи', href: '/recording-settings', icon: AdjustmentsHorizontalIcon, permission: 'DEVICES:READ' },
   { name: 'Токены регистрации', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
-  { name: 'Аудит поведения', href: '/settings/behavior-audit', icon: EyeIcon, permission: 'AUDIT:READ' },
 ];
 
 /** Global items outside the company scope. */
@@ -115,7 +114,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
   const location = useLocation();
   const [isTenantMenuExpanded, setIsTenantMenuExpanded] = useState(true);
   const [isArchiveExpanded, setIsArchiveExpanded] = useState(
-    location.pathname.startsWith('/archive') || location.pathname.startsWith('/recordings'),
+    location.pathname.startsWith('/archive') || location.pathname.startsWith('/recordings') || location.pathname.startsWith('/settings/behavior-audit'),
   );
   const [isCatalogsExpanded, setIsCatalogsExpanded] = useState(
     location.pathname.startsWith('/catalogs'),
@@ -125,8 +124,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
     location.pathname.startsWith('/users') ||
     location.pathname.startsWith('/device-tokens') ||
     location.pathname.startsWith('/recording-settings') ||
-    location.pathname.startsWith('/roles') ||
-    location.pathname.startsWith('/settings/behavior-audit'),
+    location.pathname.startsWith('/roles'),
   );
 
   const handleClick = () => {
@@ -134,15 +132,14 @@ export default function Sidebar({ onClose }: SidebarProps) {
   };
 
   const isSuperAdmin = user?.roles?.includes('SUPER_ADMIN');
-  const isArchiveActive = location.pathname.startsWith('/archive') || location.pathname.startsWith('/recordings');
+  const isArchiveActive = location.pathname.startsWith('/archive') || location.pathname.startsWith('/recordings') || location.pathname.startsWith('/settings/behavior-audit');
   const isCatalogsActive = location.pathname.startsWith('/catalogs');
   const isSettingsActive =
     location.pathname.startsWith('/devices') ||
     location.pathname.startsWith('/users') ||
     location.pathname.startsWith('/device-tokens') ||
     location.pathname.startsWith('/recording-settings') ||
-    location.pathname.startsWith('/roles') ||
-    location.pathname.startsWith('/settings/behavior-audit');
+    location.pathname.startsWith('/roles');
 
   return (
     <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-gray-950 px-6 pb-4">

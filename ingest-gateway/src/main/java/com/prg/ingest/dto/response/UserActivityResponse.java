@@ -35,6 +35,7 @@ public class UserActivityResponse {
     @AllArgsConstructor
     public static class ActivitySummary {
         private long totalActiveMs;
+        private long realActiveMs;
         private int totalDaysActive;
         private long avgDailyActiveMs;
         private int totalSessions;
@@ -74,6 +75,7 @@ public class UserActivityResponse {
     public static class DailyBreakdown {
         private String date;
         private long totalActiveMs;
+        private long realActiveMs;
         private String firstActivityTs;
         private String lastActivityTs;
     }

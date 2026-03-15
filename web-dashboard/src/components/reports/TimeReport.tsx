@@ -73,8 +73,15 @@ export default function TimeReport({ username, from, to, deviceId }: TimeReportP
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         <div className="bg-white rounded-lg border border-gray-200 p-3">
-          <p className="text-xs text-gray-500">Активное время</p>
+          <p className="text-xs text-gray-500">Общее время</p>
           <p className="text-lg font-bold text-gray-900">{formatDuration(summary.total_active_ms)}</p>
+        </div>
+        <div className="bg-white rounded-lg border border-green-200 p-3">
+          <p className="text-xs text-green-600">Реальная активность</p>
+          <p className="text-lg font-bold text-green-700">{formatDuration(summary.real_active_ms)}</p>
+          {summary.total_active_ms > 0 && (
+            <p className="text-xs text-green-500">{Math.round(summary.real_active_ms / summary.total_active_ms * 100)}%</p>
+          )}
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-3">
           <p className="text-xs text-gray-500">Дней активности</p>
@@ -106,22 +113,49 @@ export default function TimeReport({ username, from, to, deviceId }: TimeReportP
       <div className="bg-white rounded-lg border border-gray-200 p-5">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Активность по дням</h3>
         {daily_breakdown.length > 0 ? (
+          <>
           <div className="space-y-2">
-            {daily_breakdown.map((day) => (
-              <div key={day.date} className="flex items-center gap-3">
-                <span className="text-xs text-gray-500 w-24 shrink-0">{formatDateRu(day.date)}</span>
-                <div className="flex-1 bg-gray-100 rounded-full h-4">
-                  <div
-                    className="bg-red-500 h-4 rounded-full transition-all"
-                    style={{ width: `${(day.total_active_ms / maxDailyMs) * 100}%` }}
-                  />
+            {daily_breakdown.map((day) => {
+              const totalPct = (day.total_active_ms / maxDailyMs) * 100;
+              const realPct = day.total_active_ms > 0
+                ? (day.real_active_ms / day.total_active_ms) * totalPct
+                : 0;
+              const idlePct = totalPct - realPct;
+              return (
+                <div key={day.date} className="flex items-center gap-3">
+                  <span className="text-xs text-gray-500 w-24 shrink-0">{formatDateRu(day.date)}</span>
+                  <div className="flex-1 bg-gray-100 rounded-full h-4 flex overflow-hidden">
+                    <div
+                      className="bg-green-500 h-4 transition-all"
+                      style={{ width: `${realPct}%` }}
+                      title={`Активно: ${formatDuration(day.real_active_ms)}`}
+                    />
+                    {idlePct > 0 && (
+                      <div
+                        className="bg-red-300 h-4 transition-all"
+                        style={{ width: `${idlePct}%` }}
+                        title={`Idle: ${formatDuration(day.total_active_ms - day.real_active_ms)}`}
+                      />
+                    )}
+                  </div>
+                  <span className="text-xs font-medium text-gray-700 w-16 text-right shrink-0">
+                    {formatDuration(day.real_active_ms)}
+                  </span>
                 </div>
-                <span className="text-xs font-medium text-gray-700 w-16 text-right shrink-0">
-                  {formatDuration(day.total_active_ms)}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
+          <div className="flex gap-4 mt-3">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-green-500" />
+              <span className="text-xs text-gray-500">Активно</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-red-300" />
+              <span className="text-xs text-gray-500">Idle</span>
+            </div>
+          </div>
+          </>
         ) : (
           <p className="text-sm text-gray-500">Нет данных</p>
         )}

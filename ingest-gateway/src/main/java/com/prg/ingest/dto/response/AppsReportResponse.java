@@ -15,6 +15,7 @@ public class AppsReportResponse {
     private String username;
     private UserActivityResponse.PeriodRange period;
     private long totalActiveMs;
+    private long realActiveMs;
     private List<AppItem> content;
     private int page;
     private int size;

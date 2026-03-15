@@ -18,6 +18,16 @@ public class ActiveWindowTracker : BackgroundService
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
+    [DllImport("user32.dll")]
+    private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LASTINPUTINFO
+    {
+        public uint cbSize;
+        public uint dwTime;
+    }
+
     private const int PollIntervalMs = 5000;
     private const int MinIntervalMs = 3000;
 
@@ -30,6 +40,10 @@ public class ActiveWindowTracker : BackgroundService
     private string _lastProcessName = "";
     private string _lastWindowTitle = "";
     private DateTime _focusStartedAt;
+
+    // Idle tracking: did the user provide any input during the current focus interval?
+    private bool _hadInputDuringInterval;
+    private uint _lastInputTick;
 
     private static readonly HashSet<string> IgnoredProcesses = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -50,6 +64,9 @@ public class ActiveWindowTracker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("ActiveWindowTracker started (poll interval: {Ms}ms)", PollIntervalMs);
+
+        // Initialize last input tick
+        _lastInputTick = GetCurrentInputTick();
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -73,6 +90,9 @@ public class ActiveWindowTracker : BackgroundService
 
     private void Poll()
     {
+        // Check for user input activity (before window change detection)
+        CheckInputActivity();
+
         var hwnd = GetForegroundWindow();
         if (hwnd == IntPtr.Zero) return;
 
@@ -109,6 +129,8 @@ public class ActiveWindowTracker : BackgroundService
         _lastProcessName = processName;
         _lastWindowTitle = windowTitle;
         _focusStartedAt = now;
+        _hadInputDuringInterval = false;
+        _lastInputTick = GetCurrentInputTick();
     }
 
     private void CompletePreviousInterval(DateTime now)
@@ -117,6 +139,9 @@ public class ActiveWindowTracker : BackgroundService
 
         var duration = (int)(now - _focusStartedAt).TotalMilliseconds;
         if (duration < MinIntervalMs) return;
+
+        // Final input check before completing
+        CheckInputActivity();
 
         bool isBrowser = BrowserDomainParser.IsBrowser(_lastProcessName);
         string? browserName = null, domain = null;
@@ -135,9 +160,29 @@ public class ActiveWindowTracker : BackgroundService
             StartedAt = _focusStartedAt,
             EndedAt = now,
             DurationMs = duration,
-            SessionId = _commandHandler.CurrentSessionId
+            SessionId = _commandHandler.CurrentSessionId,
+            IsIdle = !_hadInputDuringInterval
         });
 
         _lastProcessName = "";
+    }
+
+    /// <summary>
+    /// Check if user input occurred since last check using GetLastInputInfo.
+    /// </summary>
+    private void CheckInputActivity()
+    {
+        uint currentTick = GetCurrentInputTick();
+        if (currentTick != _lastInputTick)
+        {
+            _hadInputDuringInterval = true;
+            _lastInputTick = currentTick;
+        }
+    }
+
+    private static uint GetCurrentInputTick()
+    {
+        var info = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
+        return GetLastInputInfo(ref info) ? info.dwTime : 0;
     }
 }

@@ -85,9 +85,10 @@ export default function AppsDomainsReport({ username, from, to, deviceId }: Apps
           <p className="text-sm text-gray-500">Нет данных</p>
         )}
         {apps && apps.total_active_ms > 0 && (
-          <p className="mt-4 text-xs text-gray-400">
-            Всего активного времени: {formatDuration(apps.total_active_ms)}
-          </p>
+          <div className="mt-4 text-xs text-gray-400 space-y-0.5">
+            <p>Общее время: {formatDuration(apps.total_active_ms)}</p>
+            <p className="text-green-600">Реальная активность: {formatDuration(apps.real_active_ms)} ({Math.round(apps.real_active_ms / apps.total_active_ms * 100)}%)</p>
+          </div>
         )}
       </div>
 

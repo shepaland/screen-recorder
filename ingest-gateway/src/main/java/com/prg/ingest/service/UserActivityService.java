@@ -164,7 +164,8 @@ public class UserActivityService {
                        COUNT(*),
                        SUM(duration_ms),
                        COUNT(DISTINCT process_name),
-                       COUNT(DISTINCT CASE WHEN is_browser = true THEN domain END)
+                       COUNT(DISTINCT CASE WHEN is_browser = true THEN domain END),
+                       COALESCE(SUM(CASE WHEN is_idle = false THEN duration_ms ELSE 0 END), 0)
                 FROM app_focus_intervals
                 WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId) AND username = :username
                   AND started_at >= CAST(:from AS timestamptz)
@@ -188,6 +189,7 @@ public class UserActivityService {
         long totalActiveMs = summaryRow[2] != null ? ((Number) summaryRow[2]).longValue() : 0;
         int uniqueApps = ((Number) summaryRow[3]).intValue();
         int uniqueDomains = ((Number) summaryRow[4]).intValue();
+        long realActiveMs = ((Number) summaryRow[5]).longValue();
 
         // Session count
         StringBuilder sessionCountSql = new StringBuilder("""
@@ -280,7 +282,8 @@ public class UserActivityService {
                 SELECT DATE(started_at) AS d,
                        SUM(duration_ms),
                        MIN(started_at),
-                       MAX(COALESCE(ended_at, started_at))
+                       MAX(COALESCE(ended_at, started_at)),
+                       COALESCE(SUM(CASE WHEN is_idle = false THEN duration_ms ELSE 0 END), 0)
                 FROM app_focus_intervals
                 WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId) AND username = :username
                   AND started_at >= CAST(:from AS timestamptz)
@@ -302,6 +305,7 @@ public class UserActivityService {
                 .map(r -> DailyBreakdown.builder()
                         .date(r[0].toString())
                         .totalActiveMs(((Number) r[1]).longValue())
+                        .realActiveMs(((Number) r[4]).longValue())
                         .firstActivityTs(r[2] != null ? toInstant(r[2]).toString() : null)
                         .lastActivityTs(r[3] != null ? toInstant(r[3]).toString() : null)
                         .build())
@@ -313,6 +317,7 @@ public class UserActivityService {
                 .period(PeriodRange.builder().from(from).to(to).build())
                 .summary(ActivitySummary.builder()
                         .totalActiveMs(totalActiveMs)
+                        .realActiveMs(realActiveMs)
                         .totalDaysActive(daysActive)
                         .avgDailyActiveMs(daysActive > 0 ? totalActiveMs / daysActive : 0)
                         .totalSessions(totalSessions)
@@ -336,9 +341,10 @@ public class UserActivityService {
         if (size < 1) size = 1;
         if (size > 100) size = 100;
 
-        // Total active time
+        // Total time (all) + active time (excluding idle)
         StringBuilder totalSql = new StringBuilder("""
-                SELECT COALESCE(SUM(duration_ms), 0)
+                SELECT COALESCE(SUM(duration_ms), 0),
+                       COALESCE(SUM(CASE WHEN is_idle = false THEN duration_ms ELSE 0 END), 0)
                 FROM app_focus_intervals
                 WHERE (CAST(:tenantId AS uuid) IS NULL OR tenant_id = :tenantId) AND username = :username
                   AND started_at >= CAST(:from AS timestamptz)
@@ -352,7 +358,9 @@ public class UserActivityService {
                 .setParameter("from", from)
                 .setParameter("to", to);
         if (deviceId != null) totalQuery.setParameter("deviceId", deviceId);
-        long totalActiveMs = ((Number) totalQuery.getSingleResult()).longValue();
+        Object[] totalRow = (Object[]) totalQuery.getSingleResult();
+        long totalActiveMs = ((Number) totalRow[0]).longValue();
+        long realActiveMs = ((Number) totalRow[1]).longValue();
 
         // Paginated apps
         String safeSortCol = "total_duration"; // only allowed sort
@@ -415,6 +423,7 @@ public class UserActivityService {
                 .username(username)
                 .period(PeriodRange.builder().from(from).to(to).build())
                 .totalActiveMs(totalActiveMs)
+                .realActiveMs(realActiveMs)
                 .content(items)
                 .page(page)
                 .size(size)

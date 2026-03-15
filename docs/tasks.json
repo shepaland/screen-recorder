@@ -367,13 +367,8 @@
       "role_status": {
         "BA": "Done",
         "SA": "Done",
-<<<<<<< Updated upstream
-        "FE": "New",
-        "BE": "New",
-=======
         "FE": "Done",
         "BE": "Done",
->>>>>>> Stashed changes
         "QA": "New"
       },
       "artifacts": {
@@ -416,6 +411,11 @@
           "ts": "2026-03-14T20:40:00Z",
           "role": "DevOps",
           "action": "Deployed: V38 миграция applied (psql), ingest-gateway + web-dashboard на test-screen-record. Fix: native SQL query (LOWER bytea), GRANT на partitions. GET /input-events: 200 OK, UI /settings/behavior-audit: 200."
+        },
+        {
+          "ts": "2026-03-15T12:40:00Z",
+          "role": "DevOps",
+          "action": "Done: web-dashboard пересобран и задеплоен на test-screen-record. Fix: Sidebar.tsx TS1109 (trailing comma в логическом выражении). HTTP 200. Pod web-dashboard-5477f88dfb-bmvzs Running."
         }
       ]
     },

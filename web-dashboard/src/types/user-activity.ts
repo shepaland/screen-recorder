@@ -40,6 +40,7 @@ export interface UserActivityResponse {
   period: { from: string; to: string }
   summary: {
     total_active_ms: number
+    real_active_ms: number
     total_days_active: number
     avg_daily_active_ms: number
     total_sessions: number
@@ -52,6 +53,7 @@ export interface UserActivityResponse {
   daily_breakdown: Array<{
     date: string
     total_active_ms: number
+    real_active_ms: number
     first_activity_ts: string | null
     last_activity_ts: string | null
   }>
@@ -69,6 +71,7 @@ export interface AppsReportResponse {
   username: string
   period: { from: string; to: string }
   total_active_ms: number
+  real_active_ms: number
   content: AppItem[]
   page: number
   size: number

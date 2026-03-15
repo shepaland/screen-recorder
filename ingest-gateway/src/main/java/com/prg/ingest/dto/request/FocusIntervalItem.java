@@ -56,4 +56,7 @@ public class FocusIntervalItem {
     private Boolean isMaximized;
     private Boolean isFullscreen;
     private Integer monitorIndex;
+
+    // Idle detection — true if no user input during this interval
+    private Boolean isIdle;
 }
