@@ -18,6 +18,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -32,6 +34,20 @@ public class InternalController {
     private final JwtTokenProvider jwtTokenProvider;
     private final DeviceRegistrationTokenRepository registrationTokenRepository;
     private final DeviceRepository deviceRepository;
+
+    @Transactional
+    private void markDeviceBlocked(UUID deviceId) {
+        try {
+            deviceRepository.findById(deviceId).ifPresent(device -> {
+                device.setStatus("blocked");
+                device.setIsActive(false);
+                deviceRepository.save(device);
+                log.info("Device {} marked as blocked (token revoked)", deviceId);
+            });
+        } catch (Exception e) {
+            log.warn("Failed to mark device {} as blocked: {}", deviceId, e.getMessage());
+        }
+    }
 
     @PostMapping("/check-access")
     public ResponseEntity<CheckAccessResponse> checkAccess(@Valid @RequestBody CheckAccessRequest request) {
@@ -57,19 +73,18 @@ public class InternalController {
 
             if (deviceIdStr != null) {
                 // This is a device JWT — must have valid registration token
+                UUID deviceId = UUID.fromString(deviceIdStr);
                 UUID regTokenId = null;
 
                 if (regTokenIdStr != null) {
-                    // New JWT format: reg_token_id embedded
                     regTokenId = UUID.fromString(regTokenIdStr);
                 } else {
-                    // Old JWT format (before fix): look up device to find token
-                    UUID deviceId = UUID.fromString(deviceIdStr);
+                    // Old JWT (before fix): look up device to find token
                     var device = deviceRepository.findById(deviceId).orElse(null);
                     if (device != null && device.getRegistrationToken() != null) {
                         regTokenId = device.getRegistrationToken().getId();
                     } else if (device != null && device.getRegistrationToken() == null) {
-                        // Device exists but token unlinked (hard-deleted) → block
+                        markDeviceBlocked(deviceId);
                         log.info("JWT rejected: device {} has no registration token (deleted)", deviceId);
                         return ResponseEntity.ok(ValidateTokenResponse.builder()
                                 .valid(false)
@@ -81,6 +96,7 @@ public class InternalController {
                 if (regTokenId != null) {
                     var regToken = registrationTokenRepository.findById(regTokenId).orElse(null);
                     if (regToken == null) {
+                        markDeviceBlocked(deviceId);
                         log.info("JWT rejected: registration token {} deleted", regTokenId);
                         return ResponseEntity.ok(ValidateTokenResponse.builder()
                                 .valid(false)
@@ -88,6 +104,7 @@ public class InternalController {
                                 .build());
                     }
                     if (!regToken.getIsActive()) {
+                        markDeviceBlocked(deviceId);
                         log.info("JWT rejected: registration token {} deactivated", regTokenId);
                         return ResponseEntity.ok(ValidateTokenResponse.builder()
                                 .valid(false)
@@ -95,6 +112,7 @@ public class InternalController {
                                 .build());
                     }
                     if (regToken.getExpiresAt() != null && regToken.getExpiresAt().isBefore(Instant.now())) {
+                        markDeviceBlocked(deviceId);
                         log.info("JWT rejected: registration token {} expired", regTokenId);
                         return ResponseEntity.ok(ValidateTokenResponse.builder()
                                 .valid(false)
