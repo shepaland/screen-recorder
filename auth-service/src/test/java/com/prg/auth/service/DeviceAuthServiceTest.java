@@ -149,7 +149,7 @@ class DeviceAuthServiceTest {
             return d;
         });
         when(jwtTokenProvider.generateDeviceAccessToken(any(), any(), anyString(), anyString(),
-                anyList(), anyList(), anyList(), any()))
+                anyList(), anyList(), anyList(), any(), any()))
                 .thenReturn("mock-device-access-token");
         when(jwtTokenProvider.getAccessTokenTtl()).thenReturn(900L);
         when(jwtConfig.getRefreshTokenTtl()).thenReturn(2592000L);
@@ -212,7 +212,7 @@ class DeviceAuthServiceTest {
                 .thenReturn(Optional.of(existingDevice));
         when(deviceRepository.save(any(Device.class))).thenAnswer(i -> i.getArgument(0));
         when(jwtTokenProvider.generateDeviceAccessToken(any(), any(), anyString(), anyString(),
-                anyList(), anyList(), anyList(), any()))
+                anyList(), anyList(), anyList(), any(), any()))
                 .thenReturn("mock-device-access-token");
         when(jwtTokenProvider.getAccessTokenTtl()).thenReturn(900L);
         when(jwtConfig.getRefreshTokenTtl()).thenReturn(2592000L);
@@ -417,7 +417,7 @@ class DeviceAuthServiceTest {
         when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(storedToken));
         when(tenantRepository.findById(tenant.getId())).thenReturn(Optional.of(tenant));
         when(jwtTokenProvider.generateDeviceAccessToken(any(), any(), anyString(), anyString(),
-                anyList(), anyList(), anyList(), eq(deviceId)))
+                anyList(), anyList(), anyList(), eq(deviceId), any()))
                 .thenReturn("new-device-access-token");
         when(jwtTokenProvider.getAccessTokenTtl()).thenReturn(900L);
         when(jwtConfig.getRefreshTokenTtl()).thenReturn(2592000L);
