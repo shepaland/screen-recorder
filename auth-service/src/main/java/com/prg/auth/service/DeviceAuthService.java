@@ -604,7 +604,7 @@ public class DeviceAuthService {
     private void markDeviceBlockedNative(UUID deviceId) {
         try (var conn = dataSource.getConnection();
              var stmt = conn.prepareStatement(
-                     "UPDATE devices SET status = 'blocked', is_active = false, updated_ts = NOW() WHERE id = ?::uuid")) {
+                     "UPDATE devices SET status = 'offline', is_active = false, updated_ts = NOW() WHERE id = ?::uuid")) {
             stmt.setString(1, deviceId.toString());
             int updated = stmt.executeUpdate();
             if (updated > 0) {
