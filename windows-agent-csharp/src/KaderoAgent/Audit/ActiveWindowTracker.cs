@@ -30,6 +30,7 @@ public class ActiveWindowTracker : BackgroundService
 
     private const int PollIntervalMs = 5000;
     private const int MinIntervalMs = 3000;
+    private const int MaxIntervalMs = 60000; // Split intervals every 60s for accurate idle tracking
 
     private readonly FocusIntervalSink _sink;
     private readonly CommandHandler _commandHandler;
@@ -90,8 +91,29 @@ public class ActiveWindowTracker : BackgroundService
 
     private void Poll()
     {
-        // Check for user input activity (before window change detection)
+        // Check for user input activity
         CheckInputActivity();
+
+        var now = DateTime.UtcNow;
+
+        // Split long intervals to capture idle periods within the same window
+        if (!string.IsNullOrEmpty(_lastProcessName) &&
+            (now - _focusStartedAt).TotalMilliseconds >= MaxIntervalMs)
+        {
+            // Complete current chunk and start a new one for the same window
+            CompletePreviousInterval(now);
+            _lastProcessName = GetProcessNameForHwnd(_lastHwnd);
+            if (!string.IsNullOrEmpty(_lastProcessName))
+            {
+                var sb = new StringBuilder(2048);
+                GetWindowText(_lastHwnd, sb, 2048);
+                _lastWindowTitle = sb.ToString().Trim();
+                _focusStartedAt = now;
+                _hadInputDuringInterval = false;
+                _lastInputTick = GetCurrentInputTick();
+            }
+            return;
+        }
 
         var hwnd = GetForegroundWindow();
         if (hwnd == IntPtr.Zero) return;
@@ -100,26 +122,15 @@ public class ActiveWindowTracker : BackgroundService
         if (hwnd == _lastHwnd) return;
 
         // Get process info
-        GetWindowThreadProcessId(hwnd, out uint pid);
-        string processName;
-        try
-        {
-            processName = Process.GetProcessById((int)pid).ProcessName;
-        }
-        catch
-        {
-            return; // Process may have exited
-        }
-
+        string processName = GetProcessNameForHwnd(hwnd);
+        if (string.IsNullOrEmpty(processName)) return;
         if (IgnoredProcesses.Contains(processName)) return;
 
         // Get window title
-        var sb = new StringBuilder(2048);
-        GetWindowText(hwnd, sb, 2048);
-        var windowTitle = sb.ToString().Trim();
+        var titleSb = new StringBuilder(2048);
+        GetWindowText(hwnd, titleSb, 2048);
+        var windowTitle = titleSb.ToString().Trim();
         if (string.IsNullOrEmpty(windowTitle)) return;
-
-        var now = DateTime.UtcNow;
 
         // Complete previous interval
         CompletePreviousInterval(now);
@@ -184,5 +195,19 @@ public class ActiveWindowTracker : BackgroundService
     {
         var info = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
         return GetLastInputInfo(ref info) ? info.dwTime : 0;
+    }
+
+    private static string GetProcessNameForHwnd(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero) return "";
+        GetWindowThreadProcessId(hwnd, out uint pid);
+        try
+        {
+            return Process.GetProcessById((int)pid).ProcessName;
+        }
+        catch
+        {
+            return "";
+        }
     }
 }

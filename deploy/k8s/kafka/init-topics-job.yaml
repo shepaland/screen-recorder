@@ -1,0 +1,72 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-init-topics
+  labels:
+    app: kafka
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app: kafka-init-topics
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      containers:
+        - name: kafka-init-topics
+          image: apache/kafka:3.7.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              BOOTSTRAP="kafka:9092"
+
+              echo "Waiting for Kafka to be ready..."
+              until /opt/kafka/bin/kafka-topics.sh --bootstrap-server $BOOTSTRAP --list > /dev/null 2>&1; do
+                echo "Kafka not ready, retrying in 5s..."
+                sleep 5
+              done
+              echo "Kafka is ready."
+
+              create_topic() {
+                TOPIC=$1; PARTITIONS=$2; RETENTION=$3
+                if /opt/kafka/bin/kafka-topics.sh --bootstrap-server $BOOTSTRAP --describe --topic "$TOPIC" > /dev/null 2>&1; then
+                  echo "Topic $TOPIC already exists, skipping."
+                else
+                  echo "Creating topic $TOPIC (partitions=$PARTITIONS, retention=${RETENTION}ms)..."
+                  /opt/kafka/bin/kafka-topics.sh --bootstrap-server $BOOTSTRAP --create \
+                    --topic "$TOPIC" \
+                    --partitions "$PARTITIONS" \
+                    --replication-factor 1 \
+                    --config "retention.ms=$RETENTION"
+                fi
+              }
+
+              create_topic "segments.ingest"   6 604800000
+              create_topic "commands.issued"    6 259200000
+              create_topic "device.events"      3 604800000
+              create_topic "audit.events"       3 31536000000
+              create_topic "webhooks.outbound"  3 259200000
+
+              echo ""
+              echo "=== Topics created ==="
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server $BOOTSTRAP --list
+              echo ""
+              echo "=== Topic details ==="
+              for t in segments.ingest commands.issued device.events audit.events webhooks.outbound; do
+                /opt/kafka/bin/kafka-topics.sh --bootstrap-server $BOOTSTRAP --describe --topic "$t"
+                echo "---"
+              done
+              echo "Done."
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "250m"

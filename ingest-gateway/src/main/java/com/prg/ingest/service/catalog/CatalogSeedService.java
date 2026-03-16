@@ -12,7 +12,9 @@ import com.prg.ingest.repository.catalog.AppGroupItemRepository;
 import com.prg.ingest.repository.catalog.AppGroupRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
@@ -30,7 +32,7 @@ public class CatalogSeedService {
      * Seed default groups, items, and aliases for a tenant.
      * If force=true, deletes existing data first.
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void seed(UUID tenantId, GroupType groupType, boolean force) {
         log.info("Seeding catalog for tenant={} groupType={} force={}", tenantId, groupType, force);
 
@@ -215,28 +217,39 @@ public class CatalogSeedService {
             return;
         }
 
-        AppGroup group = AppGroup.builder()
-                .tenantId(tenantId)
-                .groupType(groupType)
-                .name(name)
-                .description(description)
-                .color(color)
-                .sortOrder(sortOrder)
-                .isDefault(isDefault)
-                .build();
-        groupRepo.save(group);
+        AppGroup group;
+        try {
+            group = AppGroup.builder()
+                    .tenantId(tenantId)
+                    .groupType(groupType)
+                    .name(name)
+                    .description(description)
+                    .color(color)
+                    .sortOrder(sortOrder)
+                    .isDefault(isDefault)
+                    .build();
+            group = groupRepo.saveAndFlush(group);
+        } catch (DataIntegrityViolationException e) {
+            // Race condition: concurrent request already created this group
+            log.debug("Group '{}' already exists for tenant={} (concurrent insert), skipping", name, tenantId);
+            return;
+        }
 
         ItemType itemType = groupType == GroupType.APP ? ItemType.APP : ItemType.SITE;
         for (String pattern : patterns) {
-            if (!itemRepo.existsByTenantIdAndItemTypeAndPatternIgnoreCase(tenantId, itemType, pattern)) {
-                AppGroupItem item = AppGroupItem.builder()
-                        .tenantId(tenantId)
-                        .group(group)
-                        .itemType(itemType)
-                        .pattern(pattern)
-                        .matchType(MatchType.EXACT)
-                        .build();
-                itemRepo.save(item);
+            try {
+                if (!itemRepo.existsByTenantIdAndItemTypeAndPatternIgnoreCase(tenantId, itemType, pattern)) {
+                    AppGroupItem item = AppGroupItem.builder()
+                            .tenantId(tenantId)
+                            .group(group)
+                            .itemType(itemType)
+                            .pattern(pattern)
+                            .matchType(MatchType.EXACT)
+                            .build();
+                    itemRepo.saveAndFlush(item);
+                }
+            } catch (DataIntegrityViolationException e) {
+                log.debug("Item '{}' already exists for tenant={} (concurrent insert), skipping", pattern, tenantId);
             }
         }
     }
@@ -244,13 +257,17 @@ public class CatalogSeedService {
     private void createAliasIfNotExists(UUID tenantId, AliasType aliasType,
                                          String original, String displayName) {
         if (!aliasRepo.existsByTenantIdAndAliasTypeAndOriginalIgnoreCase(tenantId, aliasType, original)) {
-            AppAlias alias = AppAlias.builder()
-                    .tenantId(tenantId)
-                    .aliasType(aliasType)
-                    .original(original)
-                    .displayName(displayName)
-                    .build();
-            aliasRepo.save(alias);
+            try {
+                AppAlias alias = AppAlias.builder()
+                        .tenantId(tenantId)
+                        .aliasType(aliasType)
+                        .original(original)
+                        .displayName(displayName)
+                        .build();
+                aliasRepo.saveAndFlush(alias);
+            } catch (DataIntegrityViolationException e) {
+                log.debug("Alias '{}' already exists for tenant={} (concurrent insert), skipping", original, tenantId);
+            }
         }
     }
 }

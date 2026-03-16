@@ -21,7 +21,7 @@ import java.util.UUID;
 @Slf4j
 public class DashboardController {
 
-    private static final String PERMISSION_CATALOGS_READ = "CATALOGS:READ";
+    private static final String PERMISSION_DASHBOARD_VIEW = "DASHBOARD:VIEW";
 
     private final DashboardService dashboardService;
 
@@ -30,7 +30,7 @@ public class DashboardController {
             @RequestParam(name = "tenant_id", required = false) UUID tenantIdParam,
             HttpServletRequest httpRequest) {
 
-        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_CATALOGS_READ);
+        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_DASHBOARD_VIEW);
         UUID tenantId = resolveEffectiveTenantId(principal, tenantIdParam);
 
         log.debug("Getting dashboard metrics: tenant={}", tenantId);
@@ -48,7 +48,7 @@ public class DashboardController {
             @RequestParam(name = "tenant_id", required = false) UUID tenantIdParam,
             HttpServletRequest httpRequest) {
 
-        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_CATALOGS_READ);
+        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_DASHBOARD_VIEW);
         UUID tenantId = resolveEffectiveTenantId(principal, tenantIdParam);
         GroupType type = parseGroupType(groupType);
 
@@ -65,7 +65,7 @@ public class DashboardController {
             @RequestParam(name = "tenant_id", required = false) UUID tenantIdParam,
             HttpServletRequest httpRequest) {
 
-        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_CATALOGS_READ);
+        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_DASHBOARD_VIEW);
         UUID tenantId = resolveEffectiveTenantId(principal, tenantIdParam);
         GroupType type = parseGroupType(groupType);
 
@@ -83,7 +83,7 @@ public class DashboardController {
             @RequestParam(name = "tenant_id", required = false) UUID tenantIdParam,
             HttpServletRequest httpRequest) {
 
-        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_CATALOGS_READ);
+        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_DASHBOARD_VIEW);
         UUID tenantId = resolveEffectiveTenantId(principal, tenantIdParam);
         ItemType type = parseItemType(itemType);
 
@@ -101,7 +101,7 @@ public class DashboardController {
             @RequestParam(name = "tenant_id", required = false) UUID tenantIdParam,
             HttpServletRequest httpRequest) {
 
-        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_CATALOGS_READ);
+        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_DASHBOARD_VIEW);
         UUID tenantId = resolveEffectiveTenantId(principal, tenantIdParam);
         ItemType type = parseItemType(itemType);
 

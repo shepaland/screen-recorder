@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  labels:
+    app: kafka
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      automountServiceAccountToken: false
+      initContainers:
+        - name: kafka-init
+          image: apache/kafka:3.7.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              if [ ! -f /var/kafka-logs/meta.properties ]; then
+                echo "Formatting KRaft storage..."
+                /opt/kafka/bin/kafka-storage.sh format \
+                  --config /opt/kafka/custom-config/server.properties \
+                  --cluster-id "$KAFKA_KRAFT_CLUSTER_ID" \
+                  --ignore-formatted
+              else
+                echo "KRaft storage already formatted, skipping."
+              fi
+          env:
+            - name: KAFKA_KRAFT_CLUSTER_ID
+              value: "c09d9c5c-82ec-4007-92f0-a4c83e03d256"
+          volumeMounts:
+            - name: kafka-data
+              mountPath: /var/kafka-logs
+            - name: kafka-config
+              mountPath: /opt/kafka/custom-config
+      containers:
+        - name: kafka
+          image: apache/kafka:3.7.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - /opt/kafka/bin/kafka-server-start.sh
+            - /opt/kafka/custom-config/server.properties
+          env:
+            - name: KAFKA_KRAFT_CLUSTER_ID
+              value: "c09d9c5c-82ec-4007-92f0-a4c83e03d256"
+          ports:
+            - containerPort: 9092
+              name: plaintext
+            - containerPort: 9093
+              name: controller
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          readinessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          volumeMounts:
+            - name: kafka-data
+              mountPath: /var/kafka-logs
+            - name: kafka-config
+              mountPath: /opt/kafka/custom-config
+      volumes:
+        - name: kafka-data
+          persistentVolumeClaim:
+            claimName: kafka-data
+        - name: kafka-config
+          configMap:
+            name: kafka-config

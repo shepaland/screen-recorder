@@ -520,7 +520,17 @@ public class DashboardService {
     private void ensureGroupsExist(UUID tenantId, GroupType groupType) {
         long count = groupRepo.countByTenantIdAndGroupType(tenantId, groupType);
         if (count == 0) {
-            seedService.seed(tenantId, groupType, false);
+            try {
+                seedService.seed(tenantId, groupType, false);
+            } catch (Exception e) {
+                // Race condition: another concurrent request already seeded.
+                // Re-check — if groups exist now, it's fine.
+                long recheck = groupRepo.countByTenantIdAndGroupType(tenantId, groupType);
+                if (recheck == 0) {
+                    throw e; // Real error, not a race condition
+                }
+                log.debug("Concurrent seed detected for tenant={} groupType={}, groups already exist", tenantId, groupType);
+            }
         }
     }
 

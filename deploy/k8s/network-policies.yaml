@@ -7,14 +7,14 @@
 #   External -> Traefik (kube-system) -> web-dashboard, control-plane, ingest-gateway
 #   web-dashboard (nginx) -> auth-service (proxy /api/), control-plane (/api/cp/),
 #                           ingest-gateway (/api/ingest/), minio (/prg-segments/)
-#   control-plane -> auth-service, PostgreSQL, NATS
-#   ingest-gateway -> auth-service, PostgreSQL, MinIO, NATS
+#   control-plane -> auth-service, PostgreSQL, Kafka
+#   ingest-gateway -> auth-service, PostgreSQL, MinIO, Kafka
 #   All services -> kube-dns (UDP 53)
 #
 # External services:
 #   PostgreSQL: 172.17.0.1:5432 (host network, not in k8s)
 #   MinIO: minio service in same namespace (app: minio)
-#   NATS: nats service in same namespace (app: nats)
+#   Kafka: kafka service in same namespace (app: kafka)
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -153,7 +153,7 @@ spec:
 # control-plane (port 8080)
 # =============================================================================
 # Ingress: Traefik ingress controller (kube-system), web-dashboard
-# Egress: auth-service:8081, PostgreSQL, NATS:4222, DNS
+# Egress: auth-service:8081, PostgreSQL, Kafka:9092, DNS
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -204,7 +204,7 @@ spec:
 # Allow outbound traffic to:
 #   - auth-service:8081 (JWT validation, permission checks via /api/v1/internal/check-access)
 #   - PostgreSQL at 172.17.0.1:5432
-#   - NATS JetStream at nats:4222 (commands to agents, event publishing)
+#   - Kafka at kafka:9092 (commands to agents, event publishing)
 #   - kube-dns (UDP 53)
 # -----------------------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
@@ -236,14 +236,14 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
-    # NATS JetStream (same namespace)
+    # Kafka (same namespace)
     - to:
         - podSelector:
             matchLabels:
-              app: nats
+              app: kafka
       ports:
         - protocol: TCP
-          port: 4222
+          port: 9092
     # DNS (kube-dns in kube-system)
     - to:
         - namespaceSelector:
@@ -262,7 +262,7 @@ spec:
 # ingest-gateway (port 8084)
 # =============================================================================
 # Ingress: Traefik ingress controller, agents from outside cluster
-# Egress: auth-service:8081, PostgreSQL, MinIO:9000, NATS:4222, DNS
+# Egress: auth-service:8081, PostgreSQL, MinIO:9000, Kafka:9092, DNS
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -314,7 +314,7 @@ spec:
 #   - auth-service:8081 (device token and JWT validation)
 #   - PostgreSQL at 172.17.0.1:5432 (segment metadata persistence)
 #   - MinIO at minio:9000 (S3 presigned URL generation, segment storage)
-#   - NATS JetStream at nats:4222 (segment.confirmed events)
+#   - Kafka at kafka:9092 (segment.confirmed events)
 #   - kube-dns (UDP 53)
 # -----------------------------------------------------------------------------
 apiVersion: networking.k8s.io/v1
@@ -354,14 +354,14 @@ spec:
       ports:
         - protocol: TCP
           port: 9000
-    # NATS JetStream (same namespace)
+    # Kafka (same namespace)
     - to:
         - podSelector:
             matchLabels:
-              app: nats
+              app: kafka
       ports:
         - protocol: TCP
-          port: 4222
+          port: 9092
     # DNS (kube-dns in kube-system)
     - to:
         - namespaceSelector:
@@ -584,6 +584,126 @@ spec:
       ports:
         - protocol: TCP
           port: 9000
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# =============================================================================
+# Kafka (port 9092)
+# =============================================================================
+# Ingress: ingest-gateway, control-plane, search-service, segment-writer,
+#          kafka-init-topics job
+# Egress: DNS only (single-node KRaft, controller is co-located)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 13. Kafka -- Ingress
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka-ingress
+  labels:
+    app: kafka
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector:
+    matchLabels:
+      app: kafka
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: ingest-gateway
+        - podSelector:
+            matchLabels:
+              app: control-plane
+        - podSelector:
+            matchLabels:
+              app: search-service
+        - podSelector:
+            matchLabels:
+              app: segment-writer
+        - podSelector:
+            matchLabels:
+              app: kafka-init-topics
+      ports:
+        - protocol: TCP
+          port: 9092
+---
+# -----------------------------------------------------------------------------
+# 14. Kafka -- Egress
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka-egress
+  labels:
+    app: kafka
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector:
+    matchLabels:
+      app: kafka
+  policyTypes:
+    - Egress
+  egress:
+    # Self-connection (broker metadata advertises kafka:9092, consumer reconnects via service)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 9093
+    # DNS (kube-dns in kube-system)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# -----------------------------------------------------------------------------
+# 15. kafka-init-topics job -- Egress
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka-init-topics-egress
+spec:
+  podSelector:
+    matchLabels:
+      app: kafka-init-topics
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: kafka
+      ports:
+        - protocol: TCP
+          port: 9092
     - to:
         - namespaceSelector:
             matchLabels:
