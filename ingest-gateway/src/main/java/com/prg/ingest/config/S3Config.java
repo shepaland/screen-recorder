@@ -51,10 +51,10 @@ public class S3Config {
                 .pathStyleAccessEnabled(true)
                 .build();
 
-        // Use presignEndpoint for external-facing presigned URLs (agents upload via this URL)
-        // Defaults to internal endpoint if not configured separately
+        // Presigner signs with internal endpoint (minio:9000) to match MinIO signature validation.
+        // S3Service rewrites the URL to external endpoint after signing.
         return S3Presigner.builder()
-                .endpointOverride(URI.create(presignEndpoint))
+                .endpointOverride(URI.create(endpoint))
                 .region(Region.of(region))
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(accessKey, secretKey)))

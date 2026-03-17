@@ -26,6 +26,12 @@ public class S3Service {
     @Value("${prg.s3.bucket}")
     private String bucket;
 
+    @Value("${prg.s3.endpoint}")
+    private String s3Endpoint;
+
+    @Value("${prg.s3.presign-endpoint:}")
+    private String presignEndpoint;
+
     @Value("${prg.s3.presign-expiry-sec}")
     private int presignExpirySec;
 
@@ -48,8 +54,14 @@ public class S3Service {
                 .build();
 
         String url = s3Presigner.presignPutObject(presignRequest).url().toString();
-        // S3Presigner uses S3_PRESIGN_ENDPOINT (external URL) if configured,
-        // so no URL rewrite needed — presigner generates correct external URL.
+        // Rewrite internal MinIO URL to external presign endpoint.
+        // Presigner signs for internal host (minio:9000) so MinIO can validate the signature.
+        // We then swap the host part so agents can reach the URL through nginx proxy.
+        // nginx must forward Host header as-is (default) or set Host to minio for signature match.
+        if (presignEndpoint != null && !presignEndpoint.isBlank()) {
+            String internalBase = s3Endpoint + "/" + bucket;
+            url = url.replace(internalBase, presignEndpoint);
+        }
         log.debug("Generated presigned PUT URL for key={}", key);
         return url;
     }
