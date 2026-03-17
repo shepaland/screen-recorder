@@ -8,6 +8,8 @@ import com.prg.controlplane.entity.Device;
 import com.prg.controlplane.entity.DeviceCommand;
 import com.prg.controlplane.exception.AccessDeniedException;
 import com.prg.controlplane.exception.ResourceNotFoundException;
+import com.prg.controlplane.kafka.EventPublisher;
+import com.prg.controlplane.kafka.event.CommandIssuedEvent;
 import com.prg.controlplane.repository.DeviceCommandRepository;
 import com.prg.controlplane.repository.DeviceRepository;
 import com.prg.controlplane.security.DevicePrincipal;
@@ -29,6 +31,7 @@ public class DeviceCommandService {
 
     private final DeviceCommandRepository deviceCommandRepository;
     private final DeviceRepository deviceRepository;
+    private final EventPublisher eventPublisher;
 
     @Transactional
     public CommandResponse createCommand(UUID deviceId, CreateCommandRequest request,
@@ -54,6 +57,20 @@ public class DeviceCommandService {
 
         log.info("Command created: id={}, type={}, device_id={}, tenant_id={}",
                 command.getId(), command.getCommandType(), deviceId, tenantId);
+
+        // Dual-write to Kafka
+        eventPublisher.publish("commands.issued",
+            deviceId.toString(),
+            CommandIssuedEvent.builder()
+                .commandId(command.getId())
+                .commandType(command.getCommandType())
+                .tenantId(tenantId)
+                .deviceId(deviceId)
+                .payload(command.getPayload())
+                .createdBy(createdBy)
+                .createdAt(command.getCreatedTs())
+                .expiresAt(command.getExpiresAt())
+                .build());
 
         return toResponse(command);
     }

@@ -12,7 +12,7 @@ RUN ./mvnw dependency:go-offline -B
 
 # Copy source and build
 COPY control-plane/src ./src
-RUN ./mvnw package -DskipTests -B
+RUN ./mvnw package -DskipTests -Dmaven.test.skip=true -B
 
 # Runtime stage
 FROM eclipse-temurin:21-jre-alpine

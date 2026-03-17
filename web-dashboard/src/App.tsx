@@ -32,6 +32,9 @@ import AppGroupsPage from './pages/AppGroupsPage';
 import SiteGroupsPage from './pages/SiteGroupsPage';
 import TimelinesPage from './pages/TimelinesPage';
 import BehaviorAuditPage from './pages/BehaviorAuditPage';
+import SearchPage from './pages/SearchPage';
+import SessionDetailPage from './pages/SessionDetailPage';
+import WebhookSettingsPage from './pages/WebhookSettingsPage';
 
 function App() {
   return (
@@ -61,6 +64,10 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Search & Playback */}
+        <Route path="/search" element={<SearchPage />} />
+        <Route path="/playback/:sessionId" element={<SessionDetailPage />} />
 
         {/* Recordings Archive */}
         <Route path="/archive/devices" element={<DeviceGridPage />} />
@@ -225,6 +232,9 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Webhooks */}
+        <Route path="/settings/webhooks" element={<WebhookSettingsPage />} />
 
         {/* Settings (includes profile info) - any authenticated user */}
         <Route path="/settings" element={<SettingsPage />} />

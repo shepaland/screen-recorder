@@ -13,6 +13,8 @@ import {
   ChevronRightIcon,
   ArrowDownTrayIcon,
   AdjustmentsHorizontalIcon,
+  MagnifyingGlassIcon,
+  BellAlertIcon,
   UserGroupIcon,
   ChartBarIcon,
   UserCircleIcon,
@@ -41,6 +43,7 @@ const archiveSubmenu: NavItem[] = [
   { name: 'Устройства', href: '/archive/devices', icon: ComputerDesktopIcon },
   { name: 'Сотрудники', href: '/archive/employees', icon: UserGroupIcon },
   { name: 'Таймлайны', href: '/archive/timelines', icon: ClockIcon },
+  { name: 'Поиск записей', href: '/search', icon: MagnifyingGlassIcon },
   { name: 'Аудит поведения', href: '/settings/behavior-audit', icon: EyeIcon, permission: 'AUDIT:READ' },
 ];
 
@@ -56,6 +59,7 @@ const tenantSettingsSubmenu: NavItem[] = [
   { name: 'Пользователи', href: '/users', icon: UsersIcon, permission: 'USERS:READ' },
   { name: 'Токены', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
   { name: 'Настройки записи', href: '/recording-settings', icon: AdjustmentsHorizontalIcon, permission: 'DEVICES:READ' },
+  { name: 'Webhooks', href: '/settings/webhooks', icon: BellAlertIcon },
 ];
 
 /** Settings submenu for superadmin. */
@@ -65,6 +69,7 @@ const superAdminSettingsSubmenu: NavItem[] = [
   { name: 'Агенты', href: '/devices', icon: ComputerDesktopIcon, permission: 'DEVICES:READ' },
   { name: 'Настройки записи', href: '/recording-settings', icon: AdjustmentsHorizontalIcon, permission: 'DEVICES:READ' },
   { name: 'Токены регистрации', href: '/device-tokens', icon: KeyIcon, permission: 'DEVICE_TOKENS:READ' },
+  { name: 'Webhooks', href: '/settings/webhooks', icon: BellAlertIcon },
 ];
 
 /** Global items outside the company scope. */

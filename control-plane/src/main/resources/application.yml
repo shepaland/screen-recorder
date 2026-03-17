@@ -28,6 +28,31 @@ spring:
   flyway:
     enabled: false
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    admin:
+      auto-create: false
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 1
+    consumer:
+      group-id: webhook-dispatcher
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: "com.prg.controlplane.kafka.event"
+        spring.json.value.default.type: "com.prg.controlplane.kafka.event.WebhookOutboundEvent"
+    listener:
+      ack-mode: manual
   jackson:
     property-naming-strategy: SNAKE_CASE
     serialization:
@@ -35,6 +60,12 @@ spring:
     deserialization:
       fail-on-unknown-properties: false
     default-property-inclusion: non_null
+
+kafka:
+  dual-write:
+    enabled: ${KAFKA_DUAL_WRITE:false}
+  webhook-dispatcher:
+    enabled: ${KAFKA_WEBHOOK_DISPATCHER:false}
 
 prg:
   auth-service:

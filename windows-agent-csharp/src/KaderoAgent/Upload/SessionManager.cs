@@ -28,6 +28,17 @@ public class SessionManager
 
     public void ClearSessionError() => _consecutiveSessionErrors = 0;
 
+    /// <summary>
+    /// Invalidate the cached session ID. Next upload will trigger session creation.
+    /// Used when server returns 404 SESSION_NOT_FOUND (phantom session after restart).
+    /// </summary>
+    public void InvalidateSession()
+    {
+        var old = _currentSessionId;
+        _currentSessionId = null;
+        _logger.LogWarning("Session invalidated: {OldSession} (will create new on next upload)", old);
+    }
+
     public SessionManager(ApiClient apiClient, AuthManager authManager,
         CredentialStore credentialStore, UserSessionInfo userSessionInfo,
         ILogger<SessionManager> logger)

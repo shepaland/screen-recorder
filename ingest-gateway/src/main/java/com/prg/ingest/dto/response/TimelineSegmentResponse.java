@@ -2,6 +2,7 @@ package com.prg.ingest.dto.response;
 
 import lombok.*;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Data
@@ -15,4 +16,5 @@ public class TimelineSegmentResponse {
     private long sizeBytes;
     private String status;
     private String s3Key;
+    private Instant recordedAt;
 }

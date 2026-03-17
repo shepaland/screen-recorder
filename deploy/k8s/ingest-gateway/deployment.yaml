@@ -35,10 +35,10 @@ spec:
                 name: ingest-gateway-secret
           resources:
             requests:
-              memory: "256Mi"
+              memory: "384Mi"
               cpu: "250m"
             limits:
-              memory: "768Mi"
+              memory: "1Gi"
               cpu: "750m"
           readinessProbe:
             httpGet:

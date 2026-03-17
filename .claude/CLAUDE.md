@@ -1,4 +1,8 @@
-# Screen Recorder
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+# Screen Recorder (Кадеро)
 
 Мультитенантная платформа записи экранов операторов контактного центра.
 H.264 fMP4 запись → сегментация → S3 хранение → HLS воспроизведение → полнотекстовый поиск.
@@ -8,8 +12,8 @@ H.264 fMP4 запись → сегментация → S3 хранение → H
 - **Backend:** Java 21, Spring Boot 3.x, Spring Security (JWT), Spring Data JPA, Spring WebFlux (ingest), Flyway (миграции)
 - **Frontend:** React 18, Vite, TypeScript, Tailwind CSS, Axios, React Router v6
 - **macOS Agent:** Swift 5.10, ScreenCaptureKit, AVAssetWriter, SQLite
-- **Windows Agent:** Java, SQLite
-- **Инфраструктура:** PostgreSQL 16 (на хосте, не в k8s), MinIO (S3), NATS JetStream, OpenSearch 2.12, k3s, Traefik
+- **Windows Agent:** C# .NET 8, Inno Setup (инсталлятор), SQLite
+- **Инфраструктура:** PostgreSQL 16 (на хосте, не в k8s), MinIO (S3), Apache Kafka 3.7 (KRaft), OpenSearch 2.12, k3s, Traefik
 - **Мониторинг:** Prometheus, Grafana, Loki, Tempo, AlertManager
 
 ## Сервисы и порты
@@ -17,10 +21,10 @@ H.264 fMP4 запись → сегментация → S3 хранение → H
 | Сервис | Порт | Назначение |
 |--------|------|------------|
 | auth-service | 8081 | JWT, RBAC (6 ролей, 27 пермишенов), ABAC, аудит |
-| control-plane | 8080 | Устройства, политики записи, команды агентам (NATS), вебхуки |
+| control-plane | 8080 | Устройства, политики записи, команды агентам (Kafka), вебхуки |
 | ingest-gateway | 8084 | Приём видеосегментов: presign → upload → confirm → MinIO |
 | playback-service | 8082 | HLS M3U8 плейлисты, проксирование сегментов из MinIO |
-| search-service | 8083 | NATS consumer → OpenSearch индексация, полнотекстовый поиск |
+| search-service | 8083 | Kafka consumer → OpenSearch индексация, полнотекстовый поиск |
 | web-dashboard | 80 | React SPA, nginx |
 
 ## Git
@@ -99,14 +103,14 @@ swift build && swift test
 Data Plane (видеопоток) отделён от Control Plane (команды, конфигурация). Все сервисы stateless.
 
 **Ingest flow:**
-Agent → presign (ingest-gw) → PUT segment в MinIO → confirm (ingest-gw) → PostgreSQL + NATS event → search-service → OpenSearch
+Agent → presign (ingest-gw) → PUT segment в MinIO → confirm (ingest-gw) → Kafka (segments.confirmed) → segment-writer (PostgreSQL) + search-service (OpenSearch)
 
 **Playback flow:**
 Browser → search-service (поиск) → playback-service (M3U8) → MinIO (proxy stream)
 
 **Control flow:**
-CRM/АТС webhook → control-plane → NATS → Agent
-Admin → control-plane → NATS command → Agent
+CRM/АТС webhook → control-plane → Kafka → Agent
+Admin → control-plane → Kafka command → Agent
 
 **S2S авторизация:**
 playback-service, search-service → auth-service `/api/v1/internal/check-access` (ABAC)
@@ -121,14 +125,15 @@ playback-service, search-service → auth-service `/api/v1/internal/check-access
 - **Аудит:** immutable (triggers блокируют UPDATE/DELETE на audit_log).
 - **Производительность:** система должна обеспечивать работу 10 000 одновременно подключенных компьютеров, которые передают на сервер свои записи.
 
-## NATS JetStream потоки
+## Kafka топики
 
-| Поток | Subjects | Retention |
-|-------|----------|-----------|
-| COMMANDS | commands.> | 72h |
-| EVENTS | events.>, segments.> | 168h |
-| WEBHOOKS | webhooks.> | 72h |
-| AUDIT | audit.> | 1 год |
+| Топик | Producer | Consumer | Назначение |
+|-------|----------|----------|------------|
+| commands.issued | control-plane | — | Команды агентам |
+| device.events | control-plane | — | События устройств |
+| segments.confirmed | ingest-gateway | search-service, segment-writer | Подтверждение сегментов |
+| segments.written | segment-writer | — | Сегменты записаны в БД |
+| webhooks.trigger | control-plane | webhook-worker | Триггеры вебхуков |
 
 ## API конвенции
 

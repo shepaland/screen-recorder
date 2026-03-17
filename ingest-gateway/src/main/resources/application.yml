@@ -27,11 +27,45 @@ spring:
     open-in-view: false
   flyway:
     enabled: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    admin:
+      auto-create: false
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 1
+    consumer:
+      group-id: segment-writer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      max-poll-records: 100
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: "com.prg.ingest.kafka.event"
+        spring.json.value.default.type: "com.prg.ingest.kafka.event.SegmentConfirmedEvent"
+    listener:
+      type: batch
+      ack-mode: manual
   jackson:
     property-naming-strategy: SNAKE_CASE
     serialization:
       write-dates-as-timestamps: false
     default-property-inclusion: non_null
+
+kafka:
+  dual-write:
+    enabled: ${KAFKA_DUAL_WRITE:false}
+  confirm-mode: ${KAFKA_CONFIRM_MODE:sync}
+  segment-writer:
+    enabled: ${KAFKA_SEGMENT_WRITER:false}
 
 prg:
   auth-service:

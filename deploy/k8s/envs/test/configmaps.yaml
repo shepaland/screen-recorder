@@ -43,8 +43,9 @@ data:
   INGEST_SERVICE_URL: "http://ingest-gateway:8084"
   HEARTBEAT_TIMEOUT: "90"
   KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
-  KAFKA_DUAL_WRITE: "false"
+  KAFKA_DUAL_WRITE: "true"
   KAFKA_CONFIRM_MODE: "sync"
+  KAFKA_WEBHOOK_DISPATCHER: "true"
   JAVA_OPTS: "-Xms256m -Xmx512m"
   SWAGGER_API_DOCS_URL: "/screenrecorder/docs/cp/v3/api-docs"
   SWAGGER_CONFIG_URL: "/screenrecorder/docs/cp/v3/api-docs/swagger-config"
@@ -66,8 +67,39 @@ data:
   S3_PRESIGN_EXPIRY: "300"
   S3_PRESIGN_ENDPOINT: "https://services-test.shepaland.ru"
   KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
-  KAFKA_DUAL_WRITE: "false"
-  KAFKA_CONFIRM_MODE: "sync"
+  KAFKA_DUAL_WRITE: "true"
+  KAFKA_CONFIRM_MODE: "kafka-only"
+  KAFKA_SEGMENT_WRITER: "true"
   JAVA_OPTS: "-Xms256m -Xmx768m"
   SWAGGER_API_DOCS_URL: "/screenrecorder/docs/ingest/v3/api-docs"
   SWAGGER_CONFIG_URL: "/screenrecorder/docs/ingest/v3/api-docs/swagger-config"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: search-service-config
+  labels:
+    app: search-service
+data:
+  KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+  OPENSEARCH_HOST: "opensearch"
+  OPENSEARCH_PORT: "9200"
+  AUTH_SERVICE_URL: "http://auth-service:8081"
+  JAVA_OPTS: "-Xms256m -Xmx512m"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: playback-service-config
+  labels:
+    app: playback-service
+data:
+  DB_HOST: "172.17.0.1"
+  DB_PORT: "5432"
+  DB_NAME: "prg_test"
+  AUTH_SERVICE_URL: "http://auth-service:8081"
+  S3_ENDPOINT: "http://minio:9000"
+  S3_REGION: "us-east-1"
+  S3_BUCKET: "prg-segments"
+  S3_PRESIGN_EXPIRY: "300"
+  JAVA_OPTS: "-Xms256m -Xmx512m"

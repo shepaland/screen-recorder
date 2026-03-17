@@ -41,6 +41,7 @@ public class PresignRequest {
 
     private String contentType;
 
+    /** Original recording time on the agent (file creation time). Optional. */
     private Instant recordedAt;
 
     private Map<String, Object> metadata;

@@ -40,6 +40,7 @@ public class RecordingController {
 
     /**
      * GET /api/v1/ingest/recordings — paginated list of recordings for the tenant.
+     * Supports text search (hostname, username, session ID) and range filters.
      */
     @GetMapping
     public ResponseEntity<PageResponse<RecordingListItemResponse>> listRecordings(
@@ -145,6 +146,39 @@ public class RecordingController {
             streamAsZip(download, httpResponse);
         } else {
             streamAsMp4(download, httpResponse);
+        }
+    }
+
+    /**
+     * GET /api/v1/ingest/recordings/{id}/segments/{segmentId}/download — download a single segment as MP4.
+     * Requires RECORDINGS:EXPORT permission.
+     */
+    @GetMapping("/{id}/segments/{segmentId}/download")
+    public void downloadSegment(
+            @PathVariable UUID id,
+            @PathVariable UUID segmentId,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) throws IOException {
+
+        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_RECORDINGS_EXPORT);
+
+        log.info("Downloading segment: tenant={} recording={} segment={}",
+                principal.getTenantId(), id, segmentId);
+
+        Segment segment = recordingService.getSegmentForDownload(id, segmentId, principal);
+
+        String filename = String.format("segment_%s_%05d.mp4",
+                id.toString().substring(0, 8), segment.getSequenceNum());
+
+        httpResponse.setContentType("video/mp4");
+        httpResponse.setHeader("Content-Disposition",
+                "attachment; filename=\"" + filename + "\"");
+        if (segment.getSizeBytes() != null) {
+            httpResponse.setContentLengthLong(segment.getSizeBytes());
+        }
+
+        try (var s3Stream = s3Service.getObject(segment.getS3Key())) {
+            s3Stream.transferTo(httpResponse.getOutputStream());
         }
     }
 

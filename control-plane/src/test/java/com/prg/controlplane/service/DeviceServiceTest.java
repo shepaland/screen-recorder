@@ -9,8 +9,11 @@ import com.prg.controlplane.entity.Device;
 import com.prg.controlplane.entity.DeviceCommand;
 import com.prg.controlplane.exception.AccessDeniedException;
 import com.prg.controlplane.exception.ResourceNotFoundException;
+import com.prg.controlplane.kafka.EventPublisher;
 import com.prg.controlplane.repository.DeviceCommandRepository;
+import com.prg.controlplane.repository.DeviceGroupRepository;
 import com.prg.controlplane.repository.DeviceRepository;
+import com.prg.controlplane.repository.DeviceStatusLogRepository;
 import com.prg.controlplane.repository.RecordingSessionRepository;
 import com.prg.controlplane.security.DevicePrincipal;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,10 +42,19 @@ class DeviceServiceTest {
     private DeviceRepository deviceRepository;
 
     @Mock
+    private DeviceGroupRepository deviceGroupRepository;
+
+    @Mock
     private DeviceCommandRepository deviceCommandRepository;
 
     @Mock
     private RecordingSessionRepository recordingSessionRepository;
+
+    @Mock
+    private DeviceStatusLogRepository deviceStatusLogRepository;
+
+    @Mock
+    private EventPublisher eventPublisher;
 
     @InjectMocks
     private DeviceService deviceService;
@@ -101,15 +113,19 @@ class DeviceServiceTest {
                 .build();
 
         Page<Device> page = new PageImpl<>(List.of(device, device2), PageRequest.of(0, 20), 2);
-        when(deviceRepository.findByTenantIdWithFilters(eq(tenantId), eq("online"), isNull(), eq(false), any(PageRequest.class)))
+        when(deviceRepository.findByTenantIdWithFilters(
+                eq(tenantId), eq("online"), isNull(), eq(false),
+                eq(false), eq(false), anyList(), any(PageRequest.class)))
                 .thenReturn(page);
 
-        PageResponse<DeviceResponse> result = deviceService.getDevices(tenantId, "online", null, false, 0, 20);
+        PageResponse<DeviceResponse> result = deviceService.getDevices(tenantId, "online", null, false, null, 0, 20);
 
         assertThat(result.getContent()).hasSize(2);
         assertThat(result.getTotalElements()).isEqualTo(2);
         assertThat(result.getContent().get(0).getStatus()).isEqualTo("online");
-        verify(deviceRepository).findByTenantIdWithFilters(eq(tenantId), eq("online"), isNull(), eq(false), any(PageRequest.class));
+        verify(deviceRepository).findByTenantIdWithFilters(
+                eq(tenantId), eq("online"), isNull(), eq(false),
+                eq(false), eq(false), anyList(), any(PageRequest.class));
     }
 
     @Test
@@ -174,6 +190,10 @@ class DeviceServiceTest {
             assertThat(cmdList.get(0).getDeliveredTs()).isNotNull();
             return true;
         }));
+
+        // Verify status change logged and Kafka event published
+        verify(deviceStatusLogRepository).save(any());
+        verify(eventPublisher).publish(eq("device.events"), eq(deviceId.toString()), any());
     }
 
     @Test
@@ -192,13 +212,12 @@ class DeviceServiceTest {
                 .updatedTs(Instant.now())
                 .build();
 
-        // Principal has deviceId set to a different device, and does NOT have DEVICES:UPDATE permission
         DevicePrincipal restrictedPrincipal = DevicePrincipal.builder()
                 .userId(UUID.randomUUID())
                 .tenantId(tenantId)
-                .deviceId(deviceId) // principal's device
+                .deviceId(deviceId)
                 .roles(List.of("DEVICE_AGENT"))
-                .permissions(List.of()) // no DEVICES:UPDATE
+                .permissions(List.of())
                 .scopes(List.of("device"))
                 .build();
 

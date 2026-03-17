@@ -55,6 +55,9 @@ public class Segment {
     @Column(nullable = false, length = 20)
     private String status;
 
+    @Column(name = "recorded_at")
+    private Instant recordedAt;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private Map<String, Object> metadata;

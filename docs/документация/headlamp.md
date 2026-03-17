@@ -1,0 +1,13 @@
+# Headlamp — Kubernetes UI
+
+**URL:** `https://services-test.shepaland.ru/screenrecorder/headlamp/`
+
+**Token для входа:**
+```
+eyJhbGciOiJSUzI1NiIsImtpZCI6IldacW0zVWhwZzlsRnJNUk5zNzBQb1VNbjlONkxoSmFmYk1uMjRGeXI4Mk0ifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJoZWFkbGFtcC1zeXN0ZW0iLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlY3JldC5uYW1lIjoiaGVhZGxhbXAtdG9rZW4iLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoiaGVhZGxhbXAiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiI0NGEwMWFlMi0yNmVkLTQxMjktYWVlYy1iOWJlYjE5MGY0MjUiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6aGVhZGxhbXAtc3lzdGVtOmhlYWRsYW1wIn0.IKD6mChK1FiPXgkrDdEXcYag1jth7h3kUJuACBkJWqXQGrSUDKjRL7V_WTNzYhApDs0TBCORDUSriYa0I4Wpi4E2oojore0B4ygXuWCw9hz72-NS2F9OhYte-FEvPGD7307kBqU3umZp91EBIgKr2OLrZQOlN8NLC6lkcBZNcOzDNxUGBNTnFr1W17tfY8iIj6nGhA_sr9cOsWb44UEtWJlx7KlpOL7s4o7SlgB3-4uwS1jKj6kMR1xMGmlhPNp0ic7X0ogxHjlWq0L7BNZWyvMOCfhA37iGJn5O0CEHzcrH1wXeDjMwDzbdv5Ka73F8pIUtkzUUNENHhHNy6MSLXA
+```
+
+**Тип токена:** persistent (kubernetes.io/service-account-token), не истекает
+**Service Account:** `headlamp` в namespace `headlamp-system`
+**Роль:** `cluster-admin` (полный доступ ко всем namespace'ам)
+**Сервер:** shepaland-cloud (158.160.222.120)

@@ -7,6 +7,7 @@ import com.prg.controlplane.entity.Device;
 import com.prg.controlplane.entity.DeviceCommand;
 import com.prg.controlplane.exception.AccessDeniedException;
 import com.prg.controlplane.exception.ResourceNotFoundException;
+import com.prg.controlplane.kafka.EventPublisher;
 import com.prg.controlplane.repository.DeviceCommandRepository;
 import com.prg.controlplane.repository.DeviceRepository;
 import com.prg.controlplane.security.DevicePrincipal;
@@ -36,6 +37,9 @@ class DeviceCommandServiceTest {
 
     @Mock
     private DeviceRepository deviceRepository;
+
+    @Mock
+    private EventPublisher eventPublisher;
 
     @InjectMocks
     private DeviceCommandService deviceCommandService;

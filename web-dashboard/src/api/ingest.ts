@@ -66,6 +66,11 @@ export async function getRecordings(params?: {
   device_id?: string;
   from?: string;
   to?: string;
+  search?: string;
+  min_segments?: number;
+  max_segments?: number;
+  min_bytes?: number;
+  max_bytes?: number;
 }): Promise<RecordingsResponse> {
   const response = await ingestApiClient.get<RecordingsResponse>('/recordings', { params });
   return response.data;

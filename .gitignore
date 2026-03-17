@@ -18,3 +18,4 @@ control-plane/target/
 ingest-gateway/target/
 windows-agent/target/
 macos-agent/KaderoAgent/.build/
+.claude/worktrees/

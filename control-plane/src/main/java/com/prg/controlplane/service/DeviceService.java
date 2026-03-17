@@ -9,6 +9,8 @@ import com.prg.controlplane.entity.DeviceStatusLog;
 import com.prg.controlplane.exception.AccessDeniedException;
 import com.prg.controlplane.exception.ResourceNotFoundException;
 import com.prg.controlplane.entity.DeviceGroup;
+import com.prg.controlplane.kafka.EventPublisher;
+import com.prg.controlplane.kafka.event.DeviceStatusEvent;
 import com.prg.controlplane.repository.DeviceCommandRepository;
 import com.prg.controlplane.repository.DeviceGroupRepository;
 import com.prg.controlplane.repository.DeviceRepository;
@@ -37,6 +39,7 @@ public class DeviceService {
     private final DeviceCommandRepository deviceCommandRepository;
     private final RecordingSessionRepository recordingSessionRepository;
     private final DeviceStatusLogRepository deviceStatusLogRepository;
+    private final EventPublisher eventPublisher;
 
     @Value("${prg.device.default-heartbeat-interval-sec:30}")
     private int defaultHeartbeatIntervalSec;
@@ -217,6 +220,20 @@ public class DeviceService {
                     .newStatus(newStatus)
                     .changedTs(Instant.now())
                     .trigger("heartbeat")
+                    .build());
+
+            // Dual-write to Kafka
+            boolean isOnline = !"offline".equals(newStatus);
+            eventPublisher.publish("device.events",
+                deviceId.toString(),
+                DeviceStatusEvent.builder()
+                    .eventId(UUID.randomUUID())
+                    .eventType(isOnline ? "device.online" : "device.offline")
+                    .timestamp(Instant.now())
+                    .tenantId(principal.getTenantId())
+                    .deviceId(deviceId)
+                    .hostname(device.getHostname())
+                    .agentVersion(request.getAgentVersion())
                     .build());
         }
 

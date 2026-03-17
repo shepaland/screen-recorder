@@ -1,0 +1,290 @@
+[
+  {
+    "page": "01-login",
+    "tc_id": "TC-L01",
+    "name": "Пустая отправка",
+    "status": "PASS",
+    "details": "Остаётся на логине",
+    "screenshot": "screenshots/01-login/02-empty-submit.png"
+  },
+  {
+    "page": "01-login",
+    "tc_id": "TC-L02",
+    "name": "Неверный пароль",
+    "status": "PASS",
+    "details": "Ошибка или остаётся",
+    "screenshot": "screenshots/01-login/03-wrong-password.png"
+  },
+  {
+    "page": "01-login",
+    "tc_id": "TC-L03",
+    "name": "Успешный логин",
+    "status": "PASS",
+    "details": "→ https://services-test.shepaland.ru/screenrecorder",
+    "screenshot": "screenshots/01-login/04-success.png"
+  },
+  {
+    "page": "02-dashboard",
+    "tc_id": "TC-D01",
+    "name": "Загрузка dashboard",
+    "status": "PASS",
+    "details": "Виджеты отображаются",
+    "screenshot": "screenshots/02-dashboard/01-loaded.png"
+  },
+  {
+    "page": "02-dashboard",
+    "tc_id": "TC-D02",
+    "name": "Период 14 дней",
+    "status": "PASS",
+    "details": "Графики обновились",
+    "screenshot": "screenshots/02-dashboard/02-period-14d.png"
+  },
+  {
+    "page": "02-dashboard",
+    "tc_id": "TC-D03",
+    "name": "Период 30 дней",
+    "status": "PASS",
+    "details": "Графики обновились",
+    "screenshot": "screenshots/02-dashboard/03-period-30d.png"
+  },
+  {
+    "page": "02-dashboard",
+    "tc_id": "TC-D04",
+    "name": "Период 7 дней (возврат)",
+    "status": "PASS",
+    "details": "Графики обновились",
+    "screenshot": "screenshots/02-dashboard/04-period-7d.png"
+  },
+  {
+    "page": "03-search",
+    "tc_id": "TC-S01",
+    "name": "Страница загружается",
+    "status": "PASS",
+    "details": "Поле ввода и кнопка",
+    "screenshot": "screenshots/03-search/01-loaded.png"
+  },
+  {
+    "page": "03-search",
+    "tc_id": "TC-S02",
+    "name": "Пустой поиск",
+    "status": "PASS",
+    "details": "Возвращает результаты или 0",
+    "screenshot": "screenshots/03-search/02-empty-search.png"
+  },
+  {
+    "page": "03-search",
+    "tc_id": "TC-S03",
+    "name": "Поиск 'mp4'",
+    "status": "PASS",
+    "details": "Запрос выполнен",
+    "screenshot": "screenshots/03-search/03-search-mp4.png"
+  },
+  {
+    "page": "03-search",
+    "tc_id": "TC-S04",
+    "name": "Поиск несуществующего (негатив)",
+    "status": "PASS",
+    "details": "0 результатов",
+    "screenshot": "screenshots/03-search/04-search-negative.png"
+  },
+  {
+    "page": "03-search",
+    "tc_id": "TC-S05",
+    "name": "Поиск по Enter",
+    "status": "PASS",
+    "details": "Enter отправляет запрос",
+    "screenshot": "screenshots/03-search/05-search-enter.png"
+  },
+  {
+    "page": "03-search",
+    "tc_id": "TC-S06",
+    "name": "XSS в поле поиска (негатив)",
+    "status": "PASS",
+    "details": "Скрипт не выполнился",
+    "screenshot": "screenshots/03-search/06-search-xss.png"
+  },
+  {
+    "page": "04-webhooks",
+    "tc_id": "TC-W01",
+    "name": "Страница загружается",
+    "status": "PASS",
+    "details": "Список подписок",
+    "screenshot": "screenshots/04-webhooks/01-loaded.png"
+  },
+  {
+    "page": "04-webhooks",
+    "tc_id": "TC-W02",
+    "name": "Кнопка Добавить → форма",
+    "status": "PASS",
+    "details": "3 полей",
+    "screenshot": "screenshots/04-webhooks/02-form-open.png"
+  },
+  {
+    "page": "04-webhooks",
+    "tc_id": "TC-W03",
+    "name": "Создание без URL (негатив)",
+    "status": "PASS",
+    "details": "Ошибка или пусто",
+    "screenshot": "screenshots/04-webhooks/03-create-empty.png"
+  },
+  {
+    "page": "04-webhooks",
+    "tc_id": "TC-W04",
+    "name": "Создание webhook",
+    "status": "PASS",
+    "details": "Webhook создан",
+    "screenshot": "screenshots/04-webhooks/04-created.png"
+  },
+  {
+    "page": "04-webhooks",
+    "tc_id": "TC-W05",
+    "name": "Toggle вкл/выкл",
+    "status": "PASS",
+    "details": "Статус переключён",
+    "screenshot": "screenshots/04-webhooks/05-toggled.png"
+  },
+  {
+    "page": "04-webhooks",
+    "tc_id": "TC-W06",
+    "name": "Delivery log",
+    "status": "PASS",
+    "details": "Лог отображается",
+    "screenshot": "screenshots/04-webhooks/06-delivery-log.png"
+  },
+  {
+    "page": "04-webhooks",
+    "tc_id": "TC-W07",
+    "name": "Удаление webhook",
+    "status": "PASS",
+    "details": "Было 2, стало 1",
+    "screenshot": "screenshots/04-webhooks/07-deleted.png"
+  },
+  {
+    "page": "05-archive-devices",
+    "tc_id": "TC-AD01",
+    "name": "Список устройств",
+    "status": "PASS",
+    "details": "Карточки отображаются",
+    "screenshot": "screenshots/05-archive-devices/01-loaded.png"
+  },
+  {
+    "page": "06-archive-employees",
+    "tc_id": "TC-AE01",
+    "name": "Список сотрудников",
+    "status": "PASS",
+    "details": "Таблица загружена",
+    "screenshot": "screenshots/06-archive-employees/01-loaded.png"
+  },
+  {
+    "page": "07-timelines",
+    "tc_id": "TC-AT01",
+    "name": "Таймлайны",
+    "status": "PASS",
+    "details": "Страница загружена",
+    "screenshot": "screenshots/07-timelines/01-loaded.png"
+  },
+  {
+    "page": "08-catalogs",
+    "tc_id": "TC-C01",
+    "name": "Приложения",
+    "status": "PASS",
+    "details": "Справочник загружен",
+    "screenshot": "screenshots/08-catalogs/01-apps.png"
+  },
+  {
+    "page": "08-catalogs",
+    "tc_id": "TC-C02",
+    "name": "Сайты",
+    "status": "PASS",
+    "details": "Справочник загружен",
+    "screenshot": "screenshots/08-catalogs/02-sites.png"
+  },
+  {
+    "page": "09-device-tokens",
+    "tc_id": "TC-DT01",
+    "name": "Список токенов",
+    "status": "PASS",
+    "details": "Таблица загружена",
+    "screenshot": "screenshots/09-device-tokens/01-loaded.png"
+  },
+  {
+    "page": "09-device-tokens",
+    "tc_id": "TC-DT02",
+    "name": "Форма создания",
+    "status": "PASS",
+    "details": "Форма открылась",
+    "screenshot": "screenshots/09-device-tokens/02-create-form.png"
+  },
+  {
+    "page": "10-recording-settings",
+    "tc_id": "TC-RS01",
+    "name": "Настройки записи",
+    "status": "PASS",
+    "details": "Страница загружена",
+    "screenshot": "screenshots/10-recording-settings/01-loaded.png"
+  },
+  {
+    "page": "11-devices",
+    "tc_id": "TC-DV01",
+    "name": "Список агентов",
+    "status": "PASS",
+    "details": "Таблица загружена",
+    "screenshot": "screenshots/11-devices/01-loaded.png"
+  },
+  {
+    "page": "12-users",
+    "tc_id": "TC-U01",
+    "name": "Список пользователей",
+    "status": "PASS",
+    "details": "Таблица загружена",
+    "screenshot": "screenshots/12-users/01-loaded.png"
+  },
+  {
+    "page": "13-behavior-audit",
+    "tc_id": "TC-BA01",
+    "name": "Аудит поведения",
+    "status": "PASS",
+    "details": "Страница загружена",
+    "screenshot": "screenshots/13-behavior-audit/01-loaded.png"
+  },
+  {
+    "page": "14-sidebar",
+    "tc_id": "TC-SB01",
+    "name": "Меню Аналитика",
+    "status": "PASS",
+    "details": "Подменю раскрыто",
+    "screenshot": "screenshots/14-sidebar/01-analytics-expanded.png"
+  },
+  {
+    "page": "14-sidebar",
+    "tc_id": "TC-SB02",
+    "name": "Меню Настройки",
+    "status": "PASS",
+    "details": "Webhooks в подменю",
+    "screenshot": "screenshots/14-sidebar/02-settings-expanded.png"
+  },
+  {
+    "page": "14-sidebar",
+    "tc_id": "TC-SB03",
+    "name": "Навигация → Поиск",
+    "status": "PASS",
+    "details": "URL: https://services-test.shepaland.ru/screenrecorder/search",
+    "screenshot": "screenshots/14-sidebar/03-nav-search.png"
+  },
+  {
+    "page": "14-sidebar",
+    "tc_id": "TC-SB04",
+    "name": "Навигация → Webhooks",
+    "status": "PASS",
+    "details": "URL: https://services-test.shepaland.ru/screenrecorder/settings/webhooks",
+    "screenshot": "screenshots/14-sidebar/04-nav-webhooks.png"
+  },
+  {
+    "page": "14-sidebar",
+    "tc_id": "TC-SB05",
+    "name": "Logout",
+    "status": "PASS",
+    "details": "URL: https://services-test.shepaland.ru/screenrecorder/login?redirect=%2F",
+    "screenshot": "screenshots/14-sidebar/05-logout.png"
+  }
+]

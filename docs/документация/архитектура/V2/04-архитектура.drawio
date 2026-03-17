@@ -1,0 +1,356 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/28.0.6 Chrome/138.0.7204.100 Electron/37.2.3 Safari/537.36" version="28.0.6">
+  <diagram id="kadero-arch-v2" name="System Architecture V2">
+    <mxGraphModel dx="1299" dy="1260" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="4000" pageHeight="2000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="g-edge" value="Edge Layer (Traefik + nginx)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F2F2;strokeColor=#999999;strokeWidth=2;fontSize=12;fontStyle=1;fontColor=#666666;verticalAlign=top;spacingTop=5;arcSize=6;" parent="1" vertex="1">
+          <mxGeometry x="620" y="30" width="260" height="530" as="geometry" />
+        </mxCell>
+        <mxCell id="title" value="&lt;b style=&quot;font-size:20px&quot;&gt;КАДЕРО — Архитектура V2 (Kafka Integration)&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#666666&quot;&gt;9 сервисов · Apache Kafka · OpenSearch · HLS Playback · Webhooks&lt;br&gt;Актуально на 17 марта 2026&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=14;fontColor=#1F3864;" parent="1" vertex="1">
+          <mxGeometry x="700" y="-160" width="700" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="g-users" value="Пользователи и агенты" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;strokeWidth=2;dashed=1;fontSize=13;fontStyle=1;fontColor=#666666;verticalAlign=top;spacingTop=5;arcSize=8;" parent="1" vertex="1">
+          <mxGeometry x="40" y="30" width="500" height="530" as="geometry" />
+        </mxCell>
+        <mxCell id="user-admin" value="&lt;b&gt;Администратор&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Браузер&lt;/font&gt;" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=default;verticalAlign=top;aspect=fixed;imageAspect=0;image=img/lib/allied_telesis/computer_and_terminals/Personal_Computer.svg;html=1;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="165" y="158" width="50" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="user-super" value="&lt;b&gt;Руководитель&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Браузер&lt;/font&gt;" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=default;verticalAlign=top;aspect=fixed;imageAspect=0;image=img/lib/allied_telesis/computer_and_terminals/Personal_Computer.svg;html=1;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="250" y="74" width="50" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="user-operator" value="&lt;b&gt;Оператор КЦ&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Windows ПК&lt;/font&gt;" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=default;verticalAlign=top;aspect=fixed;imageAspect=0;image=img/lib/allied_telesis/computer_and_terminals/Personal_Computer.svg;html=1;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="130" y="310" width="50" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="agent-win" value="&lt;b&gt;Windows Agent&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;C# .NET 8.0 + FFmpeg H.264&lt;br&gt;Screen Capture (fMP4, 1 FPS)&lt;br&gt;Active Window · Idle Detect&lt;br&gt;Focus Intervals · Input Events&lt;br&gt;SQLite · Named Pipes IPC&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="250" y="230" width="250" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="agent-mac" value="&lt;b&gt;macOS Agent&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Swift 5.10 · ScreenCaptureKit&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;dashed=1;" parent="1" vertex="1">
+          <mxGeometry x="250" y="370" width="250" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-crm" value="&lt;b&gt;CRM / АТС&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Webhook receiver&lt;br&gt;HTTP POST + HMAC&lt;/font&gt;" style="shape=mxgraph.cloud;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="285" y="450" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e-agent" style="rounded=1;strokeColor=#C65911;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;entryX=0;entryY=0.75;entryDx=0;entryDy=0;" parent="1" source="agent-win" target="traefik" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="610" y="160" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="590" y="285" />
+              <mxPoint x="590" y="123" />
+              <mxPoint x="650" y="123" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-agent-l" value="HTTPS /443&lt;br&gt;&lt;font size=&quot;1&quot;&gt;heartbeat · presign ·&amp;nbsp;&lt;/font&gt;&lt;div&gt;&lt;font size=&quot;1&quot;&gt;upload · confirm&lt;/font&gt;&lt;/div&gt;" style="edgeLabel;html=1;fontSize=8;fontColor=#C65911;" parent="e-agent" vertex="1" connectable="0">
+          <mxGeometry x="-0.1" relative="1" as="geometry">
+            <mxPoint x="-80" y="51" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-admin" style="rounded=1;strokeColor=#2F5496;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;" parent="1" source="user-admin" target="traefik" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="560" y="189" />
+              <mxPoint x="560" y="105" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-super" style="rounded=1;strokeColor=#2F5496;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" parent="1" source="user-super" target="traefik" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="traefik" value="&lt;b&gt;Traefik&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Ingress · TLS /443&lt;br&gt;StripPrefix /screenrecorder&lt;br&gt;cert-manager / ACME&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="650" y="70" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="nginx" value="&lt;b&gt;web-dashboard&lt;/b&gt; :80&lt;br&gt;&lt;font size=&quot;1&quot;&gt;nginx + React 18 SPA&lt;br&gt;TypeScript · Tailwind · hls.js&lt;/font&gt;&lt;br&gt;&lt;hr size=&quot;1&quot;&gt;&lt;font size=&quot;1&quot;&gt;&lt;b&gt;/api/search/&lt;/b&gt; → search:8083&lt;br&gt;&lt;b&gt;/api/playback/&lt;/b&gt; → playback:8082&lt;br&gt;&lt;b&gt;/api/cp/&lt;/b&gt; → cp:8080&lt;br&gt;&lt;b&gt;/api/ingest/&lt;/b&gt; → ingest:8084&lt;br&gt;&lt;b&gt;/api/&lt;/b&gt; → auth:8081&lt;br&gt;&lt;b&gt;/prg-segments/&lt;/b&gt; → minio:9000&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="650" y="200" width="200" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="e-traefik" style="rounded=1;strokeColor=#333333;strokeWidth=2;" parent="1" source="traefik" target="nginx" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-traefik-l" value="StripPrefix" style="edgeLabel;html=1;fontSize=8;fontColor=#333333;" parent="e-traefik" vertex="1" connectable="0">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="g-services" value="Application Services (k3s · test-screen-record)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D6E4F0;strokeColor=#2F5496;strokeWidth=2;fontSize=12;fontStyle=1;fontColor=#2F5496;verticalAlign=top;spacingTop=5;arcSize=6;" parent="1" vertex="1">
+          <mxGeometry x="960" y="30" width="580" height="530" as="geometry" />
+        </mxCell>
+        <mxCell id="auth-svc" value="&lt;b&gt;auth-service :8081&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Java 21 · Spring Boot 3.3&lt;br&gt;JWT · RBAC 6 ролей · 29 perms&lt;br&gt;OAuth (Yandex/Mail.ru) · Email OTP&lt;br&gt;Device tokens · Flyway V1–V38&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="990" y="70" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="cp-svc" value="&lt;b&gt;control-plane :8080&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Java 21 · Spring Boot 3.3&lt;br&gt;Devices · Heartbeat (30s)&lt;br&gt;Commands · Device groups&lt;br&gt;&lt;b&gt;Webhooks CRUD&lt;/b&gt;&lt;br&gt;&lt;b&gt;Kafka: commands.issued,&lt;br&gt;device.events, webhooks.outbound&lt;/b&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="990" y="200" width="240" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="ingest-svc" value="&lt;b&gt;ingest-gateway :8084&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Java 21 · Spring Boot 3.3&lt;br&gt;Presign S3 · &lt;b&gt;Kafka-only confirm (202)&lt;/b&gt;&lt;br&gt;&lt;b&gt;segment-writer consumer&lt;/b&gt;&lt;br&gt;User Activity · Focus Intervals&lt;br&gt;Dashboard · Catalogs&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="990" y="380" width="240" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="search-svc" value="&lt;b&gt;search-service :8083&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Java 21 · Spring Boot 3.3&lt;br&gt;&lt;b&gt;Kafka consumer → OpenSearch&lt;/b&gt;&lt;br&gt;Fulltext search · Tenant isolation&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="1270" y="85" width="240" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="playback-svc" value="&lt;b&gt;playback-service :8082&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Java 21 · Spring Boot 3.3&lt;br&gt;&lt;b&gt;HLS M3U8 playlist&lt;/b&gt;&lt;br&gt;Segment 302 redirect → S3 presigned GET&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="1270" y="230" width="240" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="s2s-note" value="&lt;font size=&quot;1&quot;&gt;S2S: все сервисы валидируют JWT&lt;br&gt;через auth-service (X-Internal-API-Key)&lt;/font&gt;" style="text;html=1;align=left;fontSize=9;fontColor=#666666;" parent="1" vertex="1">
+          <mxGeometry x="1280" y="350" width="200" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="g-kafka" value="Event Streaming" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;strokeWidth=2;fontSize=12;fontStyle=1;fontColor=#E65100;verticalAlign=top;spacingTop=5;arcSize=6;" parent="1" vertex="1">
+          <mxGeometry x="960" y="610" width="580" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="kafka" value="&lt;b&gt;Apache Kafka 3.7.0&lt;/b&gt; :9092&lt;br&gt;&lt;font size=&quot;1&quot;&gt;KRaft mode (no ZooKeeper)&lt;br&gt;PVC 20Gi · 1 broker&lt;/font&gt;" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;size=15;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=10;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="990" y="650" width="230" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="kafka-topics" value="&lt;font size=&quot;1&quot;&gt;&lt;b&gt;Topics:&lt;/b&gt;&lt;br&gt;segments.ingest (6p, 7d)&lt;br&gt;commands.issued (6p, 3d)&lt;br&gt;device.events (3p, 7d)&lt;br&gt;audit.events (3p, 365d)&lt;br&gt;webhooks.outbound (3p, 3d)&lt;/font&gt;" style="text;html=1;align=left;fontSize=9;fontColor=#E65100;fillColor=#FFF8E1;rounded=1;strokeColor=#FFE0B2;" parent="1" vertex="1">
+          <mxGeometry x="1270" y="640" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="kafka-consumers" value="&lt;font size=&quot;1&quot;&gt;&lt;b&gt;Consumer Groups:&lt;/b&gt;&lt;br&gt;segment-writer → PostgreSQL&lt;br&gt;search-indexer → OpenSearch&lt;br&gt;webhook-dispatcher → HTTP POST&lt;/font&gt;" style="text;html=1;align=left;fontSize=9;fontColor=#E65100;fillColor=#FFF8E1;rounded=1;strokeColor=#FFE0B2;" parent="1" vertex="1">
+          <mxGeometry x="1270" y="740" width="190" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="g-data" value="Data Layer (persistent)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E4DFEC;strokeColor=#7030A0;strokeWidth=2;fontSize=12;fontStyle=1;fontColor=#7030A0;verticalAlign=top;spacingTop=5;arcSize=6;" parent="1" vertex="1">
+          <mxGeometry x="1620" y="30" width="280" height="780" as="geometry" />
+        </mxCell>
+        <mxCell id="pg" value="&lt;b&gt;PostgreSQL 16&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;172.17.0.1:5432 (host)&lt;br&gt;prg_test / prg_prod&lt;br&gt;Flyway V1–V38&lt;br&gt;Мультитенантность (tenant_id)&lt;br&gt;Партиции: segments, audit_log&lt;br&gt;HikariCP 10–30 conn&lt;br&gt;Webhooks (V38)&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="1650" y="80" width="220" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="minio" value="&lt;b&gt;MinIO (S3)&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;:9000 API / :9001 Console&lt;br&gt;Bucket: prg-segments&lt;br&gt;/{tenant}/{device}/{session}/{seq}.mp4&lt;br&gt;Presigned PUT/GET (300s)&lt;br&gt;H.264 fMP4 (60s, 1 FPS)&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="1650" y="310" width="220" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="opensearch" value="&lt;b&gt;OpenSearch 2.12&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;:9200 · single-node&lt;br&gt;Index: segments-YYYY-MM&lt;br&gt;~3200+ docs · PVC 50Gi&lt;br&gt;Fulltext + tenant filter&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="1650" y="510" width="220" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="g-ext" value="Внешние системы" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#d6b656;strokeWidth=2;dashed=1;fontSize=12;fontStyle=1;fontColor=#BF8F00;verticalAlign=top;spacingTop=5;arcSize=6;" parent="1" vertex="1">
+          <mxGeometry x="1970" y="30" width="210" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-yandex" value="&lt;b&gt;Yandex ID&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;OAuth 2.0&lt;/font&gt;" style="shape=mxgraph.cloud;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="1990" y="70" width="160" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-smtp" value="&lt;b&gt;SMTP&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Email OTP&lt;/font&gt;" style="shape=mxgraph.cloud;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="1990" y="145" width="160" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="e-n-auth" style="rounded=1;strokeColor=#6c8ebf;strokeWidth=1.5;edgeStyle=orthogonalEdgeStyle;" parent="1" source="nginx" target="auth-svc" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="950" y="305" />
+              <mxPoint x="950" y="120" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-n-auth-l" value="/api/" style="edgeLabel;html=1;fontSize=7;fontColor=#6c8ebf;" parent="e-n-auth" vertex="1" connectable="0">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-n-cp" style="rounded=1;strokeColor=#6c8ebf;strokeWidth=1.5;edgeStyle=orthogonalEdgeStyle;" parent="1" source="nginx" target="cp-svc" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-n-cp-l" value="/api/cp/" style="edgeLabel;html=1;fontSize=7;fontColor=#6c8ebf;" parent="e-n-cp" vertex="1" connectable="0">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-n-ingest" style="rounded=1;strokeColor=#6c8ebf;strokeWidth=1.5;edgeStyle=orthogonalEdgeStyle;" parent="1" source="nginx" target="ingest-svc" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-n-ingest-l" value="/api/ingest/" style="edgeLabel;html=1;fontSize=7;fontColor=#6c8ebf;" parent="e-n-ingest" vertex="1" connectable="0">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-n-search" style="rounded=1;strokeColor=#00897B;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" parent="1" source="nginx" target="search-svc" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1250" y="360" />
+              <mxPoint x="1250" y="200" />
+              <mxPoint x="1390" y="200" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-n-search-l" value="&lt;b&gt;/api/search/&lt;/b&gt;" style="edgeLabel;html=1;fontSize=7;fontColor=#00897B;" parent="e-n-search" vertex="1" connectable="0">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-n-playback" style="rounded=1;strokeColor=#00897B;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;" parent="1" source="nginx" target="playback-svc" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1390" y="350" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-n-playback-l" value="&lt;b&gt;/api/playback/&lt;/b&gt;" style="edgeLabel;html=1;fontSize=7;fontColor=#00897B;" parent="e-n-playback" vertex="1" connectable="0">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-auth-pg" style="rounded=1;strokeColor=#9673a6;strokeWidth=1.5;edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.25;exitDx=0;exitDy=0;" parent="1" source="auth-svc" target="pg" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1250" y="95" />
+              <mxPoint x="1250" y="60" />
+              <mxPoint x="1560" y="60" />
+              <mxPoint x="1560" y="170" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-cp-pg" style="rounded=1;strokeColor=#9673a6;strokeWidth=1.5;edgeStyle=orthogonalEdgeStyle;" parent="1" source="cp-svc" target="pg" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1260" y="270" />
+              <mxPoint x="1260" y="210" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-ingest-pg" style="rounded=1;strokeColor=#9673a6;strokeWidth=1.5;edgeStyle=orthogonalEdgeStyle;" parent="1" source="ingest-svc" target="pg" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1600" y="435" />
+              <mxPoint x="1600" y="170" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-playback-pg" style="rounded=1;strokeColor=#9673a6;strokeWidth=1.5;edgeStyle=orthogonalEdgeStyle;" parent="1" source="playback-svc" target="pg" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ingest-minio" style="rounded=1;strokeColor=#d6b656;strokeWidth=1.5;edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.25;exitDx=0;exitDy=0;" parent="1" source="ingest-svc" target="minio" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-playback-minio" style="rounded=1;strokeColor=#d6b656;strokeWidth=1.5;edgeStyle=orthogonalEdgeStyle;entryX=0;entryY=0;entryDx=0;entryDy=45;entryPerimeter=0;" parent="1" source="playback-svc" target="minio" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1590" y="250" />
+              <mxPoint x="1590" y="355" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-nginx-minio" style="rounded=1;strokeColor=#d6b656;strokeWidth=3;dashed=1;edgeStyle=orthogonalEdgeStyle;entryX=0;entryY=0;entryDx=0;entryDy=105;entryPerimeter=0;" parent="1" source="nginx" target="minio" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="750" y="840" />
+              <mxPoint x="1570" y="840" />
+              <mxPoint x="1570" y="415" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-nginx-minio-l" value="/prg-segments/" style="edgeLabel;html=1;fontSize=7;fontColor=#d6b656;" parent="e-nginx-minio" vertex="1" connectable="0">
+          <mxGeometry x="-0.6" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-search-os" style="rounded=1;strokeColor=#9673a6;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;" parent="1" source="search-svc" target="opensearch" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1550" y="120" />
+              <mxPoint x="1550" y="570" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-search-os-l" value="REST :9200" style="edgeLabel;html=1;fontSize=7;fontColor=#9673a6;" parent="e-search-os" vertex="1" connectable="0">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-ingest-kafka" style="rounded=1;strokeColor=#E65100;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;" parent="1" source="ingest-svc" target="kafka" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ingest-kafka-l" value="&lt;b&gt;segments.ingest&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;publish + consume&lt;/font&gt;" style="edgeLabel;html=1;fontSize=7;fontColor=#E65100;" parent="e-ingest-kafka" vertex="1" connectable="0">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-cp-kafka" style="rounded=1;strokeColor=#E65100;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;entryX=0.375;entryY=0;entryDx=0;entryDy=0;exitX=0;exitY=0.75;exitDx=0;exitDy=0;" parent="1" source="cp-svc" target="kafka" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="980" y="275" />
+              <mxPoint x="980" y="320" />
+              <mxPoint x="940" y="320" />
+              <mxPoint x="940" y="580" />
+              <mxPoint x="1076" y="580" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-cp-kafka-l" value="&lt;b&gt;commands · events · webhooks&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;publish + consume&lt;/font&gt;" style="edgeLabel;html=1;fontSize=7;fontColor=#E65100;" parent="e-cp-kafka" vertex="1" connectable="0">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-search-kafka" style="rounded=1;strokeColor=#E65100;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;entryX=0.625;entryY=0;entryDx=0;entryDy=0;" parent="1" source="search-svc" target="kafka" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1240" y="100" />
+              <mxPoint x="1240" y="600" />
+              <mxPoint x="1134" y="600" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-search-kafka-l" value="&lt;b&gt;segments.ingest&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;consume → index&lt;/font&gt;" style="edgeLabel;html=1;fontSize=7;fontColor=#E65100;" parent="e-search-kafka" vertex="1" connectable="0">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="10" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-auth-yandex" style="rounded=1;strokeColor=#d6b656;edgeStyle=orthogonalEdgeStyle;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=2;" parent="1" source="auth-svc" target="ext-yandex" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1260" y="120" />
+              <mxPoint x="1260" y="180" />
+              <mxPoint x="1590" y="180" />
+              <mxPoint x="1590" y="-20" />
+              <mxPoint x="1940" y="-20" />
+              <mxPoint x="1940" y="98" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-auth-smtp" style="rounded=1;strokeColor=#d6b656;edgeStyle=orthogonalEdgeStyle;strokeWidth=2;exitX=1;exitY=0.75;exitDx=0;exitDy=0;" parent="1" source="auth-svc" target="ext-smtp" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1250" y="145" />
+              <mxPoint x="1250" y="190" />
+              <mxPoint x="1610" y="190" />
+              <mxPoint x="1610" y="10" />
+              <mxPoint x="1920" y="10" />
+              <mxPoint x="1920" y="172" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-webhook-crm" style="rounded=1;strokeColor=#E65100;strokeWidth=2;dashed=1;edgeStyle=orthogonalEdgeStyle;exitX=0;exitY=0.25;exitDx=0;exitDy=0;" parent="1" source="cp-svc" target="ext-crm" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="900" y="235" />
+              <mxPoint x="900" y="590" />
+              <mxPoint x="375" y="590" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-webhook-crm-l" value="&lt;b&gt;Webhook POST&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;HMAC-SHA256&lt;/font&gt;" style="edgeLabel;html=1;fontSize=8;fontColor=#E65100;" parent="e-webhook-crm" vertex="1" connectable="0">
+          <mxGeometry x="-0.5" relative="1" as="geometry">
+            <mxPoint x="10" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="zabbix-note" value="&lt;b&gt;Zabbix Monitoring&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Dashboard «Кадеро» · 11 метрик&lt;br&gt;Broker status · Consumer lag&lt;br&gt;CPU · Memory · Topic offsets&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=9;dashed=1;" parent="1" vertex="1">
+          <mxGeometry x="1650" y="690" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#CCCCCC;" parent="1" vertex="1">
+          <mxGeometry x="260" y="990" width="560" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-t" value="&lt;b&gt;Легенда:&lt;/b&gt;" style="text;html=1;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="270" y="995" width="70" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" value="Сервис" style="rounded=1;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" parent="1" vertex="1">
+          <mxGeometry x="270" y="1020" width="60" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" value="Данные" style="shape=cylinder3;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;size=5;" parent="1" vertex="1">
+          <mxGeometry x="340" y="1016" width="55" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" value="Kafka" style="shape=hexagon;perimeter=hexagonPerimeter2;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=9;fixedSize=1;size=8;" parent="1" vertex="1">
+          <mxGeometry x="405" y="1018" width="60" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" value="Внешняя" style="shape=mxgraph.cloud;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;" parent="1" vertex="1">
+          <mxGeometry x="475" y="1014" width="70" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5" value="── sync (HTTP/JDBC)&lt;br&gt;&lt;font color=&quot;#E65100&quot;&gt;── Kafka event flow&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#00897B&quot;&gt;── NEW routes (V2)&lt;/font&gt;&lt;br&gt;- - webhook delivery" style="text;html=1;fontSize=9;fontColor=#333333;align=left;" parent="1" vertex="1">
+          <mxGeometry x="560" y="992" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-v2" value="&lt;b&gt;V1 → V2:&lt;/b&gt; NATS → Kafka · +search-service · +playback-service · +OpenSearch · +Webhooks" style="text;html=1;fontSize=9;fontColor=#2F5496;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="270" y="1060" width="540" height="15" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

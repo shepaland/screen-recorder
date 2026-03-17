@@ -564,6 +564,25 @@
           "action": "auth-service deployed на test-screen-record. Flyway validation fixed (V37 checksum NULL)."
         }
       ]
+    },
+    {
+      "id": 12,
+      "created_at": "2026-03-17T00:00:00Z",
+      "title": "DevOps: деплой ingest-gateway с Kafka-интеграцией на test-screen-record",
+      "description": "Деплой обновлённого ingest-gateway (Kafka dual-write, kafka-only confirm mode, segment-writer consumer) на test-стейджинг shepaland-cloud, namespace test-screen-record.",
+      "feature_code": "kafka-integration",
+      "overall_status": "In Progress",
+      "role_status": {
+        "DevOps": "In Progress"
+      },
+      "artifacts": {},
+      "history": [
+        {
+          "ts": "2026-03-17T00:00:00Z",
+          "role": "DevOps",
+          "action": "Начат деплой ingest-gateway на test-screen-record. rsync исходников → mvn package → docker build → k3s import → kubectl apply + rollout restart."
+        }
+      ]
     }
   ]
 }
