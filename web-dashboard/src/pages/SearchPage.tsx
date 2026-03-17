@@ -551,7 +551,7 @@ function SessionRow({
           )}
         </td>
         <td className="px-4 py-3">
-          <div className="font-mono text-xs text-gray-500">{session.id.slice(0, 12)}...</div>
+          <div className="font-mono text-xs text-gray-500 break-all">{session.id}</div>
           <div className="text-[10px] mt-0.5">{statusLabel(session.status)}</div>
         </td>
         <td className="px-4 py-3 text-xs text-gray-600">{formatDate(session.started_ts)}</td>
