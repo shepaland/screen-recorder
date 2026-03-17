@@ -15,9 +15,12 @@ public class AgentStatusProvider : IStatusProvider
     private readonly CredentialStore _credentialStore;
     private readonly ScreenCaptureManager _captureManager;
     private readonly UploadQueue _uploadQueue;
+    private readonly SessionManager _sessionManager;
     private readonly MetricsCollector _metrics;
     private readonly SessionWatcher _sessionWatcher;
     private readonly IAuditEventSink _auditSink;
+    private readonly FocusIntervalSink _focusSink;
+    private readonly InputEventSink _inputSink;
     private readonly IOptions<AgentConfig> _config;
 
     // Lazy-resolved to avoid circular DI
@@ -32,17 +35,21 @@ public class AgentStatusProvider : IStatusProvider
 
     public AgentStatusProvider(AuthManager authManager, CredentialStore credentialStore,
         ScreenCaptureManager captureManager, UploadQueue uploadQueue,
-        MetricsCollector metrics, SessionWatcher sessionWatcher,
-        IAuditEventSink auditSink, IOptions<AgentConfig> config,
-        IServiceProvider serviceProvider)
+        SessionManager sessionManager, MetricsCollector metrics,
+        SessionWatcher sessionWatcher, IAuditEventSink auditSink,
+        FocusIntervalSink focusSink, InputEventSink inputSink,
+        IOptions<AgentConfig> config, IServiceProvider serviceProvider)
     {
         _authManager = authManager;
         _credentialStore = credentialStore;
         _captureManager = captureManager;
         _uploadQueue = uploadQueue;
+        _sessionManager = sessionManager;
         _metrics = metrics;
         _sessionWatcher = sessionWatcher;
         _auditSink = auditSink;
+        _focusSink = focusSink;
+        _inputSink = inputSink;
         _config = config;
         _serviceProvider = serviceProvider;
     }
@@ -119,6 +126,10 @@ public class AgentStatusProvider : IStatusProvider
             SegmentsQueued = _uploadQueue.QueuedCount,
             SessionLocked = !_sessionWatcher.IsSessionActive,
             AuditEventsQueued = _auditSink.QueuedCount,
+            UploadError = _sessionManager.HasSessionError,
+            UploadErrorMessage = _sessionManager.HasSessionError ? "Сессия потеряна, пересоздание..." : null,
+            FocusIntervalsQueued = _focusSink.QueuedCount,
+            InputEventsQueued = _inputSink.QueuedCount,
             LastHeartbeatTs = lastHb,
             LastError = lastError
         };

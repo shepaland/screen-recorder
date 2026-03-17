@@ -14,8 +14,19 @@ public class SessionManager
     private readonly UserSessionInfo _userSessionInfo;
     private readonly ILogger<SessionManager> _logger;
     private string? _currentSessionId;
+    private int _consecutiveSessionErrors;
 
     public string? CurrentSessionId => _currentSessionId;
+    public bool HasSessionError => _consecutiveSessionErrors > 0;
+
+    public void InvalidateSession()
+    {
+        _logger.LogWarning("Session invalidated: {SessionId}. Will create new on next segment.", _currentSessionId);
+        _currentSessionId = null;
+        _consecutiveSessionErrors++;
+    }
+
+    public void ClearSessionError() => _consecutiveSessionErrors = 0;
 
     public SessionManager(ApiClient apiClient, AuthManager authManager,
         CredentialStore credentialStore, UserSessionInfo userSessionInfo,
@@ -54,6 +65,7 @@ public class SessionManager
         {
             var response = await _apiClient.PostAsync<SessionResponse>(url, body, ct);
             _currentSessionId = response?.Id;
+            ClearSessionError();
             _logger.LogInformation("Recording session started: {SessionId}", _currentSessionId);
             return _currentSessionId ?? throw new Exception("Failed to create session");
         }
@@ -67,6 +79,7 @@ public class SessionManager
             // Retry session creation
             var response = await _apiClient.PostAsync<SessionResponse>(url, body, ct);
             _currentSessionId = response?.Id;
+            ClearSessionError();
             _logger.LogInformation("Recording session started after closing stale: {SessionId}", _currentSessionId);
             return _currentSessionId ?? throw new Exception("Failed to create session after closing stale");
         }

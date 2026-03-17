@@ -110,6 +110,10 @@ public class AgentStatus
     public bool AutoStart { get; set; }
     public bool SessionLocked { get; set; }
     public int AuditEventsQueued { get; set; }
+    public bool UploadError { get; set; }
+    public string? UploadErrorMessage { get; set; }
+    public int FocusIntervalsQueued { get; set; }
+    public int InputEventsQueued { get; set; }
     public string AgentVersion { get; set; } = "1.0.0";
 
     // Segment context for video timecode binding (Tray reads via get_status)

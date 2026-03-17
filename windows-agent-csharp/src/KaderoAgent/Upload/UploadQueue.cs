@@ -49,8 +49,29 @@ public class UploadQueue
     {
         await foreach (var segment in _channel.Reader.ReadAllAsync(ct))
         {
+            // If current session was invalidated, create a new one
+            if (_sessionManager.CurrentSessionId == null)
+            {
+                try
+                {
+                    _logger.LogInformation("No active session. Creating new session...");
+                    await _sessionManager.StartSessionAsync(ct: ct);
+                    _logger.LogInformation("New session created: {SessionId}", _sessionManager.CurrentSessionId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to create new session. Segment queued for retry.");
+                    _db.SavePendingSegment(segment);
+                    await Task.Delay(10_000, ct);
+                    continue;
+                }
+            }
+
+            // Use current session for upload (may differ from segment's original session)
+            var effectiveSessionId = _sessionManager.CurrentSessionId ?? segment.SessionId;
+
             var success = await _uploader.UploadSegmentAsync(
-                segment.FilePath, segment.SessionId, segment.SequenceNum, serverUrl, ct);
+                segment.FilePath, effectiveSessionId, segment.SequenceNum, serverUrl, ct);
 
             if (success)
             {

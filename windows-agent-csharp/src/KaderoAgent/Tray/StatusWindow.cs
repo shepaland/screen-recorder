@@ -39,8 +39,17 @@ public class StatusWindow : Form
     private Label _cpuValue = null!;
     private Label _memoryValue = null!;
     private Label _diskValue = null!;
-    private Label _queueValue = null!;
     private Label _lastHeartbeatValue = null!;
+
+    // Queue indicators
+    private Panel _segmentsQueueIndicator = null!;
+    private Label _segmentsQueueLabel = null!;
+    private Panel _auditQueueIndicator = null!;
+    private Label _auditQueueLabel = null!;
+    private Panel _focusQueueIndicator = null!;
+    private Label _focusQueueLabel = null!;
+    private Panel _inputQueueIndicator = null!;
+    private Label _inputQueueLabel = null!;
 
     // Connection info (read-only)
     private TextBox _serverUrlBox = null!;
@@ -63,7 +72,7 @@ public class StatusWindow : Form
     private void InitializeComponent()
     {
         Text = "Кадеро — Статус агента";
-        Size = new Size(480, 520);
+        Size = new Size(480, 580);
         ShowInTaskbar = true;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -152,14 +161,41 @@ public class StatusWindow : Form
         Controls.Add(GlassHelper.CreateLabel("Диск", left, y, 60, secondary: true));
         _diskValue = GlassHelper.CreateLabel("—", left + 60, y, 70);
         Controls.Add(_diskValue);
-        Controls.Add(GlassHelper.CreateLabel("Очередь", left + 140, y, 70, secondary: true));
-        _queueValue = GlassHelper.CreateLabel("—", left + 210, y, 70);
-        Controls.Add(_queueValue);
         y += 22;
 
         Controls.Add(GlassHelper.CreateLabel("Посл. heartbeat", left, y, 140, secondary: true));
         _lastHeartbeatValue = GlassHelper.CreateLabel("—", valX, y, 280);
         Controls.Add(_lastHeartbeatValue);
+        y += 28;
+
+        // Separator
+        Controls.Add(GlassHelper.CreateSeparator(left, y, fullWidth));
+        y += 12;
+
+        // ── Queues Section ──
+        Controls.Add(GlassHelper.CreateSectionHeader("Очереди", left, y));
+        y += 28;
+
+        _segmentsQueueIndicator = GlassHelper.CreateIndicator(left, y, GlassHelper.StatusGreen);
+        Controls.Add(_segmentsQueueIndicator);
+        _segmentsQueueLabel = GlassHelper.CreateLabel("Сегменты: —", left + 22, y, 200);
+        Controls.Add(_segmentsQueueLabel);
+
+        _auditQueueIndicator = GlassHelper.CreateIndicator(left + 220, y, GlassHelper.StatusGreen);
+        Controls.Add(_auditQueueIndicator);
+        _auditQueueLabel = GlassHelper.CreateLabel("Аудит: —", left + 242, y, 200);
+        Controls.Add(_auditQueueLabel);
+        y += 22;
+
+        _focusQueueIndicator = GlassHelper.CreateIndicator(left, y, GlassHelper.StatusGreen);
+        Controls.Add(_focusQueueIndicator);
+        _focusQueueLabel = GlassHelper.CreateLabel("Фокус: —", left + 22, y, 200);
+        Controls.Add(_focusQueueLabel);
+
+        _inputQueueIndicator = GlassHelper.CreateIndicator(left + 220, y, GlassHelper.StatusGreen);
+        Controls.Add(_inputQueueIndicator);
+        _inputQueueLabel = GlassHelper.CreateLabel("Ввод: —", left + 242, y, 200);
+        Controls.Add(_inputQueueLabel);
         y += 28;
 
         // Separator
@@ -458,8 +494,21 @@ public class StatusWindow : Form
         _cpuValue.Text = $"{status.CpuPercent:F1}%";
         _memoryValue.Text = $"{status.MemoryMb:F0} МБ";
         _diskValue.Text = $"{status.DiskFreeGb:F1} ГБ";
-        _queueValue.Text = $"{status.SegmentsQueued}";
         _lastHeartbeatValue.Text = status.LastHeartbeatTs?.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss") ?? "—";
+
+        // Queues
+        UpdateQueueRow(_segmentsQueueIndicator, _segmentsQueueLabel, "Сегменты", status.SegmentsQueued);
+        UpdateQueueRow(_auditQueueIndicator, _auditQueueLabel, "Аудит", status.AuditEventsQueued);
+        UpdateQueueRow(_focusQueueIndicator, _focusQueueLabel, "Фокус", status.FocusIntervalsQueued);
+        UpdateQueueRow(_inputQueueIndicator, _inputQueueLabel, "Ввод", status.InputEventsQueued);
+
+        // Upload error: override recording indicator to orange
+        if (status.UploadError)
+        {
+            _recordingIndicator.BackColor = GlassHelper.StatusOrange;
+            _recordingIndicator.Invalidate();
+            _recordingStatusLabel.Text = status.UploadErrorMessage ?? "Ошибка загрузки";
+        }
 
         // Server URL (read-only)
         if (!string.IsNullOrEmpty(status.ServerUrl))
@@ -477,6 +526,18 @@ public class StatusWindow : Form
             _registrationIndicator.BackColor = GlassHelper.StatusRed;
         }
         _registrationIndicator.Invalidate();
+    }
+
+    private void UpdateQueueRow(Panel indicator, Label label, string name, int count)
+    {
+        label.Text = $"{name}: {count}";
+        indicator.BackColor = count switch
+        {
+            0 => GlassHelper.StatusGreen,
+            <= 50 => GlassHelper.StatusYellow,
+            _ => GlassHelper.StatusRed
+        };
+        indicator.Invalidate();
     }
 
     // OnReconnect removed — server URL and token changes only via reinstall
