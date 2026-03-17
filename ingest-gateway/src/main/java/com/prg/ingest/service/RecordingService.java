@@ -449,29 +449,30 @@ public class RecordingService {
 
     /**
      * Map a native query Object[] row from findByTenantIdWithFiltersEnriched.
-     * Column order: rs.* (14 cols including os_username), device_hostname, employee_name
+     * Column order: rs.* (14 cols), device_hostname, employee_name
      */
     @SuppressWarnings("unchecked")
     private RecordingListItemResponse mapEnrichedRow(Object[] row) {
-        // recording_sessions columns: id(0), tenant_id(1), device_id(2), user_id(3),
-        // os_username(4), status(5), started_ts(6), ended_ts(7),
-        // segment_count(8), total_bytes(9), total_duration_ms(10),
-        // metadata(11), created_ts(12), updated_ts(13)
+        // recording_sessions columns (DB order):
+        // id(0), tenant_id(1), device_id(2), user_id(3), status(4),
+        // started_ts(5), ended_ts(6), segment_count(7), total_bytes(8),
+        // total_duration_ms(9), metadata(10), created_ts(11), updated_ts(12),
+        // os_username(13)
         // JOIN columns: device_hostname(14), employee_name(15)
         UUID id = (UUID) row[0];
         UUID deviceId = (UUID) row[2];
-        String status = (String) row[5];
-        Instant startedTs = toInstant(row[6]);
-        Instant endedTs = toInstant(row[7]);
-        Integer segmentCount = row[8] != null ? ((Number) row[8]).intValue() : 0;
-        Long totalBytes = row[9] != null ? ((Number) row[9]).longValue() : 0L;
-        Long totalDurationMs = row[10] != null ? ((Number) row[10]).longValue() : 0L;
+        String status = (String) row[4];
+        Instant startedTs = toInstant(row[5]);
+        Instant endedTs = toInstant(row[6]);
+        Integer segmentCount = row[7] != null ? ((Number) row[7]).intValue() : 0;
+        Long totalBytes = row[8] != null ? ((Number) row[8]).longValue() : 0L;
+        Long totalDurationMs = row[9] != null ? ((Number) row[9]).longValue() : 0L;
 
         Map<String, Object> metadata = null;
-        if (row[11] != null) {
-            if (row[11] instanceof Map) {
-                metadata = (Map<String, Object>) row[11];
-            } else if (row[11] instanceof String metaStr) {
+        if (row[10] != null) {
+            if (row[10] instanceof Map) {
+                metadata = (Map<String, Object>) row[10];
+            } else if (row[10] instanceof String metaStr) {
                 try {
                     metadata = new com.fasterxml.jackson.databind.ObjectMapper()
                             .readValue(metaStr, new com.fasterxml.jackson.core.type.TypeReference<>() {});
