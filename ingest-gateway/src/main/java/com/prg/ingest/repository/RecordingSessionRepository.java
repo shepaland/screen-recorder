@@ -51,10 +51,13 @@ public interface RecordingSessionRepository extends JpaRepository<RecordingSessi
     @Query(value = """
             SELECT rs.*,
                    d.hostname AS device_hostname,
-                   u.username AS employee_name
+                   (SELECT dae.username FROM device_audit_events dae
+                    WHERE dae.device_id = rs.device_id AND dae.tenant_id = rs.tenant_id
+                      AND dae.username IS NOT NULL AND dae.username != ''
+                      AND dae.event_ts <= rs.started_ts + INTERVAL '5 minutes'
+                    ORDER BY dae.event_ts DESC LIMIT 1) AS employee_name
             FROM recording_sessions rs
             LEFT JOIN devices d ON d.id = rs.device_id AND d.tenant_id = rs.tenant_id
-            LEFT JOIN users u ON u.id = rs.user_id
             WHERE rs.tenant_id = :tenantId
               AND (CAST(:status AS varchar) IS NULL OR rs.status = :status)
               AND (CAST(:deviceId AS uuid) IS NULL OR rs.device_id = :deviceId)
@@ -62,8 +65,12 @@ public interface RecordingSessionRepository extends JpaRepository<RecordingSessi
               AND (CAST(:toTs AS timestamptz) IS NULL OR rs.started_ts <= :toTs)
               AND (CAST(:search AS varchar) IS NULL
                    OR d.hostname ILIKE '%' || :search || '%'
-                   OR u.username ILIKE '%' || :search || '%'
-                   OR CAST(rs.id AS text) ILIKE '%' || :search || '%')
+                   OR CAST(rs.id AS text) ILIKE '%' || :search || '%'
+                   OR EXISTS (SELECT 1 FROM device_audit_events dae2
+                              WHERE dae2.device_id = rs.device_id AND dae2.tenant_id = rs.tenant_id
+                                AND dae2.username ILIKE '%' || :search || '%'
+                                AND dae2.event_ts <= rs.started_ts + INTERVAL '5 minutes'
+                              LIMIT 1))
               AND (CAST(:minSegments AS integer) IS NULL OR rs.segment_count >= :minSegments)
               AND (CAST(:maxSegments AS integer) IS NULL OR rs.segment_count <= :maxSegments)
               AND (CAST(:minBytes AS bigint) IS NULL OR rs.total_bytes >= :minBytes)
@@ -74,7 +81,6 @@ public interface RecordingSessionRepository extends JpaRepository<RecordingSessi
             SELECT COUNT(*)
             FROM recording_sessions rs
             LEFT JOIN devices d ON d.id = rs.device_id AND d.tenant_id = rs.tenant_id
-            LEFT JOIN users u ON u.id = rs.user_id
             WHERE rs.tenant_id = :tenantId
               AND (CAST(:status AS varchar) IS NULL OR rs.status = :status)
               AND (CAST(:deviceId AS uuid) IS NULL OR rs.device_id = :deviceId)
@@ -82,8 +88,12 @@ public interface RecordingSessionRepository extends JpaRepository<RecordingSessi
               AND (CAST(:toTs AS timestamptz) IS NULL OR rs.started_ts <= :toTs)
               AND (CAST(:search AS varchar) IS NULL
                    OR d.hostname ILIKE '%' || :search || '%'
-                   OR u.username ILIKE '%' || :search || '%'
-                   OR CAST(rs.id AS text) ILIKE '%' || :search || '%')
+                   OR CAST(rs.id AS text) ILIKE '%' || :search || '%'
+                   OR EXISTS (SELECT 1 FROM device_audit_events dae2
+                              WHERE dae2.device_id = rs.device_id AND dae2.tenant_id = rs.tenant_id
+                                AND dae2.username ILIKE '%' || :search || '%'
+                                AND dae2.event_ts <= rs.started_ts + INTERVAL '5 minutes'
+                              LIMIT 1))
               AND (CAST(:minSegments AS integer) IS NULL OR rs.segment_count >= :minSegments)
               AND (CAST(:maxSegments AS integer) IS NULL OR rs.segment_count <= :maxSegments)
               AND (CAST(:minBytes AS bigint) IS NULL OR rs.total_bytes >= :minBytes)
