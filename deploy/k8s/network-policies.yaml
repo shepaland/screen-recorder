@@ -87,6 +87,20 @@ spec:
       ports:
         - protocol: TCP
           port: 8081
+    - from:
+        - podSelector:
+            matchLabels:
+              app: playback-service
+      ports:
+        - protocol: TCP
+          port: 8081
+    - from:
+        - podSelector:
+            matchLabels:
+              app: search-service
+      ports:
+        - protocol: TCP
+          port: 8081
 ---
 # -----------------------------------------------------------------------------
 # 3. auth-service -- Egress
@@ -472,6 +486,22 @@ spec:
       ports:
         - protocol: TCP
           port: 9000
+    # search-service (proxied via /api/search/)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: search-service
+      ports:
+        - protocol: TCP
+          port: 8083
+    # playback-service (proxied via /api/playback/)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: playback-service
+      ports:
+        - protocol: TCP
+          port: 8082
     # DNS (kube-dns in kube-system)
     - to:
         - namespaceSelector:
@@ -704,6 +734,218 @@ spec:
       ports:
         - protocol: TCP
           port: 9092
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# =============================================================================
+# search-service (port 8083)
+# =============================================================================
+# -----------------------------------------------------------------------------
+# 16. search-service -- Egress
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: search-service-egress
+  labels:
+    app: search-service
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector:
+    matchLabels:
+      app: search-service
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+    - to:
+        - podSelector:
+            matchLabels:
+              app: opensearch
+      ports:
+        - protocol: TCP
+          port: 9200
+    - to:
+        - podSelector:
+            matchLabels:
+              app: auth-service
+      ports:
+        - protocol: TCP
+          port: 8081
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# -----------------------------------------------------------------------------
+# 17. OpenSearch -- Ingress
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: opensearch-ingress
+  labels:
+    app: opensearch
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector:
+    matchLabels:
+      app: opensearch
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: search-service
+      ports:
+        - protocol: TCP
+          port: 9200
+---
+# -----------------------------------------------------------------------------
+# 18. OpenSearch -- Egress (DNS only)
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: opensearch-egress
+  labels:
+    app: opensearch
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector:
+    matchLabels:
+      app: opensearch
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# -----------------------------------------------------------------------------
+# 19. search-service -- Ingress
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: search-service-ingress
+  labels:
+    app: search-service
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector:
+    matchLabels:
+      app: search-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: web-dashboard
+      ports:
+        - protocol: TCP
+          port: 8083
+---
+# -----------------------------------------------------------------------------
+# 20. playback-service -- Ingress
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: playback-service-ingress
+  labels:
+    app: playback-service
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector:
+    matchLabels:
+      app: playback-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: web-dashboard
+      ports:
+        - protocol: TCP
+          port: 8082
+---
+# =============================================================================
+# playback-service (port 8082)
+# =============================================================================
+# -----------------------------------------------------------------------------
+# 21. playback-service -- Egress
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: playback-service-egress
+  labels:
+    app: playback-service
+    app.kubernetes.io/part-of: screen-recorder
+spec:
+  podSelector:
+    matchLabels:
+      app: playback-service
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 172.17.0.1/32
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    - to:
+        - podSelector:
+            matchLabels:
+              app: auth-service
+      ports:
+        - protocol: TCP
+          port: 8081
     - to:
         - namespaceSelector:
             matchLabels:
