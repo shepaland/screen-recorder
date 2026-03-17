@@ -30,6 +30,9 @@ public class RecordingSession {
     @Column(name = "user_id")
     private UUID userId;
 
+    @Column(name = "os_username", length = 256)
+    private String osUsername;
+
     @Column(nullable = false, length = 20)
     private String status;
 

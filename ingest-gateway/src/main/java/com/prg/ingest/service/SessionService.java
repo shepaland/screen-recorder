@@ -49,6 +49,7 @@ public class SessionService {
                 .tenantId(principal.getTenantId())
                 .deviceId(principal.getDeviceId())
                 .userId(principal.getUserId())
+                .osUsername(request.getOsUsername())
                 .status("active")
                 .startedTs(Instant.now())
                 .metadata(request.getMetadata())

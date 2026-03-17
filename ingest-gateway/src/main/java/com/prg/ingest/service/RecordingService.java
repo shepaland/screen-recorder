@@ -42,28 +42,37 @@ public class RecordingService {
             String status, UUID deviceId,
             Instant from, Instant to) {
 
+        return listRecordings(principal, page, size, status, deviceId, from, to,
+                null, null, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<RecordingListItemResponse> listRecordings(
+            DevicePrincipal principal,
+            int page, int size,
+            String status, UUID deviceId,
+            Instant from, Instant to,
+            String search,
+            Integer minSegments, Integer maxSegments,
+            Long minBytes, Long maxBytes) {
+
         Pageable pageable = PageRequest.of(page, size);
 
-        Page<RecordingSession> sessionPage = sessionRepository.findByTenantIdWithFilters(
-                principal.getTenantId(), status, deviceId, from, to, pageable);
+        Page<Object[]> resultPage = sessionRepository.findByTenantIdWithFiltersEnriched(
+                principal.getTenantId(), status, deviceId, from, to,
+                search, minSegments, maxSegments, minBytes, maxBytes,
+                pageable);
 
-        // Collect unique device IDs to resolve hostnames in a single query
-        Set<UUID> deviceIds = sessionPage.getContent().stream()
-                .map(RecordingSession::getDeviceId)
-                .collect(Collectors.toSet());
-
-        Map<UUID, DeviceInfo> deviceInfoMap = resolveDeviceInfo(deviceIds, principal.getTenantId());
-
-        List<RecordingListItemResponse> content = sessionPage.getContent().stream()
-                .map(session -> toListItemResponse(session, deviceInfoMap))
+        List<RecordingListItemResponse> content = resultPage.getContent().stream()
+                .map(this::mapEnrichedRow)
                 .toList();
 
         return PageResponse.<RecordingListItemResponse>builder()
                 .content(content)
-                .page(sessionPage.getNumber())
-                .size(sessionPage.getSize())
-                .totalElements(sessionPage.getTotalElements())
-                .totalPages(sessionPage.getTotalPages())
+                .page(resultPage.getNumber())
+                .size(resultPage.getSize())
+                .totalElements(resultPage.getTotalElements())
+                .totalPages(resultPage.getTotalPages())
                 .build();
     }
 
@@ -435,6 +444,59 @@ public class RecordingService {
                 .sizeBytes(segment.getSizeBytes())
                 .status(segment.getStatus())
                 .s3Key(segment.getS3Key())
+                .build();
+    }
+
+    /**
+     * Map a native query Object[] row from findByTenantIdWithFiltersEnriched.
+     * Column order: rs.* (14 cols including os_username), device_hostname, employee_name
+     */
+    @SuppressWarnings("unchecked")
+    private RecordingListItemResponse mapEnrichedRow(Object[] row) {
+        // recording_sessions columns: id(0), tenant_id(1), device_id(2), user_id(3),
+        // os_username(4), status(5), started_ts(6), ended_ts(7),
+        // segment_count(8), total_bytes(9), total_duration_ms(10),
+        // metadata(11), created_ts(12), updated_ts(13)
+        // JOIN columns: device_hostname(14), employee_name(15)
+        UUID id = (UUID) row[0];
+        UUID deviceId = (UUID) row[2];
+        String status = (String) row[5];
+        Instant startedTs = toInstant(row[6]);
+        Instant endedTs = toInstant(row[7]);
+        Integer segmentCount = row[8] != null ? ((Number) row[8]).intValue() : 0;
+        Long totalBytes = row[9] != null ? ((Number) row[9]).longValue() : 0L;
+        Long totalDurationMs = row[10] != null ? ((Number) row[10]).longValue() : 0L;
+
+        Map<String, Object> metadata = null;
+        if (row[11] != null) {
+            if (row[11] instanceof Map) {
+                metadata = (Map<String, Object>) row[11];
+            } else if (row[11] instanceof String metaStr) {
+                try {
+                    metadata = new com.fasterxml.jackson.databind.ObjectMapper()
+                            .readValue(metaStr, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+                } catch (Exception e) {
+                    log.warn("Failed to parse metadata JSON for session {}", id);
+                    metadata = Map.of();
+                }
+            }
+        }
+
+        String deviceHostname = row[14] != null ? row[14].toString() : null;
+        String employeeName = row[15] != null ? row[15].toString() : null;
+
+        return RecordingListItemResponse.builder()
+                .id(id)
+                .deviceId(deviceId)
+                .deviceHostname(deviceHostname)
+                .employeeName(employeeName)
+                .status(status)
+                .startedTs(startedTs)
+                .endedTs(endedTs)
+                .segmentCount(segmentCount)
+                .totalBytes(totalBytes)
+                .totalDurationMs(totalDurationMs)
+                .metadata(metadata)
                 .build();
     }
 }

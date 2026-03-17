@@ -1,4 +1,5 @@
 using System.Net;
+using KaderoAgent.Audit;
 using KaderoAgent.Auth;
 using KaderoAgent.Util;
 using Microsoft.Extensions.Logging;
@@ -10,17 +11,20 @@ public class SessionManager
     private readonly ApiClient _apiClient;
     private readonly AuthManager _authManager;
     private readonly CredentialStore _credentialStore;
+    private readonly UserSessionInfo _userSessionInfo;
     private readonly ILogger<SessionManager> _logger;
     private string? _currentSessionId;
 
     public string? CurrentSessionId => _currentSessionId;
 
     public SessionManager(ApiClient apiClient, AuthManager authManager,
-        CredentialStore credentialStore, ILogger<SessionManager> logger)
+        CredentialStore credentialStore, UserSessionInfo userSessionInfo,
+        ILogger<SessionManager> logger)
     {
         _apiClient = apiClient;
         _authManager = authManager;
         _credentialStore = credentialStore;
+        _userSessionInfo = userSessionInfo;
         _logger = logger;
     }
 
@@ -32,9 +36,11 @@ public class SessionManager
         var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";
 
         var url = $"{baseUrl}/api/ingest/v1/ingest/sessions";
+        var osUsername = _userSessionInfo.GetCurrentUsername();
         var body = new
         {
             device_id = _authManager.DeviceId,
+            os_username = osUsername,
             metadata = new
             {
                 resolution,
@@ -42,6 +48,7 @@ public class SessionManager
                 codec = "h264"
             }
         };
+        _logger.LogDebug("Creating session with os_username={Username}", osUsername);
 
         try
         {

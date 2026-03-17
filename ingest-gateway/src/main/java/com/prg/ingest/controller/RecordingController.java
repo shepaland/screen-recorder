@@ -49,6 +49,11 @@ public class RecordingController {
             @RequestParam(name = "device_id", required = false) UUID deviceId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+            @RequestParam(required = false) String search,
+            @RequestParam(name = "min_segments", required = false) Integer minSegments,
+            @RequestParam(name = "max_segments", required = false) Integer maxSegments,
+            @RequestParam(name = "min_bytes", required = false) Long minBytes,
+            @RequestParam(name = "max_bytes", required = false) Long maxBytes,
             HttpServletRequest httpRequest) {
 
         DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_RECORDINGS_READ);
@@ -57,11 +62,9 @@ public class RecordingController {
         if (size > 100) size = 100;
         if (page < 0) page = 0;
 
-        log.debug("Listing recordings: tenant={} page={} size={} status={} device_id={} from={} to={}",
-                principal.getTenantId(), page, size, status, deviceId, from, to);
-
         PageResponse<RecordingListItemResponse> response =
-                recordingService.listRecordings(principal, page, size, status, deviceId, from, to);
+                recordingService.listRecordings(principal, page, size, status, deviceId, from, to,
+                        search, minSegments, maxSegments, minBytes, maxBytes);
 
         return ResponseEntity.ok(response);
     }
