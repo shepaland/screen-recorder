@@ -79,7 +79,7 @@ public class AuthManager
             {
                 hostname,
                 os_version = osVersion,
-                agent_version = "1.0.0",
+                agent_version = GetType().Assembly.GetName().Version?.ToString() ?? "0.0.0",
                 hardware_id = hwId
             }
         };
@@ -250,7 +250,7 @@ public class AuthManager
                 {
                     hostname,
                     os_version = osVersion,
-                    agent_version = "1.0.0",
+                    agent_version = GetType().Assembly.GetName().Version?.ToString() ?? "0.0.0",
                     hardware_id = hwId
                 }
             };

@@ -73,7 +73,7 @@ public class HeartbeatService : BackgroundService
                 {
                     status,
                     session_locked = _commandHandler.IsPausedByLock,
-                    agent_version = "1.0.0",
+                    agent_version = GetType().Assembly.GetName().Version?.ToString() ?? "0.0.0",
                     metrics = new
                     {
                         cpu_percent = _metrics.GetCpuUsage(),

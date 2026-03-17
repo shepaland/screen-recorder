@@ -71,7 +71,8 @@ public class StatusWindow : Form
 
     private void InitializeComponent()
     {
-        Text = "Кадеро — Статус агента";
+        var ver = GetType().Assembly.GetName().Version?.ToString() ?? "0.0.0";
+        Text = $"Кадеро — Статус агента v{ver}";
         Size = new Size(480, 580);
         ShowInTaskbar = true;
         MaximizeBox = false;

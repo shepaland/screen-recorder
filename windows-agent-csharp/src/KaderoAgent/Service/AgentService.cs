@@ -262,7 +262,7 @@ public class AgentService : BackgroundService
             {
                 status = AgentState.Stopped.ToHeartbeatStatus(),
                 session_locked = _sessionWatcher != null && !_sessionWatcher.IsSessionActive,
-                agent_version = "1.0.0",
+                agent_version = GetType().Assembly.GetName().Version?.ToString() ?? "0.0.0",
                 metrics = new
                 {
                     cpu_percent = 0.0,

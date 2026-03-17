@@ -114,7 +114,7 @@ public class AgentStatus
     public string? UploadErrorMessage { get; set; }
     public int FocusIntervalsQueued { get; set; }
     public int InputEventsQueued { get; set; }
-    public string AgentVersion { get; set; } = "1.0.0";
+    public string AgentVersion { get; set; } = typeof(AgentStatus).Assembly.GetName().Version?.ToString() ?? "0.0.0";
 
     // Segment context for video timecode binding (Tray reads via get_status)
     public string? CurrentSegmentId { get; set; }
