@@ -51,13 +51,16 @@ public class UploadQueue
     {
         await foreach (var segment in _channel.Reader.ReadAllAsync(ct))
         {
-            // If session was invalidated (404 recovery), reassign segment to current session
+            // Discard pending segments from old/different sessions — they would create
+            // duplicate sequence_num entries and break HLS playlist generation.
             var currentSession = _sessionManager.CurrentSessionId;
             if (currentSession != null && segment.SessionId != currentSession)
             {
-                _logger.LogInformation("Reassigning segment {Seq} from session {Old} to {New}",
+                _logger.LogWarning("Discarding stale segment {Seq} from old session {Old} (current: {New})",
                     segment.SequenceNum, segment.SessionId, currentSession);
-                segment.SessionId = currentSession;
+                _db.MarkSegmentUploaded(segment.FilePath);
+                try { File.Delete(segment.FilePath); } catch { }
+                continue;
             }
 
             var success = await _uploader.UploadSegmentAsync(
