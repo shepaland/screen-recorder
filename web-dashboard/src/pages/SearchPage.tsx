@@ -157,6 +157,7 @@ export default function SearchPage() {
   // Play session from row action
   const handlePlaySession = async (e: React.MouseEvent, session: Recording) => {
     e.stopPropagation();
+    if (session.segment_count === 0) return;
     let segs = segmentsCache.get(session.id);
     if (!segs) {
       try {
@@ -167,6 +168,7 @@ export default function SearchPage() {
         segs = [];
       }
     }
+    if (segs.length === 0) return;
     openPlayer(session.id, segs);
   };
 
@@ -236,14 +238,16 @@ export default function SearchPage() {
 
   const statusLabel = (status: string) => {
     switch (status) {
-      case 'RECORDING':
-        return <span className="text-green-400">Запись</span>;
-      case 'COMPLETED':
-        return <span className="text-gray-400">Завершена</span>;
-      case 'ERROR':
-        return <span className="text-red-400">Ошибка</span>;
+      case 'active':
+        return <span className="text-green-600 font-medium">Запись</span>;
+      case 'completed':
+        return <span className="text-gray-500">Завершена</span>;
+      case 'interrupted':
+        return <span className="text-yellow-600">Прервана</span>;
+      case 'failed':
+        return <span className="text-red-600">Ошибка</span>;
       default:
-        return <span className="text-gray-400">{status}</span>;
+        return <span className="text-gray-500">{status}</span>;
     }
   };
 
@@ -253,7 +257,7 @@ export default function SearchPage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold text-white mb-6">Поиск записей</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Поиск записей</h1>
 
       {/* Search bar */}
       <div className="flex gap-3 mb-4">
@@ -265,15 +269,15 @@ export default function SearchPage() {
             onChange={(e) => updateFilter('search', e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Поиск по устройству, сотруднику..."
-            className="w-full pl-10 pr-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
           />
         </div>
         <button
           onClick={() => setShowFilters(!showFilters)}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
             showFilters
-              ? 'bg-red-600/20 border-red-500 text-red-400'
-              : 'bg-white/10 border-white/20 text-gray-300 hover:bg-white/20'
+              ? 'bg-red-50 border-red-500 text-red-600'
+              : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
           }`}
         >
           <FunnelIcon className="w-4 h-4" />
@@ -290,51 +294,52 @@ export default function SearchPage() {
 
       {/* Filter bar */}
       {showFilters && (
-        <div className="bg-white/5 rounded-lg p-4 mb-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4 grid grid-cols-2 md:grid-cols-4 gap-3">
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Устройство</label>
+            <label className="block text-xs text-gray-500 mb-1">Устройство</label>
             <input
               type="text"
               value={filters.device}
               onChange={(e) => updateFilter('device', e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="ID устройства"
-              className="w-full px-3 py-1.5 bg-white/10 border border-white/20 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+              className="w-full px-3 py-1.5 bg-gray-50 border border-gray-300 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-red-500"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Статус</label>
+            <label className="block text-xs text-gray-500 mb-1">Статус</label>
             <select
               value={filters.status}
               onChange={(e) => updateFilter('status', e.target.value)}
-              className="w-full px-3 py-1.5 bg-white/10 border border-white/20 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500"
+              className="w-full px-3 py-1.5 bg-gray-50 border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-red-500"
             >
-              <option value="" className="bg-gray-900">Все</option>
-              <option value="RECORDING" className="bg-gray-900">Запись</option>
-              <option value="COMPLETED" className="bg-gray-900">Завершена</option>
-              <option value="ERROR" className="bg-gray-900">Ошибка</option>
+              <option value="">Все</option>
+              <option value="active">Запись</option>
+              <option value="completed">Завершена</option>
+              <option value="interrupted">Прервана</option>
+              <option value="failed">Ошибка</option>
             </select>
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Дата от</label>
+            <label className="block text-xs text-gray-500 mb-1">Дата от</label>
             <input
               type="date"
               value={filters.from}
               onChange={(e) => updateFilter('from', e.target.value)}
-              className="w-full px-3 py-1.5 bg-white/10 border border-white/20 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500"
+              className="w-full px-3 py-1.5 bg-gray-50 border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-red-500"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Дата до</label>
+            <label className="block text-xs text-gray-500 mb-1">Дата до</label>
             <input
               type="date"
               value={filters.to}
               onChange={(e) => updateFilter('to', e.target.value)}
-              className="w-full px-3 py-1.5 bg-white/10 border border-white/20 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-red-500"
+              className="w-full px-3 py-1.5 bg-gray-50 border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-1 focus:ring-red-500"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Сегментов от</label>
+            <label className="block text-xs text-gray-500 mb-1">Сегментов от</label>
             <input
               type="number"
               min="0"
@@ -342,11 +347,11 @@ export default function SearchPage() {
               onChange={(e) => updateFilter('minSegments', e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="мин"
-              className="w-full px-3 py-1.5 bg-white/10 border border-white/20 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+              className="w-full px-3 py-1.5 bg-gray-50 border border-gray-300 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-red-500"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Сегментов до</label>
+            <label className="block text-xs text-gray-500 mb-1">Сегментов до</label>
             <input
               type="number"
               min="0"
@@ -354,11 +359,11 @@ export default function SearchPage() {
               onChange={(e) => updateFilter('maxSegments', e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="макс"
-              className="w-full px-3 py-1.5 bg-white/10 border border-white/20 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+              className="w-full px-3 py-1.5 bg-gray-50 border border-gray-300 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-red-500"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Размер от (МБ)</label>
+            <label className="block text-xs text-gray-500 mb-1">Размер от (МБ)</label>
             <input
               type="number"
               min="0"
@@ -367,11 +372,11 @@ export default function SearchPage() {
               onChange={(e) => updateFilter('minMb', e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="мин"
-              className="w-full px-3 py-1.5 bg-white/10 border border-white/20 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+              className="w-full px-3 py-1.5 bg-gray-50 border border-gray-300 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-red-500"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Размер до (МБ)</label>
+            <label className="block text-xs text-gray-500 mb-1">Размер до (МБ)</label>
             <input
               type="number"
               min="0"
@@ -380,13 +385,13 @@ export default function SearchPage() {
               onChange={(e) => updateFilter('maxMb', e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="макс"
-              className="w-full px-3 py-1.5 bg-white/10 border border-white/20 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+              className="w-full px-3 py-1.5 bg-gray-50 border border-gray-300 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-red-500"
             />
           </div>
           <div className="col-span-2 md:col-span-4 flex justify-end">
             <button
               onClick={handleResetFilters}
-              className="text-sm text-gray-400 hover:text-white transition-colors"
+              className="text-sm text-gray-500 hover:text-gray-800 transition-colors"
             >
               Сбросить фильтры
             </button>
@@ -395,14 +400,14 @@ export default function SearchPage() {
       )}
 
       {/* Results count */}
-      <div className="text-sm text-gray-400 mb-4">
+      <div className="text-sm text-gray-500 mb-4">
         Найдено: {totalElements} сессий
       </div>
 
       {/* Sessions table */}
-      <div className="bg-white/5 rounded-lg overflow-hidden">
-        <table className="w-full text-sm text-white">
-          <thead className="bg-white/10 text-gray-300 uppercase text-xs">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <table className="w-full text-sm text-gray-900">
+          <thead className="bg-gray-50 text-gray-500 uppercase text-xs border-b border-gray-200">
             <tr>
               <th className="w-8 px-2 py-3" />
               <th className="px-4 py-3 text-left">Сотрудник</th>
@@ -415,7 +420,7 @@ export default function SearchPage() {
               <th className="px-4 py-3 text-center">Действия</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/10">
+          <tbody className="divide-y divide-gray-100">
             {sessions.map((s) => {
               const isExpanded = expandedIds.has(s.id);
               const segs = segmentsCache.get(s.id) || [];
@@ -442,7 +447,7 @@ export default function SearchPage() {
             })}
             {sessions.length === 0 && !loading && (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                   Нет результатов
                 </td>
               </tr>
@@ -457,17 +462,17 @@ export default function SearchPage() {
           <button
             onClick={() => fetchSessions(page - 1)}
             disabled={page === 0}
-            className="px-3 py-1 bg-white/10 rounded text-white disabled:opacity-30 hover:bg-white/20 transition-colors"
+            className="px-3 py-1 bg-white border border-gray-300 rounded text-gray-700 disabled:opacity-30 hover:bg-gray-50 transition-colors"
           >
             Назад
           </button>
-          <span className="px-3 py-1 text-gray-400 text-sm">
+          <span className="px-3 py-1 text-gray-500 text-sm">
             {page + 1} / {totalPages}
           </span>
           <button
             onClick={() => fetchSessions(page + 1)}
             disabled={page + 1 >= totalPages}
-            className="px-3 py-1 bg-white/10 rounded text-white disabled:opacity-30 hover:bg-white/20 transition-colors"
+            className="px-3 py-1 bg-white border border-gray-300 rounded text-gray-700 disabled:opacity-30 hover:bg-gray-50 transition-colors"
           >
             Вперёд
           </button>
@@ -527,7 +532,7 @@ function SessionRow({
       {/* Main row */}
       <tr
         onClick={onToggle}
-        className="hover:bg-white/5 cursor-pointer"
+        className="hover:bg-gray-50 cursor-pointer"
       >
         <td className="px-2 py-3 text-center">
           {isExpanded ? (
@@ -536,37 +541,40 @@ function SessionRow({
             <ChevronRightIcon className="w-4 h-4 text-gray-400 inline" />
           )}
         </td>
-        <td className="px-4 py-3">
-          {session.employee_name || <span className="text-gray-500">-</span>}
+        <td className="px-4 py-3 text-gray-900">
+          {session.employee_name || <span className="text-gray-400">-</span>}
         </td>
         <td className="px-4 py-3">
-          <div className="font-mono text-xs">{session.device_hostname || session.device_id.slice(0, 12)}</div>
+          <div className="font-mono text-xs text-gray-700">{session.device_hostname || session.device_id.slice(0, 12)}</div>
           {session.device_deleted && (
-            <span className="text-[10px] text-red-400">удалено</span>
+            <span className="text-[10px] text-red-500">удалено</span>
           )}
         </td>
         <td className="px-4 py-3">
-          <div className="font-mono text-xs text-gray-300">{session.id.slice(0, 12)}...</div>
+          <div className="font-mono text-xs text-gray-500">{session.id.slice(0, 12)}...</div>
           <div className="text-[10px] mt-0.5">{statusLabel(session.status)}</div>
         </td>
-        <td className="px-4 py-3 text-xs">{formatDate(session.started_ts)}</td>
-        <td className="px-4 py-3 text-xs">{formatDate(session.ended_ts)}</td>
-        <td className="px-4 py-3 text-right">{session.segment_count}</td>
-        <td className="px-4 py-3 text-right">{formatBytes(session.total_bytes)}</td>
+        <td className="px-4 py-3 text-xs text-gray-600">{formatDate(session.started_ts)}</td>
+        <td className="px-4 py-3 text-xs text-gray-600">
+          {session.ended_ts ? formatDate(session.ended_ts) : <span className="text-green-600 font-medium">В процессе</span>}
+        </td>
+        <td className="px-4 py-3 text-right text-gray-700">{session.segment_count}</td>
+        <td className="px-4 py-3 text-right text-gray-700">{formatBytes(session.total_bytes)}</td>
         <td className="px-4 py-3">
           <div className="flex items-center justify-center gap-1">
             <button
               onClick={onPlay}
-              className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-              title="Воспроизвести"
+              disabled={session.segment_count === 0}
+              className="p-1.5 rounded hover:bg-gray-200 text-gray-500 hover:text-red-600 transition-colors disabled:opacity-30"
+              title={session.segment_count === 0 ? 'Нет сегментов' : 'Воспроизвести'}
             >
               <PlayIcon className="w-4 h-4" />
             </button>
             <button
               onClick={onDownload}
-              disabled={downloading === session.id}
-              className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors disabled:opacity-50"
-              title="Скачать (ZIP)"
+              disabled={downloading === session.id || session.status === 'active'}
+              className="p-1.5 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors disabled:opacity-30"
+              title={session.status === 'active' ? 'Запись в процессе' : 'Скачать (ZIP)'}
             >
               <ArrowDownTrayIcon className="w-4 h-4" />
             </button>
@@ -577,14 +585,14 @@ function SessionRow({
       {/* Expanded: segments table */}
       {isExpanded && (
         <tr>
-          <td colSpan={9} className="bg-white/[0.02] px-6 py-3">
+          <td colSpan={9} className="bg-gray-50 px-6 py-3">
             {isLoadingSegments ? (
-              <div className="text-gray-400 text-sm py-4 text-center">Загрузка сегментов...</div>
+              <div className="text-gray-500 text-sm py-4 text-center">Загрузка сегментов...</div>
             ) : segments.length === 0 ? (
-              <div className="text-gray-500 text-sm py-4 text-center">Нет сегментов</div>
+              <div className="text-gray-400 text-sm py-4 text-center">Нет сегментов</div>
             ) : (
-              <table className="w-full text-xs text-white">
-                <thead className="text-gray-400 uppercase">
+              <table className="w-full text-xs text-gray-700">
+                <thead className="text-gray-500 uppercase">
                   <tr>
                     <th className="px-3 py-2 text-left">#</th>
                     <th className="px-3 py-2 text-left">Статус</th>
@@ -593,21 +601,21 @@ function SessionRow({
                     <th className="px-3 py-2 text-center">Действия</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-gray-200">
                   {segments.map((seg, idx) => (
-                    <tr key={seg.id} className="hover:bg-white/5">
+                    <tr key={seg.id} className="hover:bg-gray-100">
                       <td className="px-3 py-2">{seg.sequence_num}</td>
                       <td className="px-3 py-2">
                         <span
                           className={
-                            seg.status === 'CONFIRMED'
-                              ? 'text-green-400'
-                              : seg.status === 'ERROR'
-                                ? 'text-red-400'
-                                : 'text-gray-400'
+                            seg.status === 'confirmed'
+                              ? 'text-green-600'
+                              : seg.status === 'failed'
+                                ? 'text-red-600'
+                                : 'text-gray-500'
                           }
                         >
-                          {seg.status}
+                          {seg.status === 'confirmed' ? 'Готов' : seg.status === 'uploaded' ? 'Загружен' : seg.status === 'failed' ? 'Ошибка' : seg.status}
                         </span>
                       </td>
                       <td className="px-3 py-2 text-right">{formatDuration(seg.duration_ms)}</td>
@@ -616,15 +624,15 @@ function SessionRow({
                         <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => onPlaySegment(seg, idx)}
-                            className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-red-600 transition-colors"
                             title="Воспроизвести с этого сегмента"
                           >
                             <PlayIcon className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={(e) => onDownloadSegment(e, seg)}
-                            disabled={downloading === seg.id}
-                            className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+                            disabled={downloading === seg.id || seg.status !== 'confirmed'}
+                            className="p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors disabled:opacity-30"
                             title="Скачать сегмент"
                           >
                             <ArrowDownTrayIcon className="w-3.5 h-3.5" />
