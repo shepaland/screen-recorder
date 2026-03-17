@@ -13,16 +13,18 @@ public class SegmentUploader
     private readonly ApiClient _apiClient;
     private readonly AuthManager _authManager;
     private readonly ScreenCaptureManager _captureManager;
+    private readonly SessionManager _sessionManager;
     private readonly IOptions<AgentConfig> _config;
     private readonly ILogger<SegmentUploader> _logger;
 
     public SegmentUploader(ApiClient apiClient, AuthManager authManager,
-        ScreenCaptureManager captureManager, IOptions<AgentConfig> config,
-        ILogger<SegmentUploader> logger)
+        ScreenCaptureManager captureManager, SessionManager sessionManager,
+        IOptions<AgentConfig> config, ILogger<SegmentUploader> logger)
     {
         _apiClient = apiClient;
         _authManager = authManager;
         _captureManager = captureManager;
+        _sessionManager = sessionManager;
         _config = config;
         _logger = logger;
     }
@@ -93,11 +95,12 @@ public class SegmentUploader
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
-            // 404 = session not found on server (expired/closed after re-login).
-            // Discard the segment to prevent infinite retry loop.
-            _logger.LogWarning("Session not found (404) for segment {Seq} of session {Session}, discarding",
-                sequenceNum, sessionId);
-            return true; // Mark as "uploaded" so it's removed from the queue
+            // 404 = session not found on server (phantom session after server restart).
+            // Instead of discarding, invalidate the session and signal retry with a new one.
+            _logger.LogWarning("Session {Session} not found (404) for segment {Seq}, requesting new session...",
+                sessionId, sequenceNum);
+            _sessionManager.InvalidateSession();
+            return false; // retry — UploadQueue will re-enqueue with the new session
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
         {

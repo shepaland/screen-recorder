@@ -54,7 +54,7 @@ public class SessionService {
                 .metadata(request.getMetadata())
                 .build();
 
-        session = sessionRepository.save(session);
+        session = sessionRepository.saveAndFlush(session);
 
         log.info("Created recording session id={} for device={} tenant={}",
                 session.getId(), session.getDeviceId(), session.getTenantId());

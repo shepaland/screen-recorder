@@ -12,6 +12,7 @@ public class UploadQueue
     private readonly LocalDatabase _db;
     private readonly ILogger<UploadQueue> _logger;
     private Task? _processingTask;
+    private Task? _retryTask;
     private CancellationTokenSource? _cts;
 
     public int QueuedCount => _channel.Reader.Count;
@@ -38,6 +39,7 @@ public class UploadQueue
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         _processingTask = Task.Run(() => ProcessLoop(serverUrl, _cts.Token), _cts.Token);
+        _retryTask = Task.Run(() => RetryPendingLoop(serverUrl, _cts.Token), _cts.Token);
     }
 
     public void StopProcessing()
@@ -49,6 +51,15 @@ public class UploadQueue
     {
         await foreach (var segment in _channel.Reader.ReadAllAsync(ct))
         {
+            // If session was invalidated (404 recovery), reassign segment to current session
+            var currentSession = _sessionManager.CurrentSessionId;
+            if (currentSession != null && segment.SessionId != currentSession)
+            {
+                _logger.LogInformation("Reassigning segment {Seq} from session {Old} to {New}",
+                    segment.SequenceNum, segment.SessionId, currentSession);
+                segment.SessionId = currentSession;
+            }
+
             var success = await _uploader.UploadSegmentAsync(
                 segment.FilePath, segment.SessionId, segment.SequenceNum, serverUrl, ct);
 
@@ -63,6 +74,39 @@ public class UploadQueue
                 _logger.LogWarning("Segment queued for retry: {File}", segment.FilePath);
                 // Backoff to prevent hot retry loops
                 await Task.Delay(5000, ct);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Periodically check SQLite for pending segments and re-enqueue them.
+    /// Handles segments that failed during runtime (not just on startup).
+    /// </summary>
+    private async Task RetryPendingLoop(string serverUrl, CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(60_000, ct);
+
+                var pending = _db.GetPendingSegments();
+                if (pending.Count == 0) continue;
+
+                _logger.LogInformation("RetryPendingLoop: found {Count} pending segments", pending.Count);
+                foreach (var seg in pending)
+                {
+                    if (ct.IsCancellationRequested) break;
+                    if (File.Exists(seg.FilePath))
+                        await EnqueueAsync(seg);
+                    else
+                        _db.MarkSegmentUploaded(seg.FilePath);
+                }
+            }
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "RetryPendingLoop error, will retry next cycle");
             }
         }
     }
