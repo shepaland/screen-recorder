@@ -27,6 +27,7 @@ export interface Recording {
   device_id: string;
   device_hostname: string;
   device_deleted?: boolean;
+  employee_name?: string;
   status: string;
   started_ts: string;
   ended_ts: string | null;
@@ -65,6 +66,11 @@ export async function getRecordings(params?: {
   device_id?: string;
   from?: string;
   to?: string;
+  search?: string;
+  min_segments?: number;
+  max_segments?: number;
+  min_bytes?: number;
+  max_bytes?: number;
 }): Promise<RecordingsResponse> {
   const response = await ingestApiClient.get<RecordingsResponse>('/recordings', { params });
   return response.data;
@@ -85,6 +91,19 @@ export async function downloadRecording(id: string): Promise<{ blob: Blob; filen
   });
   const contentDisposition = response.headers['content-disposition'];
   let filename = `recording-${id}`;
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename="?([^"]+)"?/);
+    if (match) filename = match[1];
+  }
+  return { blob: response.data, filename };
+}
+
+export async function downloadSegment(sessionId: string, segmentId: string): Promise<{ blob: Blob; filename: string }> {
+  const response = await ingestApiClient.get(`/recordings/${sessionId}/segments/${segmentId}/download`, {
+    responseType: 'blob',
+  });
+  const contentDisposition = response.headers['content-disposition'];
+  let filename = `segment-${segmentId}.mp4`;
   if (contentDisposition) {
     const match = contentDisposition.match(/filename="?([^"]+)"?/);
     if (match) filename = match[1];

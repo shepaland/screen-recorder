@@ -26,4 +26,5 @@ public class RecordingListItemResponse {
     private Long totalBytes;
     private Long totalDurationMs;
     private Map<String, Object> metadata;
+    private String employeeName;
 }

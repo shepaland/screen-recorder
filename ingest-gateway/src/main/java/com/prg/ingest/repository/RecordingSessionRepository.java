@@ -49,6 +49,61 @@ public interface RecordingSessionRepository extends JpaRepository<RecordingSessi
             Pageable pageable);
 
     @Query(value = """
+            SELECT rs.*,
+                   d.hostname AS device_hostname,
+                   u.username AS employee_name
+            FROM recording_sessions rs
+            LEFT JOIN devices d ON d.id = rs.device_id AND d.tenant_id = rs.tenant_id
+            LEFT JOIN users u ON u.id = rs.user_id
+            WHERE rs.tenant_id = :tenantId
+              AND (CAST(:status AS varchar) IS NULL OR rs.status = :status)
+              AND (CAST(:deviceId AS uuid) IS NULL OR rs.device_id = :deviceId)
+              AND (CAST(:fromTs AS timestamptz) IS NULL OR rs.started_ts >= :fromTs)
+              AND (CAST(:toTs AS timestamptz) IS NULL OR rs.started_ts <= :toTs)
+              AND (CAST(:search AS varchar) IS NULL
+                   OR d.hostname ILIKE '%' || :search || '%'
+                   OR u.username ILIKE '%' || :search || '%'
+                   OR CAST(rs.id AS text) ILIKE '%' || :search || '%')
+              AND (CAST(:minSegments AS integer) IS NULL OR rs.segment_count >= :minSegments)
+              AND (CAST(:maxSegments AS integer) IS NULL OR rs.segment_count <= :maxSegments)
+              AND (CAST(:minBytes AS bigint) IS NULL OR rs.total_bytes >= :minBytes)
+              AND (CAST(:maxBytes AS bigint) IS NULL OR rs.total_bytes <= :maxBytes)
+            ORDER BY rs.started_ts DESC
+            """,
+            countQuery = """
+            SELECT COUNT(*)
+            FROM recording_sessions rs
+            LEFT JOIN devices d ON d.id = rs.device_id AND d.tenant_id = rs.tenant_id
+            LEFT JOIN users u ON u.id = rs.user_id
+            WHERE rs.tenant_id = :tenantId
+              AND (CAST(:status AS varchar) IS NULL OR rs.status = :status)
+              AND (CAST(:deviceId AS uuid) IS NULL OR rs.device_id = :deviceId)
+              AND (CAST(:fromTs AS timestamptz) IS NULL OR rs.started_ts >= :fromTs)
+              AND (CAST(:toTs AS timestamptz) IS NULL OR rs.started_ts <= :toTs)
+              AND (CAST(:search AS varchar) IS NULL
+                   OR d.hostname ILIKE '%' || :search || '%'
+                   OR u.username ILIKE '%' || :search || '%'
+                   OR CAST(rs.id AS text) ILIKE '%' || :search || '%')
+              AND (CAST(:minSegments AS integer) IS NULL OR rs.segment_count >= :minSegments)
+              AND (CAST(:maxSegments AS integer) IS NULL OR rs.segment_count <= :maxSegments)
+              AND (CAST(:minBytes AS bigint) IS NULL OR rs.total_bytes >= :minBytes)
+              AND (CAST(:maxBytes AS bigint) IS NULL OR rs.total_bytes <= :maxBytes)
+            """,
+            nativeQuery = true)
+    Page<Object[]> findByTenantIdWithFiltersEnriched(
+            @Param("tenantId") UUID tenantId,
+            @Param("status") String status,
+            @Param("deviceId") UUID deviceId,
+            @Param("fromTs") Instant fromTs,
+            @Param("toTs") Instant toTs,
+            @Param("search") String search,
+            @Param("minSegments") Integer minSegments,
+            @Param("maxSegments") Integer maxSegments,
+            @Param("minBytes") Long minBytes,
+            @Param("maxBytes") Long maxBytes,
+            Pageable pageable);
+
+    @Query(value = """
             SELECT rs.* FROM recording_sessions rs
             WHERE rs.device_id = :deviceId
               AND rs.tenant_id = :tenantId

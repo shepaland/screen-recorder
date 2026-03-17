@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Data
@@ -19,4 +20,5 @@ public class SegmentResponse {
     private Long sizeBytes;
     private String status;
     private String s3Key;
+    private Instant recordedAt;
 }

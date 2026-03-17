@@ -42,28 +42,37 @@ public class RecordingService {
             String status, UUID deviceId,
             Instant from, Instant to) {
 
+        return listRecordings(principal, page, size, status, deviceId, from, to,
+                null, null, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<RecordingListItemResponse> listRecordings(
+            DevicePrincipal principal,
+            int page, int size,
+            String status, UUID deviceId,
+            Instant from, Instant to,
+            String search,
+            Integer minSegments, Integer maxSegments,
+            Long minBytes, Long maxBytes) {
+
         Pageable pageable = PageRequest.of(page, size);
 
-        Page<RecordingSession> sessionPage = sessionRepository.findByTenantIdWithFilters(
-                principal.getTenantId(), status, deviceId, from, to, pageable);
+        Page<Object[]> resultPage = sessionRepository.findByTenantIdWithFiltersEnriched(
+                principal.getTenantId(), status, deviceId, from, to,
+                search, minSegments, maxSegments, minBytes, maxBytes,
+                pageable);
 
-        // Collect unique device IDs to resolve hostnames in a single query
-        Set<UUID> deviceIds = sessionPage.getContent().stream()
-                .map(RecordingSession::getDeviceId)
-                .collect(Collectors.toSet());
-
-        Map<UUID, DeviceInfo> deviceInfoMap = resolveDeviceInfo(deviceIds, principal.getTenantId());
-
-        List<RecordingListItemResponse> content = sessionPage.getContent().stream()
-                .map(session -> toListItemResponse(session, deviceInfoMap))
+        List<RecordingListItemResponse> content = resultPage.getContent().stream()
+                .map(this::mapEnrichedRow)
                 .toList();
 
         return PageResponse.<RecordingListItemResponse>builder()
                 .content(content)
-                .page(sessionPage.getNumber())
-                .size(sessionPage.getSize())
-                .totalElements(sessionPage.getTotalElements())
-                .totalPages(sessionPage.getTotalPages())
+                .page(resultPage.getNumber())
+                .size(resultPage.getSize())
+                .totalElements(resultPage.getTotalElements())
+                .totalPages(resultPage.getTotalPages())
                 .build();
     }
 
@@ -376,6 +385,83 @@ public class RecordingService {
         return Instant.parse(value.toString());
     }
 
+    /**
+     * Get a segment for individual download, verifying tenant isolation and session ownership.
+     */
+    @Transactional(readOnly = true)
+    public Segment getSegmentForDownload(UUID sessionId, UUID segmentId, DevicePrincipal principal) {
+        // 1. Verify session belongs to tenant
+        RecordingSession session = sessionRepository.findByIdAndTenantId(sessionId, principal.getTenantId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Recording not found: " + sessionId, "RECORDING_NOT_FOUND"));
+
+        // 2. Find segment by ID and tenant
+        Segment segment = segmentRepository.findByIdAndTenantId(segmentId, principal.getTenantId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Segment not found: " + segmentId, "SEGMENT_NOT_FOUND"));
+
+        // 3. Verify segment belongs to the session
+        if (!segment.getSessionId().equals(session.getId())) {
+            throw new ResourceNotFoundException(
+                    "Segment " + segmentId + " does not belong to recording " + sessionId,
+                    "SEGMENT_NOT_IN_SESSION");
+        }
+
+        return segment;
+    }
+
+    /**
+     * Map a row from the enriched native query (Object[]) to RecordingListItemResponse.
+     * Column order: rs.* (id, tenant_id, device_id, user_id, status, started_ts, ended_ts,
+     *   segment_count, total_bytes, total_duration_ms, metadata, created_ts, updated_ts),
+     *   device_hostname, employee_name
+     */
+    @SuppressWarnings("unchecked")
+    private RecordingListItemResponse mapEnrichedRow(Object[] row) {
+        UUID id = (UUID) row[0];
+        UUID deviceId = (UUID) row[2];
+        String status = (String) row[4];
+        Instant startedTs = toInstant(row[5]);
+        Instant endedTs = toInstant(row[6]);
+        Integer segmentCount = row[7] != null ? ((Number) row[7]).intValue() : null;
+        Long totalBytes = row[8] != null ? ((Number) row[8]).longValue() : null;
+        Long totalDurationMs = row[9] != null ? ((Number) row[9]).longValue() : null;
+
+        // metadata is JSONB — Hibernate may return it as String or Map
+        Map<String, Object> metadata = null;
+        if (row[10] != null) {
+            if (row[10] instanceof Map) {
+                metadata = (Map<String, Object>) row[10];
+            } else if (row[10] instanceof String metaStr) {
+                try {
+                    metadata = new com.fasterxml.jackson.databind.ObjectMapper()
+                            .readValue(metaStr, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+                } catch (Exception e) {
+                    log.warn("Failed to parse metadata JSON for session {}: {}", id, e.getMessage());
+                    metadata = Map.of();
+                }
+            }
+        }
+
+        String deviceHostname = row[13] != null ? row[13].toString() : null;
+        String employeeName = row[14] != null ? row[14].toString() : null;
+
+        return RecordingListItemResponse.builder()
+                .id(id)
+                .deviceId(deviceId)
+                .deviceHostname(deviceHostname)
+                .deviceDeleted(deviceHostname == null && deviceId != null)
+                .status(status)
+                .startedTs(startedTs)
+                .endedTs(endedTs)
+                .segmentCount(segmentCount)
+                .totalBytes(totalBytes)
+                .totalDurationMs(totalDurationMs)
+                .metadata(metadata)
+                .employeeName(employeeName)
+                .build();
+    }
+
     private record DeviceInfo(String hostname, boolean deleted) {}
 
     private Map<UUID, DeviceInfo> resolveDeviceInfo(Set<UUID> deviceIds, UUID tenantId) {
@@ -436,6 +522,7 @@ public class RecordingService {
                 .sizeBytes(segment.getSizeBytes())
                 .status(segment.getStatus())
                 .s3Key(segment.getS3Key())
+                .recordedAt(segment.getRecordedAt())
                 .build();
     }
 }

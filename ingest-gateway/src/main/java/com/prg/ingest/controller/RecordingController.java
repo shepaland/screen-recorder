@@ -40,6 +40,7 @@ public class RecordingController {
 
     /**
      * GET /api/v1/ingest/recordings — paginated list of recordings for the tenant.
+     * Supports text search (hostname, username, session ID) and range filters.
      */
     @GetMapping
     public ResponseEntity<PageResponse<RecordingListItemResponse>> listRecordings(
@@ -49,6 +50,11 @@ public class RecordingController {
             @RequestParam(name = "device_id", required = false) UUID deviceId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+            @RequestParam(required = false) String search,
+            @RequestParam(name = "min_segments", required = false) Integer minSegments,
+            @RequestParam(name = "max_segments", required = false) Integer maxSegments,
+            @RequestParam(name = "min_bytes", required = false) Long minBytes,
+            @RequestParam(name = "max_bytes", required = false) Long maxBytes,
             HttpServletRequest httpRequest) {
 
         DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_RECORDINGS_READ);
@@ -57,11 +63,14 @@ public class RecordingController {
         if (size > 100) size = 100;
         if (page < 0) page = 0;
 
-        log.debug("Listing recordings: tenant={} page={} size={} status={} device_id={} from={} to={}",
-                principal.getTenantId(), page, size, status, deviceId, from, to);
+        log.debug("Listing recordings: tenant={} page={} size={} status={} device_id={} from={} to={} search={} " +
+                        "min_segments={} max_segments={} min_bytes={} max_bytes={}",
+                principal.getTenantId(), page, size, status, deviceId, from, to,
+                search, minSegments, maxSegments, minBytes, maxBytes);
 
         PageResponse<RecordingListItemResponse> response =
-                recordingService.listRecordings(principal, page, size, status, deviceId, from, to);
+                recordingService.listRecordings(principal, page, size, status, deviceId, from, to,
+                        search, minSegments, maxSegments, minBytes, maxBytes);
 
         return ResponseEntity.ok(response);
     }
@@ -142,6 +151,39 @@ public class RecordingController {
             streamAsZip(download, httpResponse);
         } else {
             streamAsMp4(download, httpResponse);
+        }
+    }
+
+    /**
+     * GET /api/v1/ingest/recordings/{id}/segments/{segmentId}/download — download a single segment as MP4.
+     * Requires RECORDINGS:EXPORT permission.
+     */
+    @GetMapping("/{id}/segments/{segmentId}/download")
+    public void downloadSegment(
+            @PathVariable UUID id,
+            @PathVariable UUID segmentId,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) throws IOException {
+
+        DevicePrincipal principal = getPrincipalWithPermission(httpRequest, PERMISSION_RECORDINGS_EXPORT);
+
+        log.info("Downloading segment: tenant={} recording={} segment={}",
+                principal.getTenantId(), id, segmentId);
+
+        Segment segment = recordingService.getSegmentForDownload(id, segmentId, principal);
+
+        String filename = String.format("segment_%s_%05d.mp4",
+                id.toString().substring(0, 8), segment.getSequenceNum());
+
+        httpResponse.setContentType("video/mp4");
+        httpResponse.setHeader("Content-Disposition",
+                "attachment; filename=\"" + filename + "\"");
+        if (segment.getSizeBytes() != null) {
+            httpResponse.setContentLengthLong(segment.getSizeBytes());
+        }
+
+        try (var s3Stream = s3Service.getObject(segment.getS3Key())) {
+            s3Stream.transferTo(httpResponse.getOutputStream());
         }
     }
 
