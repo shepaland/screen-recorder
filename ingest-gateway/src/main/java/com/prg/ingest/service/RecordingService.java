@@ -320,6 +320,7 @@ public class RecordingService {
                                     .sizeBytes(seg.getSizeBytes() != null ? seg.getSizeBytes() : 0L)
                                     .status(seg.getStatus())
                                     .s3Key(seg.getS3Key())
+                                    .recordedAt(seg.getRecordedAt())
                                     .build())
                             .toList();
 

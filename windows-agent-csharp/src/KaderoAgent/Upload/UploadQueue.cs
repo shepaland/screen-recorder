@@ -51,18 +51,9 @@ public class UploadQueue
     {
         await foreach (var segment in _channel.Reader.ReadAllAsync(ct))
         {
-            // Discard pending segments from old/different sessions — they would create
-            // duplicate sequence_num entries and break HLS playlist generation.
-            var currentSession = _sessionManager.CurrentSessionId;
-            if (currentSession != null && segment.SessionId != currentSession)
-            {
-                _logger.LogWarning("Discarding stale segment {Seq} from old session {Old} (current: {New})",
-                    segment.SequenceNum, segment.SessionId, currentSession);
-                _db.MarkSegmentUploaded(segment.FilePath);
-                try { File.Delete(segment.FilePath); } catch { }
-                continue;
-            }
-
+            // Upload segments with their ORIGINAL session_id.
+            // Server accepts late uploads to completed/interrupted sessions (24h window).
+            // This preserves correct timeline positioning.
             var success = await _uploader.UploadSegmentAsync(
                 segment.FilePath, segment.SessionId, segment.SequenceNum, serverUrl, ct);
 

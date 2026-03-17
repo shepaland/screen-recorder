@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
@@ -39,6 +40,9 @@ public class PresignRequest {
     private String checksumSha256;
 
     private String contentType;
+
+    /** Original recording time on the agent (file creation time). Optional. */
+    private Instant recordedAt;
 
     private Map<String, Object> metadata;
 }

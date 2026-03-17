@@ -52,6 +52,8 @@ public class SegmentUploader
                 ? serverCfg.SegmentDurationSec : _config.Value.SegmentDurationSec;
 
             // 1. Presign
+            // Send file creation time as recorded_at for accurate timeline placement
+            var recordedAt = File.GetCreationTimeUtc(filePath).ToString("o");
             var presignBody = new
             {
                 device_id = _authManager.DeviceId,
@@ -61,6 +63,7 @@ public class SegmentUploader
                 duration_ms = segDuration * 1000,
                 checksum_sha256 = checksum,
                 content_type = "video/mp4",
+                recorded_at = recordedAt,
                 metadata = new { resolution, fps, codec = "h264" }
             };
 
