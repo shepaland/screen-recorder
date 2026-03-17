@@ -151,6 +151,48 @@ catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
 
 ---
 
+## Дефект 3: В UI отображается только очередь сегментов — нет очередей событий
+
+### Описание
+
+В окне статуса агента показан единственный счётчик `Очередь: N` — это `SegmentsQueued` (количество видеосегментов в Channel). Но агент накапливает **четыре** независимые очереди данных, три из которых **невидимы** оператору:
+
+| Очередь | Класс | Свойство | Тип данных | В UI |
+|---------|-------|----------|-----------|------|
+| Видеосегменты | `UploadQueue` | `QueuedCount` | mp4-файлы (60с каждый) | Отображается |
+| Аудит-события | `AuditEventSink` | `QueuedCount` | SESSION_LOCK/UNLOCK, LOGON/LOGOFF, PROCESS_START/STOP | Передаётся в AgentStatus, но **НЕ отображается** |
+| Focus-интервалы | `FocusIntervalSink` | `QueuedCount` | Переключение окон (app_name, window_title, duration) | **НЕ передаётся** в AgentStatus, не отображается |
+| Input-события | `InputEventSink` | `QueuedCount` | Клики, скроллы, нажатия клавиш (агрегированные) | **НЕ передаётся** в AgentStatus, не отображается |
+
+### Что это значит для оператора
+
+Когда сервер недоступен или сессия потеряна:
+- **Видео** — очередь сегментов = 0 (дискардятся при 404, Дефект 1+2)
+- **Поведение** — аудит-события, focus-интервалы, input-события копятся в in-memory очередях и SQLite, но оператор не видит сколько
+- При восстановлении связи — накопленные события отправятся (если сервис не перезапущен), но нет возможности понять был ли пробел
+
+### Ожидаемое поведение UI
+
+Секция "Очереди" в окне статуса:
+
+```
+┌────────────────────────────────────────┐
+│ ОЧЕРЕДИ ПЕРЕДАЧИ                       │
+│                                        │
+│ Видеосегменты    ●  3 ожидают          │
+│ Аудит-события    ●  47 ожидают         │
+│ Focus-интервалы  ●  128 ожидают        │
+│ Input-события    ●  85 ожидают         │
+│                                        │
+│ ● зелёный = 0, ● жёлтый = 1-50,       │
+│ ● красный = 50+                        │
+└────────────────────────────────────────┘
+```
+
+Индикатор цветом: зелёный (0 — всё передано), жёлтый (1-50 — небольшое отставание), красный (50+ — проблема с передачей).
+
+---
+
 ## Полный план исправления
 
 ### Шаг 1: SessionManager — добавить InvalidateSession() и флаг ошибки
@@ -262,7 +304,77 @@ if (status.UploadError)
 
 ---
 
+### Шаг 8: AgentStatusProvider — добавить все очереди
+
+```csharp
+// AgentStatusProvider.cs — добавить зависимости:
+private readonly FocusIntervalSink _focusSink;
+private readonly InputEventSink _inputSink;
+
+// В GetCurrentStatus():
+status.SegmentsQueued = _uploadQueue.QueuedCount;
+status.AuditEventsQueued = _auditSink.QueuedCount;
+status.FocusIntervalsQueued = _focusSink.QueuedCount;    // NEW
+status.InputEventsQueued = _inputSink.QueuedCount;        // NEW
+```
+
+### Шаг 9: AgentStatus (PipeProtocol) — добавить поля для всех очередей
+
+```csharp
+// PipeProtocol.cs — AgentStatus class:
+public int SegmentsQueued { get; set; }         // уже есть
+public int AuditEventsQueued { get; set; }      // уже есть, но не показывается
+public int FocusIntervalsQueued { get; set; }   // NEW
+public int InputEventsQueued { get; set; }      // NEW
+```
+
+### Шаг 10: StatusWindow — секция "Очереди передачи"
+
+Заменить одиночный `_queueValue` на секцию из четырёх строк:
+
+```csharp
+// StatusWindow.cs — в InitializeComponent():
+// Секция "ОЧЕРЕДИ ПЕРЕДАЧИ"
+var queueLabel = GlassHelper.CreateHeaderLabel("ОЧЕРЕДИ ПЕРЕДАЧИ", left, y);
+Controls.Add(queueLabel);
+y += 24;
+
+_segmentsQueueIndicator = CreateIndicator(left, y);
+_segmentsQueueLabel = GlassHelper.CreateLabel("Видеосегменты: 0", left + 16, y, 250);
+y += 20;
+
+_auditQueueIndicator = CreateIndicator(left, y);
+_auditQueueLabel = GlassHelper.CreateLabel("Аудит-события: 0", left + 16, y, 250);
+y += 20;
+
+_focusQueueIndicator = CreateIndicator(left, y);
+_focusQueueLabel = GlassHelper.CreateLabel("Focus-интервалы: 0", left + 16, y, 250);
+y += 20;
+
+_inputQueueIndicator = CreateIndicator(left, y);
+_inputQueueLabel = GlassHelper.CreateLabel("Input-события: 0", left + 16, y, 250);
+
+// В UpdateUI():
+UpdateQueueRow(_segmentsQueueIndicator, _segmentsQueueLabel, "Видеосегменты", status.SegmentsQueued);
+UpdateQueueRow(_auditQueueIndicator, _auditQueueLabel, "Аудит-события", status.AuditEventsQueued);
+UpdateQueueRow(_focusQueueIndicator, _focusQueueLabel, "Focus-интервалы", status.FocusIntervalsQueued);
+UpdateQueueRow(_inputQueueIndicator, _inputQueueLabel, "Input-события", status.InputEventsQueued);
+
+private void UpdateQueueRow(Panel indicator, Label label, string name, int count)
+{
+    label.Text = $"{name}: {count}";
+    indicator.BackColor = count == 0 ? GlassHelper.StatusGreen
+                        : count < 50 ? GlassHelper.StatusYellow
+                        : GlassHelper.StatusRed;
+    indicator.Invalidate();
+}
+```
+
+---
+
 ## Файлы для изменений (полный список)
+
+### Дефект 1+2: Session recovery + silent data loss
 
 | Файл | Изменение | Приоритет |
 |------|-----------|-----------|
@@ -270,9 +382,17 @@ if (status.UploadError)
 | `Upload/SegmentUploader.cs` | При 404 → `InvalidateSession()` + `return false` | Critical |
 | `Upload/UploadQueue.cs` | При null session → `StartSessionAsync()` перед upload | Critical |
 | `Service/AgentStatusProvider.cs` | Добавить `UploadError` / `UploadErrorMessage` | Medium |
-| `Ipc/PipeProtocol.cs` | Добавить поля в `AgentStatus` | Medium |
-| `Tray/StatusWindow.cs` | Показать ошибку upload в UI | Medium |
+| `Ipc/PipeProtocol.cs` | Добавить `UploadError`, `UploadErrorMessage` в `AgentStatus` | Medium |
+| `Tray/StatusWindow.cs` | Показать ошибку upload оранжевым в UI | Medium |
 | `Tray/TrayApplication.cs` | Иконка трея при upload error | Low |
+
+### Дефект 3: Очереди всех типов данных в UI
+
+| Файл | Изменение | Приоритет |
+|------|-----------|-----------|
+| `Service/AgentStatusProvider.cs` | Добавить `FocusIntervalsQueued`, `InputEventsQueued` + inject `FocusIntervalSink`, `InputEventSink` | Medium |
+| `Ipc/PipeProtocol.cs` | Добавить `FocusIntervalsQueued`, `InputEventsQueued` в `AgentStatus` | Medium |
+| `Tray/StatusWindow.cs` | Заменить одиночный `Очередь: N` на секцию из 4 строк с цветовыми индикаторами | Medium |
 
 ## Workaround (до исправления)
 
