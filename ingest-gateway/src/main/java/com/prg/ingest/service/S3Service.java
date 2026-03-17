@@ -48,6 +48,8 @@ public class S3Service {
                 .build();
 
         String url = s3Presigner.presignPutObject(presignRequest).url().toString();
+        // S3Presigner uses S3_PRESIGN_ENDPOINT (external URL) if configured,
+        // so no URL rewrite needed — presigner generates correct external URL.
         log.debug("Generated presigned PUT URL for key={}", key);
         return url;
     }
