@@ -14,5 +14,6 @@ import java.util.UUID;
 public class InputEventsResponse {
     private int accepted;
     private int duplicates;
+    private int total;
     private UUID correlationId;
 }

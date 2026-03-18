@@ -119,6 +119,7 @@ public class AuditEventService {
         return SubmitAuditEventsResponse.builder()
                 .accepted(accepted)
                 .duplicates(duplicates)
+                .total(accepted + duplicates)
                 .correlationId(correlationId)
                 .build();
     }

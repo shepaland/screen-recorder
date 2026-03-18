@@ -14,5 +14,6 @@ import java.util.UUID;
 public class FocusIntervalsResponse {
     private int accepted;
     private int duplicates;
+    private int total;
     private UUID correlationId;
 }

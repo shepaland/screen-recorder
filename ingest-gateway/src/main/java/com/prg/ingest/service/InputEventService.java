@@ -183,6 +183,7 @@ public class InputEventService {
                         .clipboardAction(clip.getAction())
                         .clipboardContentType(clip.getContentType())
                         .clipboardContentLength(clip.getContentLength())
+                        .contentHash(clip.getContentHash())
                         .processName(sanitize(clip.getSourceProcess()))
                         .segmentId(clip.getSegmentId())
                         .segmentOffsetMs(clip.getSegmentOffsetMs())
@@ -204,6 +205,7 @@ public class InputEventService {
         return InputEventsResponse.builder()
                 .accepted(accepted)
                 .duplicates(duplicates)
+                .total(accepted + duplicates)
                 .correlationId(correlationId)
                 .build();
     }

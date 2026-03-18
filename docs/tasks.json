@@ -583,6 +583,32 @@
           "action": "Начат деплой ingest-gateway на test-screen-record. rsync исходников → mvn package → docker build → k3s import → kubectl apply + rollout restart."
         }
       ]
+    },
+    {
+      "id": 13,
+      "created_at": "2026-03-18T00:00:00Z",
+      "title": "DevOps: деплой agent-upload-redesign Phase 1 (ingest-gateway + control-plane) на test",
+      "description": "Деплой Phase 1 agent-upload-redesign: ingest-gateway (убран kafka-only confirm, S3 HEAD check, idempotent confirm, V40 миграция clipboard_content_hash, enriched activity responses) + control-plane (upload_enabled в heartbeat, ThrottleConfig) на test-стейджинг shepaland-cloud, namespace test-screen-record.",
+      "feature_code": "agent-upload-redesign",
+      "overall_status": "Done",
+      "role_status": {
+        "DevOps": "Done"
+      },
+      "artifacts": {
+        "devops": "docs/agent-upload-redesign/DEVOPS/deployment-notes.md"
+      },
+      "history": [
+        {
+          "ts": "2026-03-18T00:00:00Z",
+          "role": "DevOps",
+          "action": "Начат деплой agent-upload-redesign Phase 1. Порядок: ingest-gateway → control-plane. rsync → mvn package → docker build --no-cache → k3s ctr import → rollout restart."
+        },
+        {
+          "ts": "2026-03-18T08:05:00Z",
+          "role": "DevOps",
+          "action": "Fix: дублирующийся метод mapEnrichedRow в RecordingService.java (строка 420) удалён. Конфликт миграций V40 (clipboard_content_hash vs add_recorded_at_to_segments) разрешён переименованием в V42. Колонка content_hash применена через psql. V38-V42 зарегистрированы в flyway_schema_history. ingest-gateway и control-plane задеплоены успешно. Поды Running, 0 restarts."
+        }
+      ]
     }
   ]
 }

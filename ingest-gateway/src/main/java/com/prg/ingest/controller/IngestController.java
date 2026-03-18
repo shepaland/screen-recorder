@@ -11,7 +11,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,10 +37,7 @@ public class IngestController {
             HttpServletRequest httpRequest) {
         DevicePrincipal principal = getPrincipal(httpRequest);
         ConfirmResponse response = ingestService.confirm(request, principal);
-        HttpStatus status = "accepted".equals(response.getStatus())
-            ? HttpStatus.ACCEPTED
-            : HttpStatus.OK;
-        return ResponseEntity.status(status).body(response);
+        return ResponseEntity.ok(response);
     }
 
     private DevicePrincipal getPrincipal(HttpServletRequest request) {

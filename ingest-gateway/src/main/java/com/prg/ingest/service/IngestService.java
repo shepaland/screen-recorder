@@ -17,7 +17,6 @@ import com.prg.ingest.repository.SegmentRepository;
 import com.prg.ingest.security.DevicePrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,73 +34,14 @@ public class IngestService {
     private final S3Service s3Service;
     private final EventPublisher eventPublisher;
 
-    @Value("${kafka.confirm-mode:sync}")
-    private String confirmMode;
-
     public ConfirmResponse confirm(ConfirmRequest request, DevicePrincipal principal) {
-        if ("kafka-only".equals(confirmMode)) {
-            return confirmViaKafka(request, principal);
-        }
         return confirmSync(request, principal);
     }
 
     /**
-     * Kafka-only confirm: validate segment → publish to Kafka → 202 Accepted.
-     * No DB writes (segment status + session stats updated by consumer).
-     * Auto-fallback to sync if Kafka publish fails.
-     */
-    private ConfirmResponse confirmViaKafka(ConfirmRequest request, DevicePrincipal principal) {
-        Segment segment = segmentRepository.findByIdAndTenantId(
-                        request.getSegmentId(), principal.getTenantId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Segment not found: " + request.getSegmentId(),
-                        "SEGMENT_NOT_FOUND"));
-
-        if (principal.getDeviceId() != null && !principal.getDeviceId().equals(segment.getDeviceId())) {
-            throw new AccessDeniedException(
-                    "Device does not own this segment", "DEVICE_MISMATCH");
-        }
-
-        if (!request.getChecksumSha256().equals(segment.getChecksumSha256())) {
-            throw new UploadException(
-                    "Checksum mismatch: expected " + segment.getChecksumSha256()
-                            + ", got " + request.getChecksumSha256(),
-                    "CHECKSUM_MISMATCH");
-        }
-
-        try {
-            eventPublisher.publish("segments.ingest",
-                segment.getDeviceId().toString(),
-                SegmentConfirmedEvent.builder()
-                    .eventId(UUID.randomUUID())
-                    .timestamp(Instant.now())
-                    .tenantId(principal.getTenantId())
-                    .deviceId(segment.getDeviceId())
-                    .sessionId(segment.getSessionId())
-                    .segmentId(segment.getId())
-                    .sequenceNum(segment.getSequenceNum())
-                    .s3Key(segment.getS3Key())
-                    .sizeBytes(segment.getSizeBytes())
-                    .durationMs(segment.getDurationMs())
-                    .checksumSha256(segment.getChecksumSha256())
-                    .metadata(segment.getMetadata())
-                    .build());
-
-            log.info("Kafka-only confirm: segment id={} session={} seq={}",
-                    segment.getId(), segment.getSessionId(), segment.getSequenceNum());
-
-            return ConfirmResponse.builder()
-                    .segmentId(segment.getId())
-                    .status("accepted")
-                    .build();
-        } catch (Exception e) {
-            log.warn("Kafka unavailable, falling back to sync confirm: {}", e.getMessage());
-            return confirmSync(request, principal);
-        }
-    }
-
-    /**
-     * Sync confirm: DB + S3 validation (original logic).
+     * Sync confirm: DB write + Kafka dual-write (fire-and-forget).
+     * S3 validation moved to async batch in SegmentWriterConsumer.
+     * Idempotent: already confirmed segments return ACK without re-processing.
      */
     @Transactional
     public ConfirmResponse confirmSync(ConfirmRequest request, DevicePrincipal principal) {
@@ -123,17 +63,25 @@ public class IngestService {
                     "CHECKSUM_MISMATCH");
         }
 
-        if (s3Service.objectExists(segment.getS3Key())) {
-            long actualSize = s3Service.getObjectSize(segment.getS3Key());
-            if (actualSize > 0 && segment.getSizeBytes() != null
-                    && Math.abs(actualSize - segment.getSizeBytes()) > segment.getSizeBytes() * 0.1) {
-                log.warn("Size mismatch for segment {}: expected={}, actual={}",
-                        segment.getId(), segment.getSizeBytes(), actualSize);
-            }
-        } else {
-            log.warn("S3 object not found for segment {} at key={}. "
-                            + "Confirming anyway (upload may still be in progress).",
-                    segment.getId(), segment.getS3Key());
+        // Idempotent: already confirmed → return ACK without re-processing
+        if ("confirmed".equals(segment.getStatus())) {
+            log.debug("Idempotent confirm: segment id={} already confirmed", segment.getId());
+            RecordingSession existingSession = sessionRepository.findByIdAndTenantId(
+                            segment.getSessionId(), principal.getTenantId())
+                    .orElse(null);
+            SessionStatsResponse stats = existingSession != null
+                    ? SessionStatsResponse.builder()
+                            .sessionId(existingSession.getId())
+                            .segmentCount(existingSession.getSegmentCount())
+                            .totalBytes(existingSession.getTotalBytes())
+                            .totalDurationMs(existingSession.getTotalDurationMs())
+                            .build()
+                    : null;
+            return ConfirmResponse.builder()
+                    .segmentId(segment.getId())
+                    .status("confirmed")
+                    .sessionStats(stats)
+                    .build();
         }
 
         segment.setStatus("confirmed");

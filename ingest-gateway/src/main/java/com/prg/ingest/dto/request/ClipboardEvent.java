@@ -34,6 +34,9 @@ public class ClipboardEvent {
 
     private Integer contentLength;
 
+    @Size(max = 64)
+    private String contentHash;
+
     private UUID sessionId;
 
     // Video timecode binding (nullable)

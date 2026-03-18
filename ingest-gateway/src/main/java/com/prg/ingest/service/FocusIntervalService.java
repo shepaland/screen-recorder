@@ -120,6 +120,7 @@ public class FocusIntervalService {
         return FocusIntervalsResponse.builder()
                 .accepted(accepted)
                 .duplicates(duplicates)
+                .total(accepted + duplicates)
                 .correlationId(correlationId)
                 .build();
     }

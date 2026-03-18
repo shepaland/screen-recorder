@@ -18,4 +18,6 @@ public class HeartbeatResponse {
     private List<CommandResponse> pendingCommands;
     private int nextHeartbeatSec;
     private Map<String, Object> deviceSettings;
+    @Builder.Default
+    private Boolean uploadEnabled = true;
 }

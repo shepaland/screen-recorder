@@ -11,6 +11,7 @@ import com.prg.controlplane.exception.ResourceNotFoundException;
 import com.prg.controlplane.entity.DeviceGroup;
 import com.prg.controlplane.kafka.EventPublisher;
 import com.prg.controlplane.kafka.event.DeviceStatusEvent;
+import com.prg.controlplane.config.ThrottleConfig;
 import com.prg.controlplane.repository.DeviceCommandRepository;
 import com.prg.controlplane.repository.DeviceGroupRepository;
 import com.prg.controlplane.repository.DeviceRepository;
@@ -40,6 +41,7 @@ public class DeviceService {
     private final RecordingSessionRepository recordingSessionRepository;
     private final DeviceStatusLogRepository deviceStatusLogRepository;
     private final EventPublisher eventPublisher;
+    private final ThrottleConfig throttleConfig;
 
     @Value("${prg.device.default-heartbeat-interval-sec:30}")
     private int defaultHeartbeatIntervalSec;
@@ -273,6 +275,7 @@ public class DeviceService {
                 .pendingCommands(pendingCommands.stream().map(this::toCommandResponse).toList())
                 .nextHeartbeatSec(defaultHeartbeatIntervalSec)
                 .deviceSettings(device.getSettings())
+                .uploadEnabled(throttleConfig.isUploadEnabled())
                 .build();
     }
 

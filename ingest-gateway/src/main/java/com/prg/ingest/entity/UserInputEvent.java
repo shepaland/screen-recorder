@@ -96,6 +96,10 @@ public class UserInputEvent {
     @Column(name = "clipboard_content_length")
     private Integer clipboardContentLength;
 
+    // Clipboard content hash (SHA-256, for dedup)
+    @Column(name = "content_hash")
+    private String contentHash;
+
     // Context
     @Column(name = "process_name", length = 512)
     private String processName;

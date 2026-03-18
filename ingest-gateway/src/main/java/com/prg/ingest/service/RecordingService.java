@@ -410,58 +410,6 @@ public class RecordingService {
         return segment;
     }
 
-    /**
-     * Map a row from the enriched native query (Object[]) to RecordingListItemResponse.
-     * Column order: rs.* (id, tenant_id, device_id, user_id, status, started_ts, ended_ts,
-     *   segment_count, total_bytes, total_duration_ms, metadata, created_ts, updated_ts),
-     *   device_hostname, employee_name
-     */
-    @SuppressWarnings("unchecked")
-    private RecordingListItemResponse mapEnrichedRow(Object[] row) {
-        UUID id = (UUID) row[0];
-        UUID deviceId = (UUID) row[2];
-        String status = (String) row[4];
-        Instant startedTs = toInstant(row[5]);
-        Instant endedTs = toInstant(row[6]);
-        Integer segmentCount = row[7] != null ? ((Number) row[7]).intValue() : null;
-        Long totalBytes = row[8] != null ? ((Number) row[8]).longValue() : null;
-        Long totalDurationMs = row[9] != null ? ((Number) row[9]).longValue() : null;
-
-        // metadata is JSONB — Hibernate may return it as String or Map
-        Map<String, Object> metadata = null;
-        if (row[10] != null) {
-            if (row[10] instanceof Map) {
-                metadata = (Map<String, Object>) row[10];
-            } else if (row[10] instanceof String metaStr) {
-                try {
-                    metadata = new com.fasterxml.jackson.databind.ObjectMapper()
-                            .readValue(metaStr, new com.fasterxml.jackson.core.type.TypeReference<>() {});
-                } catch (Exception e) {
-                    log.warn("Failed to parse metadata JSON for session {}: {}", id, e.getMessage());
-                    metadata = Map.of();
-                }
-            }
-        }
-
-        String deviceHostname = row[13] != null ? row[13].toString() : null;
-        String employeeName = row[14] != null ? row[14].toString() : null;
-
-        return RecordingListItemResponse.builder()
-                .id(id)
-                .deviceId(deviceId)
-                .deviceHostname(deviceHostname)
-                .deviceDeleted(deviceHostname == null && deviceId != null)
-                .status(status)
-                .startedTs(startedTs)
-                .endedTs(endedTs)
-                .segmentCount(segmentCount)
-                .totalBytes(totalBytes)
-                .totalDurationMs(totalDurationMs)
-                .metadata(metadata)
-                .employeeName(employeeName)
-                .build();
-    }
-
     private record DeviceInfo(String hostname, boolean deleted) {}
 
     private Map<UUID, DeviceInfo> resolveDeviceInfo(Set<UUID> deviceIds, UUID tenantId) {
