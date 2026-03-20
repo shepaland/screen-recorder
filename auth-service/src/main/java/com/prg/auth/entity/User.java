@@ -21,8 +21,8 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(exclude = {"roles"})
-@ToString(exclude = {"roles"})
+@EqualsAndHashCode(exclude = {"roles", "memberships"})
+@ToString(exclude = {"roles", "memberships"})
 public class User {
 
     @Id
@@ -74,6 +74,10 @@ public class User {
     )
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    @Builder.Default
+    private Set<TenantMembership> memberships = new HashSet<>();
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", nullable = false)
