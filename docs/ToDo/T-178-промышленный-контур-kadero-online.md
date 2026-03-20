@@ -47,8 +47,8 @@ Internet
 │  PostgreSQL   │◄─►│  PostgreSQL   │
 │  (primary)    │   │  (replica)    │
 │               │   │               │
-│  MinIO        │◄─►│  MinIO        │
-│  (node 1)     │   │  (node 2)     │
+│               │   │               │
+│  (S3 → Yandex Object Storage)    │
 │               │   │               │
 │  Kafka        │   │  Kafka        │
 │  (broker 1)   │   │  (broker 2)   │
@@ -69,7 +69,7 @@ Internet
 | Компонент | Реплик | RAM | CPU | Диск |
 |-----------|--------|-----|-----|------|
 | **PostgreSQL** (primary) | 1 | 4 GB | 2 cores | 50 GB |
-| **MinIO** (node 1) | 1 | 1 GB | 0.5 core | 50 GB |
+| ~~MinIO~~ | — | — | — | — *(Yandex Object Storage)* |
 | **Kafka** (KRaft broker 1) | 1 | 2 GB | 1 core | 10 GB |
 | **OpenSearch** (node 1) | 1 | 2 GB | 1 core | 20 GB |
 | auth-service | 2 | 512 MB × 2 | 0.5 × 2 | — |
@@ -85,7 +85,7 @@ Internet
 | Компонент | Реплик | RAM | CPU | Диск |
 |-----------|--------|-----|-----|------|
 | **PostgreSQL** (streaming replica) | 1 | 4 GB | 2 cores | 50 GB |
-| **MinIO** (node 2) | 1 | 1 GB | 0.5 core | 50 GB |
+| ~~MinIO~~ | — | — | — | — *(Yandex Object Storage)* |
 | **Kafka** (KRaft broker 2) | 1 | 2 GB | 1 core | 10 GB |
 | **OpenSearch** (node 2) | 1 | 2 GB | 1 core | 20 GB |
 | auth-service | 2 | 512 MB × 2 | 0.5 × 2 | — |
@@ -340,22 +340,133 @@ find /backup -name "kadero_prod_*.dump" -mtime +30 -delete
 
 ---
 
-## 7. MinIO: distributed mode
+## 7. S3: Yandex Object Storage (вместо MinIO)
+
+На продакшене вместо локального MinIO используем **Yandex Object Storage** (S3-совместимый). Это снимает ограничение в 150 GB диска и обеспечивает масштабируемое хранение видеосегментов.
+
+### Почему не MinIO
+
+- 150 GB HDD × 2 сервера — при 1000 агентах хватит на ~1 час записей
+- Yandex Object Storage: безлимитный объём, оплата по факту использования
+- S3 API полностью совместим — никаких изменений в коде (ingest-gateway, playback-service уже работают через S3 API)
+
+### Настройка Yandex Object Storage
 
 ```bash
-# На обоих серверах:
-mkdir -p /data/minio
+# 1. Создать сервисный аккаунт в Yandex Cloud
+yc iam service-account create --name kadero-s3
 
-# Docker-compose или systemd service:
-minio server http://app1/data/minio http://app2/data/minio \
-  --console-address ":9001"
+# 2. Назначить роль storage.editor
+yc resource-manager folder add-access-binding <folder-id> \
+  --role storage.editor \
+  --subject serviceAccount:<sa-id>
 
-# Env
-MINIO_ROOT_USER=kadero_minio
-MINIO_ROOT_PASSWORD=<secure_password>
+# 3. Создать статический ключ доступа
+yc iam access-key create --service-account-name kadero-s3
+# → access_key_id: YC...
+# → secret: ...
 ```
 
-Bucket: `kadero-segments`
+### Bucket
+
+```bash
+# Создать bucket через AWS CLI (S3-совместимый)
+aws s3 mb s3://kadero-segments \
+  --endpoint-url https://storage.yandexcloud.net
+
+# Lifecycle policy: удалять сегменты старше 90 дней
+aws s3api put-bucket-lifecycle-configuration \
+  --bucket kadero-segments \
+  --endpoint-url https://storage.yandexcloud.net \
+  --lifecycle-configuration '{
+    "Rules": [{
+      "ID": "expire-old-segments",
+      "Status": "Enabled",
+      "Expiration": {"Days": 90},
+      "Filter": {"Prefix": ""}
+    }]
+  }'
+```
+
+### Конфигурация в k8s
+
+```yaml
+# k8s Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: yandex-s3-credentials
+  namespace: prod-kadero
+stringData:
+  S3_ENDPOINT: "https://storage.yandexcloud.net"
+  S3_ACCESS_KEY: "YC..."
+  S3_SECRET_KEY: "..."
+  S3_BUCKET: "kadero-segments"
+  S3_REGION: "ru-central1"
+```
+
+```yaml
+# Deployment env для ingest-gateway и playback-service
+env:
+  - name: S3_ENDPOINT
+    valueFrom:
+      secretKeyRef:
+        name: yandex-s3-credentials
+        key: S3_ENDPOINT
+  - name: S3_ACCESS_KEY
+    valueFrom:
+      secretKeyRef:
+        name: yandex-s3-credentials
+        key: S3_ACCESS_KEY
+  - name: S3_SECRET_KEY
+    valueFrom:
+      secretKeyRef:
+        name: yandex-s3-credentials
+        key: S3_SECRET_KEY
+  - name: S3_BUCKET
+    valueFrom:
+      secretKeyRef:
+        name: yandex-s3-credentials
+        key: S3_BUCKET
+  - name: S3_REGION
+    valueFrom:
+      secretKeyRef:
+        name: yandex-s3-credentials
+        key: S3_REGION
+```
+
+### Presigned URLs
+
+Текущая логика presign в ingest-gateway уже генерирует S3-совместимые presigned PUT URLs. Единственное изменение — endpoint:
+- Было: `http://minio:9000` (внутренний k8s)
+- Стало: `https://storage.yandexcloud.net` (публичный Yandex S3)
+
+Агент загружает сегменты напрямую в Yandex S3 через presigned URL — трафик не проходит через наши серверы.
+
+### Playback
+
+playback-service генерирует presigned GET URLs для HLS-воспроизведения. Браузер скачивает сегменты напрямую из Yandex S3.
+
+### Стоимость (оценка)
+
+| Параметр | При 100 агентах | При 1000 агентов |
+|----------|----------------|-----------------|
+| Объём/день | ~330 GB | ~3.3 TB |
+| Объём/месяц (retention 90 дней) | ~30 TB | ~300 TB |
+| Хранение (₽2.01/GB/мес Standard) | ~60 000 ₽/мес | ~600 000 ₽/мес |
+| PUT запросы (~1/мин/агент) | ~4.3M/мес × ₽0.0112 = ~48 ₽ | ~43M/мес = ~480 ₽ |
+| GET запросы (playback) | Незначительно | Незначительно |
+
+**Оптимизация стоимости:**
+- **Cold storage** для сегментов старше 30 дней (₽1.01/GB/мес)
+- **Retention 30 дней** вместо 90 — уменьшает объём в 3 раза
+- **Сжатие:** H.264 low quality (уже используется) — ~2.3 MB/мин/агент
+
+### Что НЕ нужно на серверах
+
+- ~~MinIO~~ — не нужен
+- Freed: ~50 GB disk + 1 GB RAM на каждом сервере
+- Freed: ~1 CPU core (MinIO I/O)
 
 ---
 
@@ -554,16 +665,17 @@ Git push → GitHub Actions:
 
 ### Bottleneck
 
-- **Диск MinIO** — 150 GB × 2 = 300 GB total. При 2.3 GB/min хватит на ~2 часа!
-  **Решение:** Retention policy — удалять сегменты старше N дней. Или: внешнее S3-хранилище.
+- **S3 (Yandex Object Storage)** — безлимитный объём, bottleneck снят. Оплата по факту.
 - **PostgreSQL** — при 1000 агентах нагрузка умеренная (33 heartbeat/s ≈ 33 TPS)
 - **Kafka** — минимальная нагрузка (fire-and-forget)
+- **Диск серверов** — без MinIO: PostgreSQL (~50 GB) + Kafka (~10 GB) + OpenSearch (~20 GB) + OS = ~100 GB. 150 GB HDD достаточно с запасом.
 
-### Рекомендация по дискам
+### S3 стоимость
 
-Для 1000 агентов с retention 7 дней:
-- MinIO: **3.3 TB/день × 7 = 23 TB** — нужно **внешнее S3** (Yandex Object Storage, Selectel S3)
-- Для 150 GB HDD: retention **~1 час** видео (или 50 агентов с 7-дневным retention)
+При 1000 агентах, retention 90 дней, Yandex Object Storage Standard:
+- Объём: ~300 TB → **~600 000 ₽/мес**
+- Оптимизация: retention 30 дней → ~100 TB → **~200 000 ₽/мес**
+- Cold storage (30+ дней): **~100 000 ₽/мес**
 
 ---
 

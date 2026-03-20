@@ -64,10 +64,13 @@ swift build && swift test
 
 ## Сборка Windows Agent
 
-- **Сборка**: на Windows-машине `192.168.1.135` (логин: `shepaland` / `#6TY0N0d`)
-- **Обмен файлами**: через FTP `192.168.1.38` (анонимный доступ, без пароля)
-- **Инсталлятор**: результат сборки размещается в `C:\kadero_install\` (только инсталлятор, никаких других файлов!)
-- **Workflow**: Mac → tarball → FTP upload → Windows скачивает с FTP → dotnet publish → Inno Setup → `C:\kadero_install\KaderoAgentSetup.exe`
+
+- **Сборка**: СТРОГО на Windows-машине `192.168.1.135` (логин: `shepaland` / `#6TY0N0d`). Всегда чистая сборка. Ни когда не используй кеш. Только новые файлы
+- **Обмен файлами**: СТРОГО через FTP `192.168.1.38` (анонимный доступ, без пароля)
+- **Инсталлятор**: СТРОГО результат сборки размещается в `C:\kadero_install\` (только инсталлятор, никаких других файлов!)
+- **Workflow**: СТРОГО И ТОЛЬКО ЧИСТАЯ СБОРКА БЕЗ КЕША Mac → tarball → FTP upload → Windows скачивает с FTP → dotnet publish → Inno Setup → `C:\kadero_install\KaderoAgentSetup.exe`
+- **Версия инсталлятора**: при вызове ISCC обязательно передавать `/DAppVer=<version>` (значение из `<Version>` в `KaderoAgent.csproj`). `setup.iss` использует `{#AppVer}` через Inno Setup
+  preprocessor. Без `/DAppVer` версия будет 0.0.0.0.
 
 ## Развёртывание
 
