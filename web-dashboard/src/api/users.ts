@@ -47,3 +47,7 @@ export async function changePassword(id: string, data: ChangePasswordRequest): P
 export async function hardDeleteUser(id: string): Promise<void> {
   await apiClient.delete(`/users/${id}`, { params: { hard: true } });
 }
+
+export async function inviteUser(email: string, roleId?: string): Promise<void> {
+  await apiClient.post('/users/invite', { email, role_id: roleId });
+}

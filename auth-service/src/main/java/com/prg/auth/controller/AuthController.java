@@ -5,9 +5,13 @@ import com.prg.auth.dto.request.SelectTenantRequest;
 import com.prg.auth.dto.response.LoginResponse;
 import com.prg.auth.dto.response.MyTenantsResponse;
 import com.prg.auth.dto.response.TokenResponse;
+import com.prg.auth.entity.Invitation;
+import com.prg.auth.entity.User;
+import com.prg.auth.repository.InvitationRepository;
 import com.prg.auth.security.UserPrincipal;
 import com.prg.auth.service.AuthResult;
 import com.prg.auth.service.AuthService;
+import com.prg.auth.service.InvitationService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -27,6 +31,8 @@ import java.util.Arrays;
 public class AuthController {
 
     private final AuthService authService;
+    private final InvitationService invitationService;
+    private final InvitationRepository invitationRepository;
 
     private static final String REFRESH_TOKEN_COOKIE = "refresh_token";
     private static final String COOKIE_PATH = "/";
@@ -114,6 +120,60 @@ public class AuthController {
         AuthResult<LoginResponse> result = authService.switchTenant(
                 principal.getUserId(), request.getTenantId(), ipAddress, userAgent);
 
+        setRefreshTokenCookie(httpResponse, result.getRawRefreshToken(), authService.getRefreshTokenTtl());
+
+        return ResponseEntity.ok(result.getResponse());
+    }
+
+    /**
+     * GET /api/v1/auth/invite/{token} — check invitation validity (public).
+     */
+    @GetMapping("/invite/{token}")
+    public ResponseEntity<?> getInvitation(@PathVariable String token) {
+        Invitation invitation = invitationRepository.findByToken(token)
+                .orElseThrow(() -> new com.prg.auth.exception.ResourceNotFoundException(
+                        "Invitation not found", "INVITATION_NOT_FOUND"));
+
+        if (invitation.isAccepted()) {
+            return ResponseEntity.badRequest().body(java.util.Map.of(
+                    "error", "Приглашение уже использовано", "code", "INVITATION_ACCEPTED"));
+        }
+        if (invitation.isExpired()) {
+            return ResponseEntity.badRequest().body(java.util.Map.of(
+                    "error", "Приглашение истекло", "code", "INVITATION_EXPIRED"));
+        }
+
+        return ResponseEntity.ok(java.util.Map.of(
+                "email", invitation.getEmail(),
+                "tenant_id", invitation.getTenantId(),
+                "expires_at", invitation.getExpiresAt().toString()));
+    }
+
+    /**
+     * POST /api/v1/auth/invite/{token}/accept — accept invitation (public).
+     */
+    @PostMapping("/invite/{token}/accept")
+    public ResponseEntity<LoginResponse> acceptInvitation(
+            @PathVariable String token,
+            @RequestBody java.util.Map<String, String> request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
+
+        String password = request.get("password");
+        String firstName = request.get("first_name");
+        String lastName = request.get("last_name");
+
+        User user = invitationService.acceptInvitation(token, password, firstName, lastName);
+
+        // Auto-login after accepting invitation
+        LoginRequest loginReq = new LoginRequest();
+        loginReq.setUsername(user.getEmail());
+        loginReq.setPassword(password);
+
+        String ipAddress = getClientIp(httpRequest);
+        String userAgent = httpRequest.getHeader("User-Agent");
+
+        AuthResult<LoginResponse> result = authService.login(loginReq, ipAddress, userAgent);
         setRefreshTokenCookie(httpResponse, result.getRawRefreshToken(), authService.getRefreshTokenTtl());
 
         return ResponseEntity.ok(result.getResponse());

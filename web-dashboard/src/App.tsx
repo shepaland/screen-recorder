@@ -35,6 +35,7 @@ import BehaviorAuditPage from './pages/BehaviorAuditPage';
 import SearchPage from './pages/SearchPage';
 import SessionDetailPage from './pages/SessionDetailPage';
 import WebhookSettingsPage from './pages/WebhookSettingsPage';
+import AcceptInvitePage from './pages/AcceptInvitePage';
 
 function App() {
   return (
@@ -47,6 +48,7 @@ function App() {
       {/* Public routes -- OAuth flow (full-screen, no AuthLayout wrapper) */}
       <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
       <Route path="/onboarding" element={<OnboardingPage />} />
+      <Route path="/invite/:token" element={<AcceptInvitePage />} />
 
       {/* Protected routes */}
       <Route

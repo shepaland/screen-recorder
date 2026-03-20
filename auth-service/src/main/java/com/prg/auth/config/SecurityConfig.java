@@ -61,6 +61,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/register/initiate",
                                 "/api/v1/auth/register/verify",
                                 "/api/v1/auth/register/resend",
+                                "/api/v1/auth/invite/**",
                                 "/actuator/health",
                                 "/actuator/info",
                                 "/v3/api-docs/**",

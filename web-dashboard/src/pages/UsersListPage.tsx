@@ -8,6 +8,7 @@ import { getUsers, type UsersListParams } from '../api/users';
 import { getRoles } from '../api/roles';
 import type { UserResponse, RoleResponse } from '../types';
 import { useToast } from '../contexts/ToastContext';
+import InviteUserModal from '../components/InviteUserModal';
 
 export default function UsersListPage() {
   const navigate = useNavigate();
@@ -28,6 +29,7 @@ export default function UsersListPage() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [roleFilter, setRoleFilter] = useState<string>('');
   const [availableRoles, setAvailableRoles] = useState<RoleResponse[]>([]);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
 
   // Debounce search input
   useEffect(() => {
@@ -137,14 +139,23 @@ export default function UsersListPage() {
           </p>
         </div>
         <PermissionGate permission="USERS:CREATE">
-          <button
-            type="button"
-            onClick={() => navigate('/users/new')}
-            className="btn-primary mt-4 sm:mt-0"
-          >
-            <PlusIcon className="-ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
-            Add User
-          </button>
+          <div className="flex gap-2 mt-4 sm:mt-0">
+            <button
+              type="button"
+              onClick={() => setInviteModalOpen(true)}
+              className="btn-secondary"
+            >
+              Пригласить
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/users/new')}
+              className="btn-primary"
+            >
+              <PlusIcon className="-ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
+              Add User
+            </button>
+          </div>
         </PermissionGate>
       </div>
 
@@ -233,6 +244,12 @@ export default function UsersListPage() {
           emptyMessage="No users found"
         />
       </div>
+
+      <InviteUserModal
+        open={inviteModalOpen}
+        onClose={() => setInviteModalOpen(false)}
+        onSuccess={fetchUsers}
+      />
     </div>
   );
 }

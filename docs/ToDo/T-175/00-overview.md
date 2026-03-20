@@ -12,7 +12,7 @@
 | T-175.4 | Frontend: LoginPage email + UserCreateModal без username | A | **Done** | T-175.2, T-175.3 | `04-frontend-login-и-создание.md` |
 | T-175.5 | Таблица tenant_memberships + миграция данных | B | **Done** | T-175.1-4 | `05-tenant-memberships.md` |
 | T-175.6 | Backend: switchTenant через membership, onboarding | B | **Done** | T-175.5 | `06-backend-membership.md` |
-| T-175.7 | SMTP конфигурация + EmailService + приглашения | C | Open | T-175.2 | `07-smtp-приглашения.md` |
+| T-175.7 | SMTP конфигурация + EmailService + приглашения | C | **Done** | T-175.2 | `07-smtp-приглашения.md` |
 
 ## Порядок реализации
 
