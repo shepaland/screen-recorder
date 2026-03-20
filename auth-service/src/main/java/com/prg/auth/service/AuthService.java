@@ -68,27 +68,15 @@ public class AuthService {
         Tenant tenant;
         User user;
 
-        if (request.getTenantSlug() != null && !request.getTenantSlug().isBlank()) {
-            // Tenant specified — use original logic
-            tenant = tenantRepository.findBySlugAndIsActiveTrue(request.getTenantSlug())
-                    .orElseThrow(() -> new ResourceNotFoundException("Tenant not found or inactive", "TENANT_NOT_FOUND"));
-            user = userRepository.findByTenantIdAndUsername(tenant.getId(), request.getUsername())
-                    .orElse(null);
-        } else {
-            // No tenant specified — find password user by username across all active tenants
-            List<User> candidates = userRepository.findActivePasswordUsersByUsername(request.getUsername());
-            if (candidates.isEmpty()) {
-                user = null;
-                tenant = null;
-            } else {
-                user = candidates.get(0); // Pick first match
-                tenant = user.getTenant();
-            }
-        }
+        // Username = email, globally unique. Single lookup regardless of tenant.
+        String normalizedEmail = request.getUsername().trim().toLowerCase();
+        Optional<User> found = userRepository.findActiveByEmail(normalizedEmail);
+        user = found.orElse(null);
+        tenant = user != null ? user.getTenant() : null;
 
         if (tenant == null) {
             recordLoginAttempt(rateLimitKey);
-            throw new InvalidCredentialsException("Invalid username or password");
+            throw new InvalidCredentialsException("Invalid email or password");
         }
 
         if (user == null) {
