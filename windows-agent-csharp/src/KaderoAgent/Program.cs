@@ -184,6 +184,7 @@ builder.Services.AddSingleton<CommandHandler>();
 // Audit: session watcher, process watcher, event sink (no longer BackgroundService)
 builder.Services.AddSingleton<AuditEventSink>();
 builder.Services.AddSingleton<IAuditEventSink>(sp => sp.GetRequiredService<AuditEventSink>());
+builder.Services.AddSingleton<WtsSessionNotifier>();
 builder.Services.AddSingleton<SessionWatcher>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<SessionWatcher>());
 builder.Services.AddHostedService<ProcessWatcher>();

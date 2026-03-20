@@ -8,7 +8,11 @@
 
 [Setup]
 AppName=Kadero Agent
-AppVersion=2026.3.19.1
+; AppVersion is passed via ISCC /DAppVer=x.y.z.w (extracted from KaderoAgent.csproj <Version>)
+#ifndef AppVer
+  #define AppVer "0.0.0.0"
+#endif
+AppVersion={#AppVer}
 AppPublisher=Kadero
 AppPublisherURL=https://kadero.ru
 DefaultDirName={commonpf}\Kadero

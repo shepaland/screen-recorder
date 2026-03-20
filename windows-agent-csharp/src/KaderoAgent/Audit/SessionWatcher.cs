@@ -5,7 +5,6 @@ using KaderoAgent.Service;
 using KaderoAgent.Storage;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Win32;
 
 namespace KaderoAgent.Audit;
 
@@ -19,6 +18,7 @@ public class SessionWatcher : BackgroundService
     private readonly UserSessionInfo _userSessionInfo;
     private readonly FocusIntervalSink _focusIntervalSink;
     private readonly InputEventSink _inputEventSink;
+    private readonly WtsSessionNotifier _wtsNotifier;
     private readonly ILogger<SessionWatcher> _logger;
 
     // AgentService is resolved lazily to avoid circular DI (SessionWatcher is injected into AgentService).
@@ -39,6 +39,7 @@ public class SessionWatcher : BackgroundService
         UserSessionInfo userSessionInfo,
         FocusIntervalSink focusIntervalSink,
         InputEventSink inputEventSink,
+        WtsSessionNotifier wtsNotifier,
         IServiceProvider serviceProvider,
         ILogger<SessionWatcher> logger)
     {
@@ -50,6 +51,7 @@ public class SessionWatcher : BackgroundService
         _userSessionInfo = userSessionInfo;
         _focusIntervalSink = focusIntervalSink;
         _inputEventSink = inputEventSink;
+        _wtsNotifier = wtsNotifier;
         _serviceProvider = serviceProvider;
         _logger = logger;
     }
@@ -120,10 +122,13 @@ public class SessionWatcher : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Subscribe to session switch events
-        SystemEvents.SessionSwitch += OnSessionSwitch;
+        // Determine initial session state via WTS query (not just assume true)
+        _isSessionActive = CheckSessionActiveViaWts();
+        _logger.LogInformation("SessionWatcher started, initial state: active={Active} (via WTS query)", _isSessionActive);
 
-        _logger.LogInformation("SessionWatcher started, initial state: active={Active}", _isSessionActive);
+        // Subscribe to WTS session notifications (works in Session 0 without message pump dependency)
+        _wtsNotifier.SessionChanged += OnWtsSessionChanged;
+        _wtsNotifier.Start();
 
         try
         {
@@ -133,22 +138,44 @@ public class SessionWatcher : BackgroundService
         catch (OperationCanceledException) { }
         finally
         {
-            SystemEvents.SessionSwitch -= OnSessionSwitch;
+            _wtsNotifier.SessionChanged -= OnWtsSessionChanged;
+            _wtsNotifier.Dispose();
             _logger.LogInformation("SessionWatcher stopped");
         }
     }
 
-    private async void OnSessionSwitch(object? sender, SessionSwitchEventArgs e)
+    /// <summary>
+    /// Check if there is an active (unlocked) user session via WTS API.
+    /// Used for initial state detection and polling fallback.
+    /// </summary>
+    public bool CheckSessionActiveViaWts()
+    {
+        try
+        {
+            var sessions = _userSessionInfo.GetAllActiveUserSessions();
+            // GetAllActiveUserSessions returns sessions with state WTSActive or WTSConnected.
+            // WTSActive = unlocked, interactive. WTSConnected = connected but may be locked.
+            // If at least one session has a real user, consider session active.
+            return sessions.Count > 0;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "WTS session check failed, assuming active");
+            return true;
+        }
+    }
+
+    private async void OnWtsSessionChanged(object? sender, WtsSessionNotifier.SessionChangeEventArgs e)
     {
         try
         {
             await _lock.WaitAsync();
             try
             {
-                switch (e.Reason)
+                switch (e.Event)
                 {
-                    case SessionSwitchReason.SessionLock:
-                        _logger.LogInformation("Session LOCKED");
+                    case WtsSessionNotifier.SessionEvent.Lock:
+                        _logger.LogInformation("Session LOCKED (WTS, sessionId={SessionId})", e.SessionId);
                         _isSessionActive = false;
                         _sink.Publish(new AuditEvent
                         {
@@ -160,8 +187,8 @@ public class SessionWatcher : BackgroundService
                         GetAgentService()?.SetState(AgentState.Idle);
                         break;
 
-                    case SessionSwitchReason.SessionUnlock:
-                        _logger.LogInformation("Session UNLOCKED");
+                    case WtsSessionNotifier.SessionEvent.Unlock:
+                        _logger.LogInformation("Session UNLOCKED (WTS, sessionId={SessionId})", e.SessionId);
                         _isSessionActive = true;
                         _sink.Publish(new AuditEvent
                         {
@@ -189,8 +216,8 @@ public class SessionWatcher : BackgroundService
                         }
                         break;
 
-                    case SessionSwitchReason.SessionLogon:
-                        _logger.LogInformation("Session LOGON");
+                    case WtsSessionNotifier.SessionEvent.Logon:
+                        _logger.LogInformation("Session LOGON (WTS, sessionId={SessionId})", e.SessionId);
                         _isSessionActive = true;
 
                         // Launch headless collector in the new user session
@@ -263,9 +290,9 @@ public class SessionWatcher : BackgroundService
                         }
                         break;
 
-                    case SessionSwitchReason.ConsoleConnect:
-                    case SessionSwitchReason.RemoteConnect:
-                        _logger.LogInformation("Session {Reason}", e.Reason);
+                    case WtsSessionNotifier.SessionEvent.ConsoleConnect:
+                    case WtsSessionNotifier.SessionEvent.RemoteConnect:
+                        _logger.LogInformation("Session {Event} (WTS, sessionId={SessionId})", e.Event, e.SessionId);
                         _isSessionActive = true;
 
                         // Invalidate cached username for reconnect scenarios
@@ -273,9 +300,9 @@ public class SessionWatcher : BackgroundService
 
                         _sink.Publish(new AuditEvent
                         {
-                            EventType = e.Reason == SessionSwitchReason.ConsoleConnect
+                            EventType = e.Event == WtsSessionNotifier.SessionEvent.ConsoleConnect
                                 ? "CONSOLE_CONNECT" : "REMOTE_CONNECT",
-                            Details = new Dictionary<string, object> { ["reason"] = e.Reason.ToString() }
+                            Details = new Dictionary<string, object> { ["reason"] = e.Event.ToString() }
                         });
 
                         // Desktop is back — clear DesktopUnavailable flag so auto-start retries immediately
@@ -316,8 +343,8 @@ public class SessionWatcher : BackgroundService
                         }
                         break;
 
-                    case SessionSwitchReason.SessionLogoff:
-                        _logger.LogInformation("Session LOGOFF");
+                    case WtsSessionNotifier.SessionEvent.Logoff:
+                        _logger.LogInformation("Session LOGOFF (WTS, sessionId={SessionId})", e.SessionId);
                         _isSessionActive = false;
                         _sink.Publish(new AuditEvent
                         {
@@ -337,7 +364,7 @@ public class SessionWatcher : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error handling session switch event: {Reason}", e.Reason);
+            _logger.LogError(ex, "Error handling WTS session event: {Event}", e.Event);
         }
     }
 }

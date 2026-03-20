@@ -169,12 +169,24 @@ public class AgentService : BackgroundService
         if (_currentState is AgentState.Stopped or AgentState.Configuring or AgentState.Starting)
             return;
 
-        // If session is not active (locked/logoff), state should be Idle or AwaitingUser
-        if (_sessionWatcher != null && !_sessionWatcher.IsSessionActive)
+        // If session is not active (locked/logoff), state should be Idle or AwaitingUser.
+        // Primary: check SessionWatcher._isSessionActive (set by WTS notifications).
+        // Fallback: poll WTS API directly every 30s to catch missed WM_WTSSESSION_CHANGE.
+        if (_sessionWatcher != null)
         {
-            if (_currentState != AgentState.Idle && _currentState != AgentState.AwaitingUser)
-                SetState(AgentState.Idle);
-            return;
+            var eventDriven = !_sessionWatcher.IsSessionActive;
+            var wtsPoll = !_sessionWatcher.CheckSessionActiveViaWts();
+
+            if (eventDriven || wtsPoll)
+            {
+                if (_currentState != AgentState.Idle && _currentState != AgentState.AwaitingUser)
+                {
+                    _logger.LogInformation("Session inactive detected (event={EventDriven}, poll={WtsPoll}), transitioning to Idle",
+                        eventDriven, wtsPoll);
+                    SetState(AgentState.Idle);
+                }
+                return;
+            }
         }
 
         // Session is active: sync based on recording

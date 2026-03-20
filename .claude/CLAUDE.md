@@ -71,12 +71,11 @@ swift build && swift test
 
 ## Развёртывание
 
-Два сервера, два стейджинга:
 
 | Среда | Сервер | Namespace | URL | БД |
 |-------|--------|-----------|-----|----|
 | test | shepaland-cloud | `test-screen-record` | `https://services-test.shepaland.ru/screenrecorder` | `prg_test` |
-| prod | shepaland-videocalls-test-srv | `prod-screen-record` | `https://services.shepaland.ru/screenrecorder` | `prg_prod` |
+
 
 - **shepaland-cloud** (158.160.222.120): k3s, cert-manager + ClusterIssuer, PostgreSQL на хосте
 - **shepaland-videocalls-test-srv** (158.160.130.90): k3s, Traefik ACME, PostgreSQL на хосте (172.17.0.1:5432)
@@ -156,14 +155,8 @@ playback-service, search-service → auth-service `/api/v1/internal/check-access
 ---
 
 ## Трекер задач и тест-кейсов
-
-Файл трекера: `docs/tracker.xlsx`
-Скрипт управления: `docs/tracker.py`
-
-Требует Python 3 + openpyxl:
-```bash
-pip install openpyxl
-```
+Когда пользователь просит провести аналитику по задаче - это означает что нужно подготовить подробную пошаговвый документ и положить его в /docs/todo/TASK-<порядковый-номер-задачи>-<название задачи>
+Когда пользователь просит декомпозировать задачу - создавай директорию /docs/todo/TASK-<порядковый-номер-задачи>
 
 ### Листы
 
