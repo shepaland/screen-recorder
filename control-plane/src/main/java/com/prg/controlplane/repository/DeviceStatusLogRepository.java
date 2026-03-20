@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.jpa.repository.Modifying;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -36,4 +38,16 @@ public interface DeviceStatusLogRepository extends JpaRepository<DeviceStatusLog
             @Param("fromTs") Instant from,
             @Param("toTs") Instant to,
             Pageable pageable);
+
+    /** Direct INSERT to bypass immutable trigger on UPDATE. */
+    @Modifying
+    @Query(value = "INSERT INTO device_status_log (id, tenant_id, device_id, previous_status, new_status, trigger, details, changed_ts) " +
+                   "VALUES (gen_random_uuid(), :tenantId, :deviceId, :prevStatus, :newStatus, :trigger, CAST(:details AS jsonb), now())",
+           nativeQuery = true)
+    void insertLog(@Param("tenantId") UUID tenantId,
+                   @Param("deviceId") UUID deviceId,
+                   @Param("prevStatus") String prevStatus,
+                   @Param("newStatus") String newStatus,
+                   @Param("trigger") String trigger,
+                   @Param("details") String details);
 }

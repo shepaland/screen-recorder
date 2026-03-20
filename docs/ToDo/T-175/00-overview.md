@@ -4,15 +4,15 @@
 
 ## Подзадачи
 
-| # | Задача | Фаза | Зависит от | Файл |
-|---|--------|------|------------|------|
-| T-175.1 | Разрешение существующих дубликатов + Flyway V43 | A | — | `01-миграция-бд.md` |
-| T-175.2 | Backend: username=email, глобальная проверка, нормализация | A | T-175.1 | `02-backend-уникальность.md` |
-| T-175.3 | Backend: логин по email (один результат) | A | T-175.2 | `03-backend-логин.md` |
-| T-175.4 | Frontend: LoginPage email + UserCreateModal без username | A | T-175.2, T-175.3 | `04-frontend-login-и-создание.md` |
-| T-175.5 | Таблица tenant_memberships + миграция данных | B | T-175.1-4 | `05-tenant-memberships.md` |
-| T-175.6 | Backend: switchTenant через membership, onboarding | B | T-175.5 | `06-backend-membership.md` |
-| T-175.7 | SMTP конфигурация + EmailService + приглашения | C | T-175.2 | `07-smtp-приглашения.md` |
+| # | Задача | Фаза | Статус | Зависит от | Файл |
+|---|--------|------|--------|------------|------|
+| T-175.1 | Разрешение существующих дубликатов + Flyway V43 | A | **Done** | — | `01-миграция-бд.md` |
+| T-175.2 | Backend: username=email, глобальная проверка, нормализация | A | **Done** | T-175.1 | `02-backend-уникальность.md` |
+| T-175.3 | Backend: логин по email (один результат) | A | **Done** | T-175.2 | `03-backend-логин.md` |
+| T-175.4 | Frontend: LoginPage email + UserCreateModal без username | A | **Done** | T-175.2, T-175.3 | `04-frontend-login-и-создание.md` |
+| T-175.5 | Таблица tenant_memberships + миграция данных | B | **Done** | T-175.1-4 | `05-tenant-memberships.md` |
+| T-175.6 | Backend: switchTenant через membership, onboarding | B | **Done** | T-175.5 | `06-backend-membership.md` |
+| T-175.7 | SMTP конфигурация + EmailService + приглашения | C | Open | T-175.2 | `07-smtp-приглашения.md` |
 
 ## Порядок реализации
 
