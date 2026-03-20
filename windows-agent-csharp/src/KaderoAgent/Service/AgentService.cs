@@ -3,7 +3,6 @@ using KaderoAgent.Auth;
 using KaderoAgent.Capture;
 using KaderoAgent.Command;
 using KaderoAgent.Storage;
-using KaderoAgent.Upload;
 using KaderoAgent.Util;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -13,8 +12,6 @@ namespace KaderoAgent.Service;
 public class AgentService : BackgroundService
 {
     private readonly AuthManager _authManager;
-    private readonly LocalDatabase _db;
-    private readonly UploadQueue _uploadQueue;
     private readonly SegmentFileManager _fileManager;
     private readonly CredentialStore _credentialStore;
     private readonly CommandHandler _commandHandler;
@@ -29,15 +26,13 @@ public class AgentService : BackgroundService
     /// <summary>Current agent lifecycle state. Thread-safe read via volatile.</summary>
     public AgentState CurrentState => _currentState;
 
-    public AgentService(AuthManager authManager, LocalDatabase db, UploadQueue uploadQueue,
+    public AgentService(AuthManager authManager,
         SegmentFileManager fileManager, CredentialStore credentialStore,
         CommandHandler commandHandler, ScreenCaptureManager captureManager,
         ApiClient apiClient, ILogger<AgentService> logger,
         SessionWatcher? sessionWatcher = null)
     {
         _authManager = authManager;
-        _db = db;
-        _uploadQueue = uploadQueue;
         _fileManager = fileManager;
         _credentialStore = credentialStore;
         _commandHandler = commandHandler;
@@ -113,64 +108,20 @@ public class AgentService : BackgroundService
         var creds = _credentialStore.Load();
         var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";
 
-        // Auto-start recording FIRST (before pending segments, which can block).
-        // Only auto-start if the server has actually confirmed the config (ConfigReceivedFromServer).
-        // On fresh install with default config, autostart is always false.
-        try
-        {
-            if (_currentState == AgentState.AwaitingUser)
-            {
-                _logger.LogInformation("Session is locked, skipping auto-start");
-            }
-            else
-            {
-                var serverCfg = _authManager.ServerConfig;
-                var configFromServer = serverCfg?.ConfigReceivedFromServer ?? false;
+        // Auto-start: ALWAYS wait for first heartbeat to get fresh config from server.
+        // Never trust saved AutoStart — it may be stale. HeartbeatService will handle
+        // auto-start with exponential backoff after receiving fresh device_settings.
+        _logger.LogInformation("Waiting for first heartbeat to get fresh config before auto-start");
 
-                if (configFromServer && !(serverCfg?.RecordingEnabled ?? true))
-                {
-                    _logger.LogInformation("Recording disabled by token policy, skipping auto-start on boot");
-                }
-                else if (!configFromServer)
-                {
-                    _logger.LogInformation("ServerConfig not yet confirmed by server, skipping auto-start. " +
-                        "Will start recording when heartbeat delivers device_settings with auto_start=true.");
-                }
-                else
-                {
-                    await _commandHandler.AutoStartRecordingAsync(baseUrl, ct);
-                    if (_captureManager.IsRecording)
-                    {
-                        SetState(AgentState.Recording);
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
+        // If user session already active (Service started after user logon) —
+        // launch headless analytics collector in user session
+        if (_sessionWatcher is SessionWatcher sw && sw.IsSessionActive)
         {
-            _logger.LogError(ex, "Auto-start recording failed, will retry on next cycle");
-            SetState(AgentState.Error);
+            _logger.LogInformation("User session already active, launching headless collector");
+            LaunchHeadlessCollector();
         }
 
-        // Upload any pending segments from offline buffer (in background)
-        var pending = _db.GetPendingSegments();
-        if (pending.Count > 0)
-        {
-            _logger.LogInformation("Found {Count} pending segments, uploading...", pending.Count);
-            _uploadQueue.StartProcessing(baseUrl, ct);
-            _ = Task.Run(async () =>
-            {
-                foreach (var seg in pending)
-                {
-                    if (ct.IsCancellationRequested) break;
-                    if (File.Exists(seg.FilePath))
-                        await _uploadQueue.EnqueueAsync(seg);
-                    else
-                        _db.MarkSegmentUploaded(seg.FilePath);
-                }
-                _logger.LogInformation("Pending segments enqueue complete");
-            }, ct);
-        }
+        // Pending segments are handled by DataSyncService (reads from SQLite)
 
         // Main loop - periodic maintenance + monitoring
         try
@@ -237,9 +188,14 @@ public class AgentService : BackgroundService
             if (_currentState != AgentState.Error)
                 SetState(AgentState.Error);
         }
+        else if (_captureManager.DesktopUnavailableDetected)
+        {
+            if (_currentState != AgentState.DesktopUnavailable)
+                SetState(AgentState.DesktopUnavailable);
+        }
         else
         {
-            // Not recording, no crash -- online
+            // Not recording, no crash -- online (don't override DesktopUnavailable, HeartbeatService manages it)
             if (_currentState == AgentState.Recording || _currentState == AgentState.Error)
                 SetState(AgentState.Online);
         }
@@ -279,6 +235,46 @@ public class AgentService : BackgroundService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to send final heartbeat (best-effort)");
+        }
+    }
+
+    /// <summary>
+    /// Launch headless analytics collector in user session via CreateProcessAsUser.
+    /// Checks if already running, then launches if needed.
+    /// </summary>
+    private void LaunchHeadlessCollector()
+    {
+        try
+        {
+            var myPid = Environment.ProcessId;
+            foreach (var p in System.Diagnostics.Process.GetProcessesByName("KaderoAgent"))
+            {
+                try
+                {
+                    if (p.Id != myPid && p.SessionId > 0)
+                    {
+                        _logger.LogDebug("Headless/tray already running: PID={Pid} Session={Session}", p.Id, p.SessionId);
+                        return;
+                    }
+                }
+                finally { p.Dispose(); }
+            }
+
+            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName
+                          ?? Path.Combine(AppContext.BaseDirectory, "KaderoAgent.exe");
+            var workDir = Path.GetDirectoryName(exePath);
+
+            var pid = Capture.InteractiveProcessLauncher.LaunchInUserSession(
+                exePath, "--headless", workDir, _logger);
+
+            if (pid > 0)
+                _logger.LogInformation("Headless collector launched from AgentService: PID={Pid}", pid);
+            else
+                _logger.LogWarning("Failed to launch headless collector from AgentService");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "LaunchHeadlessCollector failed");
         }
     }
 }

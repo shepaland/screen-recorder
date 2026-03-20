@@ -83,7 +83,7 @@ prg:
     default-resolution: ${DEVICE_DEFAULT_RESOLUTION:720p}
     default-session-max-min: ${DEVICE_SESSION_MAX_MIN:60}
     default-session-max-hours: ${DEVICE_SESSION_MAX_HOURS:0}
-    default-auto-start: ${DEVICE_AUTO_START:false}
+    default-auto-start: ${DEVICE_AUTO_START:true}
   oauth:
     yandex:
       client-id: ${YANDEX_OAUTH_CLIENT_ID:}

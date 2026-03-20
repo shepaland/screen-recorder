@@ -17,7 +17,7 @@ import java.util.Map;
 public class HeartbeatRequest {
 
     @NotBlank(message = "Status is required")
-    @Pattern(regexp = "^(offline|online|recording|error|idle|starting|configuring|awaiting_user|stopped)$",
+    @Pattern(regexp = "^(offline|online|recording|error|idle|starting|configuring|awaiting_user|stopped|recording_disabled|desktop_unavailable)$",
             message = "Invalid status value")
     private String status;
 

@@ -1,4 +1,5 @@
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { Link } from 'react-router-dom';
 
 export default function DownloadPage() {
   return (
@@ -20,9 +21,9 @@ export default function DownloadPage() {
           </div>
           <h3 className="text-lg font-semibold text-gray-900">Windows</h3>
           <p className="text-sm text-gray-500 mt-1 mb-4">Windows 7 и выше</p>
-          <p className="text-xs text-gray-400 mb-4">Версия 1.0.0 &middot; ~120 МБ</p>
+          <p className="text-xs text-gray-400 mb-4">Версия 2026.3.20.1 &middot; ~91 МБ</p>
           <a
-            href="/downloads/KaderoAgentSetup.exe"
+            href="https://kadero.ru/distrib/KaderoAgentSetup.exe?v=20260320"
             className="inline-flex items-center gap-2 rounded-md bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-500 transition-colors"
           >
             <ArrowDownTrayIcon className="h-5 w-5" />
@@ -41,16 +42,16 @@ export default function DownloadPage() {
             <li>После установки откроется окно настройки подключения</li>
             <li>
               Введите <strong>токен регистрации</strong> — его можно сгенерировать в разделе{' '}
-              <a href="/device-tokens" className="text-red-600 hover:text-red-500 underline">
+              <Link to="/device-tokens" className="text-red-600 hover:text-red-500 underline">
                 Токены регистрации
-              </a>
+              </Link>
             </li>
             <li>Нажмите «Подключить» — клиент начнёт работу как служба Windows</li>
             <li>
               Управлять записью можно из раздела{' '}
-              <a href="/devices" className="text-red-600 hover:text-red-500 underline">
+              <Link to="/devices" className="text-red-600 hover:text-red-500 underline">
                 Устройства
-              </a>{' '}
+              </Link>{' '}
               — кнопка «Начать запись»
             </li>
           </ol>

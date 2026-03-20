@@ -3,6 +3,7 @@ using KaderoAgent.Auth;
 using KaderoAgent.Capture;
 using KaderoAgent.Configuration;
 using KaderoAgent.Service;
+using KaderoAgent.Storage;
 using KaderoAgent.Upload;
 using KaderoAgent.Util;
 using Microsoft.Extensions.Logging;
@@ -14,7 +15,7 @@ public class CommandHandler
 {
     private readonly ScreenCaptureManager _captureManager;
     private readonly SessionManager _sessionManager;
-    private readonly UploadQueue _uploadQueue;
+    private readonly LocalDatabase _db;
     private readonly AuthManager _authManager;
     private readonly ApiClient _apiClient;
     private readonly IOptions<AgentConfig> _config;
@@ -33,12 +34,12 @@ public class CommandHandler
     private DateTime _lastRecoveryAttempt = DateTime.MinValue;
 
     public CommandHandler(ScreenCaptureManager captureManager, SessionManager sessionManager,
-        UploadQueue uploadQueue, AuthManager authManager, ApiClient apiClient,
+        LocalDatabase db, AuthManager authManager, ApiClient apiClient,
         IOptions<AgentConfig> config, ILogger<CommandHandler> logger)
     {
         _captureManager = captureManager;
         _sessionManager = sessionManager;
-        _uploadQueue = uploadQueue;
+        _db = db;
         _authManager = authManager;
         _apiClient = apiClient;
         _config = config;
@@ -63,7 +64,6 @@ public class CommandHandler
 
         _logger.LogInformation("Pausing recording: screen locked");
         _captureManager.Stop();
-        _uploadQueue.StopProcessing();
 
         try { await _sessionManager.EndSessionAsync(ct); } catch (Exception ex)
         {
@@ -229,12 +229,14 @@ public class CommandHandler
 
             _captureManager.ResetAfterCrash();
 
+            // Cleanup session after crash so HeartbeatService can re-attempt auto-start
+            try { await _sessionManager.EndSessionAsync(ct); } catch { }
+
             if (_consecutiveFailures >= MaxConsecutiveFailures)
             {
                 _logger.LogError("Max consecutive FFmpeg failures ({Max}) reached, stopping recovery. " +
-                    "Will retry on next server START_RECORDING command or agent restart.",
+                    "HeartbeatService will continue retrying with backoff.",
                     MaxConsecutiveFailures);
-                try { await _sessionManager.EndSessionAsync(ct); } catch { }
                 return;
             }
 
@@ -245,14 +247,10 @@ public class CommandHandler
             {
                 _logger.LogInformation("Crash recovery backoff: waiting {Remaining}s before retry",
                     (int)(backoffSeconds - elapsed.TotalSeconds));
-                try { await _sessionManager.EndSessionAsync(ct); } catch { }
                 return;
             }
 
             _lastRecoveryAttempt = DateTime.UtcNow;
-
-            // End old session, start new one
-            try { await _sessionManager.EndSessionAsync(ct); } catch { }
             await StartRecording(baseUrl, ct);
         }
     }
@@ -324,7 +322,6 @@ public class CommandHandler
 
         // Don't reset _consecutiveFailures here — only reset after first segment is produced
         // (in WatchSegments) to prevent infinite crash loops when gdigrab has no desktop
-        _uploadQueue.StartProcessing(baseUrl, ct);
         _sessionStartTime = DateTime.UtcNow;
 
         // Start watching for new segments
@@ -351,7 +348,6 @@ public class CommandHandler
         _logger.LogInformation("Restarting recording due to settings change");
         _captureManager.Stop();
         try { await _sessionManager.EndSessionAsync(ct); } catch { }
-        _uploadQueue.StopProcessing();
         _sessionStartTime = null;
 
         await Task.Delay(1000, ct);
@@ -361,7 +357,6 @@ public class CommandHandler
     private async Task StopRecording(CancellationToken ct)
     {
         _captureManager.Stop();
-        _uploadQueue.StopProcessing();
         _sessionStartTime = null;
 
         await _sessionManager.EndSessionAsync(ct);
@@ -572,12 +567,21 @@ public class CommandHandler
                 _lastSegmentSequence = sequenceNum;
                 _lastSegmentStartTs = fileInfo.CreationTimeUtc;
 
-                await _uploadQueue.EnqueueAsync(new SegmentInfo
+                // Persist to SQLite — DataSyncService will upload
+                try
                 {
-                    FilePath = file,
-                    SessionId = sessionId,
-                    SequenceNum = sequenceNum++
-                });
+                    _db.InsertSegment(
+                        filePath: file,
+                        sessionId: sessionId,
+                        sequenceNum: sequenceNum,
+                        sizeBytes: fileInfo.Length,
+                        recordedAt: fileInfo.CreationTimeUtc.ToString("o"));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to persist segment to SQLite");
+                }
+                sequenceNum++;
             }
         }
 
@@ -593,12 +597,21 @@ public class CommandHandler
 
                 foreach (var file in remaining)
                 {
-                    await _uploadQueue.EnqueueAsync(new SegmentInfo
+                    var remFileInfo = new FileInfo(file);
+                    try
                     {
-                        FilePath = file,
-                        SessionId = sessionId,
-                        SequenceNum = sequenceNum++
-                    });
+                        _db.InsertSegment(
+                            filePath: file,
+                            sessionId: sessionId,
+                            sequenceNum: sequenceNum,
+                            sizeBytes: remFileInfo.Length,
+                            recordedAt: remFileInfo.CreationTimeUtc.ToString("o"));
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to persist remaining segment to SQLite");
+                    }
+                    sequenceNum++;
                 }
             }
         }

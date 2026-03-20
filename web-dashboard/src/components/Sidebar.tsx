@@ -40,9 +40,9 @@ interface NavItem {
 }
 
 const archiveSubmenu: NavItem[] = [
-  { name: 'Устройства', href: '/archive/devices', icon: ComputerDesktopIcon },
-  { name: 'Сотрудники', href: '/archive/employees', icon: UserGroupIcon },
   { name: 'Таймлайны', href: '/archive/timelines', icon: ClockIcon },
+  { name: 'Сотрудники', href: '/archive/employees', icon: UserGroupIcon },
+  { name: 'Устройства', href: '/archive/devices', icon: ComputerDesktopIcon },
   { name: 'Поиск записей', href: '/search', icon: MagnifyingGlassIcon },
   { name: 'Аудит поведения', href: '/settings/behavior-audit', icon: EyeIcon, permission: 'AUDIT:READ' },
 ];

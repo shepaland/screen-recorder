@@ -4,6 +4,7 @@ using KaderoAgent.Capture;
 using KaderoAgent.Configuration;
 using KaderoAgent.Ipc;
 using KaderoAgent.Service;
+using KaderoAgent.Storage;
 using KaderoAgent.Upload;
 using KaderoAgent.Util;
 using Microsoft.Extensions.Hosting;
@@ -19,7 +20,8 @@ public class HeartbeatService : BackgroundService
     private readonly CredentialStore _credentialStore;
     private readonly CommandHandler _commandHandler;
     private readonly ScreenCaptureManager _captureManager;
-    private readonly UploadQueue _uploadQueue;
+    private readonly DataSyncService _dataSyncService;
+    private readonly LocalDatabase _db;
     private readonly MetricsCollector _metrics;
     private readonly IStatusProvider _statusProvider;
     private readonly AgentService _agentService;
@@ -27,9 +29,14 @@ public class HeartbeatService : BackgroundService
     private readonly IOptions<AgentConfig> _config;
     private readonly ILogger<HeartbeatService> _logger;
 
+    // Auto-start retry backoff state
+    private int _autoStartFailures;
+    private DateTime _lastAutoStartAttempt = DateTime.MinValue;
+    private static readonly int[] AutoStartBackoffSeconds = { 0, 30, 60, 120, 300, 600 };
+
     public HeartbeatService(AuthManager authManager, ApiClient apiClient, CredentialStore credentialStore,
-        CommandHandler commandHandler, ScreenCaptureManager captureManager, UploadQueue uploadQueue,
-        MetricsCollector metrics, IStatusProvider statusProvider, AgentService agentService,
+        CommandHandler commandHandler, ScreenCaptureManager captureManager, DataSyncService dataSyncService,
+        LocalDatabase db, MetricsCollector metrics, IStatusProvider statusProvider, AgentService agentService,
         SessionManager sessionManager, IOptions<AgentConfig> config, ILogger<HeartbeatService> logger)
     {
         _authManager = authManager;
@@ -37,7 +44,8 @@ public class HeartbeatService : BackgroundService
         _credentialStore = credentialStore;
         _commandHandler = commandHandler;
         _captureManager = captureManager;
-        _uploadQueue = uploadQueue;
+        _dataSyncService = dataSyncService;
+        _db = db;
         _metrics = metrics;
         _statusProvider = statusProvider;
         _agentService = agentService;
@@ -53,8 +61,6 @@ public class HeartbeatService : BackgroundService
         {
             await Task.Delay(1000, ct);
         }
-
-        var interval = _authManager.ServerConfig?.HeartbeatIntervalSec ?? _config.Value.HeartbeatIntervalSec;
 
         while (!ct.IsCancellationRequested)
         {
@@ -74,16 +80,14 @@ public class HeartbeatService : BackgroundService
                     status,
                     session_locked = _commandHandler.IsPausedByLock,
                     agent_version = GetType().Assembly.GetName().Version?.ToString() ?? "0.0.0",
-                    metrics = new
-                    {
-                        cpu_percent = _metrics.GetCpuUsage(),
-                        memory_mb = _metrics.GetMemoryUsageMb(),
-                        disk_free_gb = _metrics.GetDiskFreeGb(),
-                        segments_queued = _uploadQueue.QueuedCount
-                    }
+                    metrics = BuildMetrics()
                 };
 
                 var response = await _apiClient.PutAsync<HeartbeatResponse>(url, body, ct);
+
+                // Server is reachable — enable DataSyncService if upload_enabled
+                bool uploadEnabled = response?.UploadEnabled ?? true;
+                _dataSyncService.SetServerAvailable(uploadEnabled);
 
                 // Update status provider after successful heartbeat
                 if (_statusProvider is AgentStatusProvider asp)
@@ -127,24 +131,56 @@ public class HeartbeatService : BackgroundService
                     {
                         _agentService.SetState(AgentState.Online);
                     }
+                }
 
-                    // After first heartbeat with device_settings, auto-start if needed.
-                    // Guards: state must be Online, not recording, no active session
-                    if (_agentService.CurrentState == AgentState.Online
-                        && !_captureManager.IsRecording
-                        && _sessionManager.CurrentSessionId == null)
+                // Auto-start with exponential backoff (OUTSIDE device_settings block).
+                // Runs on EVERY heartbeat cycle, not only when device_settings present.
+                // Handles: first boot, post-crash recovery, DesktopUnavailable retry.
+                var curState = _agentService.CurrentState;
+                if ((curState == AgentState.Online || curState == AgentState.DesktopUnavailable)
+                    && !_captureManager.IsRecording)
+                {
+                    var serverCfg = _authManager.ServerConfig;
+                    if (serverCfg is { ConfigReceivedFromServer: true, AutoStart: true, RecordingEnabled: true })
                     {
-                        var serverCfg = _authManager.ServerConfig;
-                        if (serverCfg is { ConfigReceivedFromServer: true, AutoStart: true, RecordingEnabled: true })
+                        // Exponential backoff: 0, 30, 60, 120, 300, 600s (max 10 min)
+                        var backoffIdx = Math.Min(_autoStartFailures, AutoStartBackoffSeconds.Length - 1);
+                        var backoffSec = AutoStartBackoffSeconds[backoffIdx];
+                        var elapsed = (DateTime.UtcNow - _lastAutoStartAttempt).TotalSeconds;
+
+                        if (elapsed >= backoffSec)
                         {
-                            _logger.LogInformation("Server confirmed auto_start=true via heartbeat, starting recording");
+                            _logger.LogInformation(
+                                "Auto-start attempt (failures={Failures}, backoff={Backoff}s)",
+                                _autoStartFailures, backoffSec);
+                            _lastAutoStartAttempt = DateTime.UtcNow;
+
                             await _commandHandler.AutoStartRecordingAsync(baseUrl, ct);
+
                             if (_captureManager.IsRecording)
                             {
+                                _autoStartFailures = 0;
                                 _agentService.SetState(AgentState.Recording);
+                            }
+                            else if (_captureManager.DesktopUnavailableDetected)
+                            {
+                                _autoStartFailures++;
+                                _agentService.SetState(AgentState.DesktopUnavailable);
+                                _logger.LogWarning(
+                                    "Desktop unavailable, will retry in {Next}s",
+                                    AutoStartBackoffSeconds[Math.Min(_autoStartFailures, AutoStartBackoffSeconds.Length - 1)]);
+                            }
+                            else
+                            {
+                                _autoStartFailures++;
                             }
                         }
                     }
+                }
+                // Reset backoff when recording starts from external command
+                else if (curState == AgentState.Recording && _autoStartFailures > 0)
+                {
+                    _autoStartFailures = 0;
                 }
 
                 // Process pending commands
@@ -156,11 +192,11 @@ public class HeartbeatService : BackgroundService
                     }
                 }
 
-                interval = response?.NextHeartbeatSec ?? interval;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Heartbeat failed");
+                _dataSyncService.SetServerAvailable(false);
 
                 // Update status provider on error
                 if (_statusProvider is AgentStatusProvider asp)
@@ -170,7 +206,46 @@ public class HeartbeatService : BackgroundService
                 }
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(interval), ct);
+            // Fixed 30s interval — heartbeat always runs at constant rate
+            await Task.Delay(TimeSpan.FromSeconds(30), ct);
+        }
+    }
+
+    private object BuildMetrics()
+    {
+        try
+        {
+            var segCounts = _db.GetSegmentCountsByStatus();
+            var actCounts = _db.GetActivityCountsByStatus();
+            long dbSize = 0;
+            try { dbSize = new FileInfo(_db.DatabasePath).Length; } catch { }
+
+            return new
+            {
+                cpu_percent = _metrics.GetCpuUsage(),
+                memory_mb = _metrics.GetMemoryUsageMb(),
+                disk_free_gb = _metrics.GetDiskFreeGb(),
+                segments_new = segCounts.GetValueOrDefault("NEW"),
+                segments_queued = segCounts.GetValueOrDefault("QUEUED"),
+                segments_pending = segCounts.GetValueOrDefault("PENDING"),
+                segments_done = segCounts.GetValueOrDefault("SERVER_SIDE_DONE"),
+                segments_evicted = segCounts.GetValueOrDefault("EVICTED"),
+                activity_new = actCounts.GetValueOrDefault("NEW"),
+                activity_pending = actCounts.GetValueOrDefault("PENDING"),
+                activity_done = actCounts.GetValueOrDefault("SERVER_SIDE_DONE"),
+                db_size_bytes = dbSize,
+                oldest_unsent_segment_age_sec = _db.GetOldestUnsentSegmentAgeSec(),
+                oldest_unsent_activity_age_sec = _db.GetOldestUnsentActivityAgeSec()
+            };
+        }
+        catch
+        {
+            return new
+            {
+                cpu_percent = _metrics.GetCpuUsage(),
+                memory_mb = _metrics.GetMemoryUsageMb(),
+                disk_free_gb = _metrics.GetDiskFreeGb()
+            };
         }
     }
 
@@ -235,6 +310,7 @@ public class HeartbeatResponse
     public List<PendingCommand>? PendingCommands { get; set; }
     public int NextHeartbeatSec { get; set; } = 30;
     public Dictionary<string, JsonElement>? DeviceSettings { get; set; }
+    public bool? UploadEnabled { get; set; }
 }
 
 public class PendingCommand

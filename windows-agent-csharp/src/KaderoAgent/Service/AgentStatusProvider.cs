@@ -6,6 +6,7 @@ using KaderoAgent.Capture;
 using KaderoAgent.Command;
 using KaderoAgent.Configuration;
 using KaderoAgent.Ipc;
+using KaderoAgent.Storage;
 using KaderoAgent.Upload;
 using Microsoft.Extensions.Options;
 
@@ -14,13 +15,11 @@ public class AgentStatusProvider : IStatusProvider
     private readonly AuthManager _authManager;
     private readonly CredentialStore _credentialStore;
     private readonly ScreenCaptureManager _captureManager;
-    private readonly UploadQueue _uploadQueue;
+    private readonly LocalDatabase _db;
     private readonly SessionManager _sessionManager;
     private readonly MetricsCollector _metrics;
     private readonly SessionWatcher _sessionWatcher;
     private readonly IAuditEventSink _auditSink;
-    private readonly FocusIntervalSink _focusSink;
-    private readonly InputEventSink _inputSink;
     private readonly IOptions<AgentConfig> _config;
 
     // Lazy-resolved to avoid circular DI
@@ -34,22 +33,19 @@ public class AgentStatusProvider : IStatusProvider
     private DateTime? _lastHeartbeatTs;
 
     public AgentStatusProvider(AuthManager authManager, CredentialStore credentialStore,
-        ScreenCaptureManager captureManager, UploadQueue uploadQueue,
+        ScreenCaptureManager captureManager, LocalDatabase db,
         SessionManager sessionManager, MetricsCollector metrics,
         SessionWatcher sessionWatcher, IAuditEventSink auditSink,
-        FocusIntervalSink focusSink, InputEventSink inputSink,
         IOptions<AgentConfig> config, IServiceProvider serviceProvider)
     {
         _authManager = authManager;
         _credentialStore = credentialStore;
         _captureManager = captureManager;
-        _uploadQueue = uploadQueue;
+        _db = db;
         _sessionManager = sessionManager;
         _metrics = metrics;
         _sessionWatcher = sessionWatcher;
         _auditSink = auditSink;
-        _focusSink = focusSink;
-        _inputSink = inputSink;
         _config = config;
         _serviceProvider = serviceProvider;
     }
@@ -123,13 +119,13 @@ public class AgentStatusProvider : IStatusProvider
             CpuPercent = _metrics.GetCpuUsage(),
             MemoryMb = _metrics.GetMemoryUsageMb(),
             DiskFreeGb = _metrics.GetDiskFreeGb(),
-            SegmentsQueued = _uploadQueue.QueuedCount,
+            SegmentsQueued = GetPendingCount(_db.GetSegmentCountsByStatus()),
             SessionLocked = !_sessionWatcher.IsSessionActive,
             AuditEventsQueued = _auditSink.QueuedCount,
             UploadError = _sessionManager.HasSessionError,
             UploadErrorMessage = _sessionManager.HasSessionError ? "Сессия потеряна, пересоздание..." : null,
-            FocusIntervalsQueued = _focusSink.QueuedCount,
-            InputEventsQueued = _inputSink.QueuedCount,
+            FocusIntervalsQueued = GetPendingCount(_db.GetActivityCountsByStatus()),
+            InputEventsQueued = 0,
             LastHeartbeatTs = lastHb,
             LastError = lastError
         };
@@ -142,5 +138,14 @@ public class AgentStatusProvider : IStatusProvider
         }
 
         return status;
+    }
+
+    private static int GetPendingCount(Dictionary<string, int> counts)
+    {
+        int total = 0;
+        if (counts.TryGetValue("NEW", out var n)) total += n;
+        if (counts.TryGetValue("PENDING", out var p)) total += p;
+        if (counts.TryGetValue("QUEUED", out var q)) total += q;
+        return total;
     }
 }

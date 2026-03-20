@@ -24,6 +24,12 @@ public class ScreenCaptureManager
     /// <summary>True if FFmpeg process has exited unexpectedly while recording flag is still set.</summary>
     public bool HasCrashed => _isRecording && _ffmpeg != null && _ffmpeg.HasExited;
 
+    /// <summary>True if last FFmpeg start failed due to desktop being unavailable (gdigrab error 5).</summary>
+    public bool DesktopUnavailableDetected { get; private set; }
+
+    /// <summary>Clear desktop-unavailable flag (e.g. after RDP reconnect).</summary>
+    public void ClearDesktopUnavailable() => DesktopUnavailableDetected = false;
+
     public ScreenCaptureManager(IOptions<AgentConfig> config, ILogger<ScreenCaptureManager> logger)
     {
         _config = config;
@@ -106,10 +112,15 @@ public class ScreenCaptureManager
 
         if (!started)
         {
-            _logger.LogError("FFmpeg failed to start, not marking as recording");
+            // Detect desktop-unavailable: FFmpeg process exited immediately (gdigrab error 5)
+            DesktopUnavailableDetected = true;
+            _logger.LogError("FFmpeg failed to start, not marking as recording (desktop may be unavailable)");
             _ffmpeg = null;
             return false;
         }
+
+        // FFmpeg started OK — desktop is available
+        DesktopUnavailableDetected = false;
 
         _isRecording = true;
         _logger.LogInformation(

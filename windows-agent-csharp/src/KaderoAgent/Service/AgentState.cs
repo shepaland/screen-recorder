@@ -27,6 +27,9 @@ public enum AgentState
     /// <summary>Screen locked or user logged off (recording paused).</summary>
     Idle,
 
+    /// <summary>Desktop session unavailable (RDP disconnected, gdigrab error 5). Will auto-recover on reconnect.</summary>
+    DesktopUnavailable,
+
     /// <summary>Recording failure or critical error.</summary>
     Error,
 
@@ -49,7 +52,8 @@ public static class AgentStateExtensions
         AgentState.Configuring => "configuring",
         AgentState.AwaitingUser => "awaiting_user",
         AgentState.Online => "online",
-        AgentState.RecordingDisabled => "online",
+        AgentState.RecordingDisabled => "recording_disabled",
+        AgentState.DesktopUnavailable => "desktop_unavailable",
         AgentState.Recording => "recording",
         AgentState.Idle => "idle",
         AgentState.Error => "error",
@@ -64,6 +68,7 @@ public static class AgentStateExtensions
     public static string ToUiStateName(this AgentState state) => state switch
     {
         AgentState.RecordingDisabled => "recording_disabled",
+        AgentState.DesktopUnavailable => "desktop_unavailable",
         _ => state.ToHeartbeatStatus()
     };
 
@@ -77,6 +82,7 @@ public static class AgentStateExtensions
         AgentState.AwaitingUser => "Ожидание входа пользователя",
         AgentState.Online => "Онлайн",
         AgentState.RecordingDisabled => "Запись отключена администратором",
+        AgentState.DesktopUnavailable => "Рабочий стол недоступен",
         AgentState.Recording => "Запись экрана",
         AgentState.Idle => "Пользователь неактивен",
         AgentState.Error => "Ошибка записи",

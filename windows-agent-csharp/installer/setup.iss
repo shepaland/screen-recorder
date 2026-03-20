@@ -8,7 +8,7 @@
 
 [Setup]
 AppName=Kadero Agent
-AppVersion=1.0.0
+AppVersion=2026.3.19.1
 AppPublisher=Kadero
 AppPublisherURL=https://kadero.ru
 DefaultDirName={commonpf}\Kadero
@@ -119,17 +119,26 @@ Filename: "sc.exe"; \
   StatusMsg: "Запуск службы..."; \
   Flags: runhidden
 
-; Launch tray application after install (checked by default, runs as the real user)
+; MANDATORY: Launch headless analytics collector (not a checkbox!)
+; Ensures focus intervals and input events are collected from the moment of installation.
+Filename: "{app}\KaderoAgent.exe"; \
+  Parameters: "--headless"; \
+  Flags: nowait runasoriginaluser
+
+; OPTIONAL: Show tray icon (checkbox, checked by default)
 Filename: "{app}\KaderoAgent.exe"; \
   Parameters: "--tray"; \
-  Description: "Запустить Кадеро в области уведомлений"; \
+  Description: "Показать иконку Кадеро в области уведомлений"; \
   Flags: postinstall nowait runasoriginaluser
 
 ; ---------------------------------------------------------------------------
 ; Uninstall actions (order: kill processes, stop service, delete service)
 ; ---------------------------------------------------------------------------
 [UninstallRun]
-; Kill all running instances of KaderoAgent (tray + any other)
+; Remove HKCU auto-start entry (headless analytics)
+Filename: "reg.exe"; Parameters: "delete HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run /v KaderoAgent /f"; \
+  RunOnceId: "RemoveAutoStart"; Flags: runhidden
+; Kill all running instances of KaderoAgent (headless + tray + any other)
 Filename: "taskkill.exe"; Parameters: "/f /im KaderoAgent.exe"; \
   RunOnceId: "KillAgent"; Flags: runhidden
 ; Stop the Windows Service

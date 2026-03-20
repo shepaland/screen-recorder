@@ -123,6 +123,32 @@ if (args.Contains("--tray"))
     return;
 }
 
+// Headless mode: analytics collector without UI (focus intervals + input events).
+// Runs TrayWindowTracker + InputTracker + PipeClient, no tray icon or windows.
+// Launched automatically via HKCU\Run and during installation.
+if (args.Contains("--headless"))
+{
+    // Separate mutex from --tray: headless and tray can run in parallel
+    using var headlessMutex = new Mutex(false, @"Local\KaderoAgentCollector", out var isFirstHeadless);
+    if (!isFirstHeadless)
+    {
+        // Another headless is already running in this user session — exit silently
+        return;
+    }
+
+    var staThread = new Thread(() =>
+    {
+        Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
+        Application.Run(new KaderoAgent.Tray.HeadlessApplication());
+    });
+    staThread.SetApartmentState(ApartmentState.STA);
+    staThread.Start();
+    staThread.Join();
+    return;
+}
+
 // Use exe directory as content root (not the working directory),
 // so appsettings.json is always found regardless of how the process was launched
 // (e.g. from HKCU\Run, schtasks, or Windows Service).
@@ -152,26 +178,25 @@ builder.Services.AddSingleton<SegmentFileManager>();
 builder.Services.AddSingleton<MetricsCollector>();
 builder.Services.AddSingleton<SessionManager>();
 builder.Services.AddSingleton<SegmentUploader>();
-builder.Services.AddSingleton<UploadQueue>();
 builder.Services.AddSingleton<ScreenCaptureManager>();
 builder.Services.AddSingleton<CommandHandler>();
 
-// Audit: session watcher, process watcher, event sink
+// Audit: session watcher, process watcher, event sink (no longer BackgroundService)
 builder.Services.AddSingleton<AuditEventSink>();
 builder.Services.AddSingleton<IAuditEventSink>(sp => sp.GetRequiredService<AuditEventSink>());
 builder.Services.AddSingleton<SessionWatcher>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<AuditEventSink>());
 builder.Services.AddHostedService(sp => sp.GetRequiredService<SessionWatcher>());
 builder.Services.AddHostedService<ProcessWatcher>();
 
-// Activity tracking: user session info, focus interval sink
-// NOTE: ActiveWindowTracker is NOT registered here — GetForegroundWindow() returns 0 in Session 0
-//       (Windows Service context). Window tracking runs in TrayWindowTracker (tray process) instead.
+// Activity tracking: sinks write to SQLite only, DataSyncService uploads
 builder.Services.AddSingleton<UserSessionInfo>();
 builder.Services.AddSingleton<FocusIntervalSink>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<FocusIntervalSink>());
 builder.Services.AddSingleton<InputEventSink>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<InputEventSink>());
+
+// Data sync: unified uploader replacing UploadQueue + sink flush-loops
+builder.Services.AddSingleton<ActivityUploader>();
+builder.Services.AddSingleton<DataSyncService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DataSyncService>());
 
 // IPC: status provider and command executor (available in all modes)
 builder.Services.AddSingleton<AgentStatusProvider>();
@@ -281,32 +306,6 @@ if (!args.Contains("--service") &&
             Arguments = "--tray",
             UseShellExecute = true // Must use shell to properly register NotifyIcon with explorer
         });
-    }
-}
-
-// Launch tray UI for interactive sessions (not when running as Windows Service)
-if (!args.Contains("--service"))
-{
-    var trayExePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-    if (trayExePath != null)
-    {
-        // Check if tray is already running
-        var trayAlreadyRunning = System.Diagnostics.Process.GetProcessesByName("KaderoAgent")
-            .Any(p => p.Id != Environment.ProcessId);
-
-        if (!trayAlreadyRunning)
-        {
-            try
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = trayExePath,
-                    Arguments = "--tray",
-                    UseShellExecute = true // Must use shell to properly register NotifyIcon with explorer
-                });
-            }
-            catch { /* non-fatal: tray is optional */ }
-        }
     }
 }
 

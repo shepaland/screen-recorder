@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Windows.Forms;
 using KaderoAgent.Ipc;
 using KaderoAgent.Resources;
-using KaderoAgent.Util;
 
 /// <summary>
 /// Tray application — UI shell for monitoring and configuring KaderoAgent Windows Service.
@@ -18,8 +17,6 @@ public class TrayApplication : ApplicationContext
 {
     private readonly NotifyIcon _trayIcon;
     private readonly PipeClient _pipeClient;
-    private readonly TrayWindowTracker _windowTracker;
-    private readonly InputTracker _inputTracker;
     private StatusWindow? _statusWindow;
     private AboutDialog? _aboutDialog;
     private System.Threading.Timer? _statusTimer;
@@ -35,9 +32,7 @@ public class TrayApplication : ApplicationContext
 
     public TrayApplication()
     {
-        _pipeClient    = new PipeClient();
-        _windowTracker = new TrayWindowTracker();
-        _inputTracker  = new InputTracker();
+        _pipeClient = new PipeClient();
 
         // Create hidden control on STA thread for marshaling UI calls
         _invokeControl = new Control();
@@ -55,13 +50,6 @@ public class TrayApplication : ApplicationContext
 
         // Start background status polling on thread pool
         StartStatusPolling();
-
-        // Start input tracking (mouse clicks via low-level hook)
-        _inputTracker.Start();
-
-        // Start active window tracking — attach InputTracker so events are sent via same pipe
-        _windowTracker.SetInputTracker(_inputTracker);
-        _windowTracker.Start();
     }
 
     private ContextMenuStrip CreateContextMenu()
@@ -87,20 +75,6 @@ public class TrayApplication : ApplicationContext
         menu.Items.Add(restartItem);
 
         menu.Items.Add(new ToolStripSeparator());
-
-        var autoStartItem = new ToolStripMenuItem("Запускать при входе в систему")
-        {
-            Checked = AutoStartHelper.IsAutoStartEnabled(),
-            CheckOnClick = true
-        };
-        autoStartItem.CheckedChanged += (_, _) =>
-        {
-            if (autoStartItem.Checked)
-                AutoStartHelper.EnableAutoStart();
-            else
-                AutoStartHelper.DisableAutoStart();
-        };
-        menu.Items.Add(autoStartItem);
 
         var aboutItem = new ToolStripMenuItem("О программе");
         aboutItem.Click += OnAbout;
@@ -151,9 +125,6 @@ public class TrayApplication : ApplicationContext
             var status = _pipeClient.GetStatusAsync().GetAwaiter().GetResult();
             if (status != null)
             {
-                // Update InputTracker with segment context for video timecode binding
-                _inputTracker.UpdateSegmentContext(status.SegmentStartTs);
-
                 // Use AgentStateName for richer tray icon states; fallback to RecordingStatus
                 var effectiveState = !string.IsNullOrEmpty(status.AgentStateName)
                     ? status.AgentStateName
@@ -342,8 +313,6 @@ public class TrayApplication : ApplicationContext
     private void OnExit(object? sender, EventArgs e)
     {
         _statusTimer?.Dispose();
-        _windowTracker.Dispose();
-        _inputTracker.Dispose();
         _statusWindow?.Close();
         _aboutDialog?.Close();
         _pipeClient.Dispose();

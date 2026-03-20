@@ -4,8 +4,8 @@ namespace KaderoAgent.Util
 {
     /// <summary>
     /// Manages auto-start on Windows login via HKCU\...\Run registry key.
-    /// Launches the main agent process (which starts PipeServer + services,
-    /// then spawns a --tray UI process automatically).
+    /// Launches --headless (analytics collector) from HKCU\Run.
+    /// The Windows Service is managed by sc.exe. Tray UI is optional (Start Menu).
     /// </summary>
     public static class AutoStartHelper
     {
@@ -17,9 +17,9 @@ namespace KaderoAgent.Util
             var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
             if (exePath == null) return;
             using var key = Registry.CurrentUser.OpenSubKey(RunKey, true);
-            // Launch --tray only from HKCU\Run. The Windows Service (host) is managed by sc.exe.
-            // This prevents a second host from competing with the service for PipeServer.
-            key?.SetValue(AppName, $"\"{exePath}\" --tray");
+            // Launch --headless (analytics collector) from HKCU\Run.
+            // This ensures focus intervals and input events are always collected.
+            key?.SetValue(AppName, $"\"{exePath}\" --headless");
         }
 
         public static void DisableAutoStart()

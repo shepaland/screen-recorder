@@ -73,6 +73,51 @@ public class SessionWatcher : BackgroundService
         return _agentService;
     }
 
+    /// <summary>
+    /// Ensure headless analytics collector is running in a user session.
+    /// Service (Session 0) launches KaderoAgent.exe --headless via CreateProcessAsUser.
+    /// Idempotent: checks if another KaderoAgent already runs in user sessions.
+    /// </summary>
+    private void EnsureHeadlessCollectorRunning()
+    {
+        try
+        {
+            // Check if headless/tray already running in any user session
+            var myPid = Environment.ProcessId;
+            var agents = System.Diagnostics.Process.GetProcessesByName("KaderoAgent");
+            foreach (var p in agents)
+            {
+                try
+                {
+                    if (p.Id != myPid && p.SessionId > 0)
+                    {
+                        _logger.LogDebug("Headless/tray already running: PID={Pid} Session={Session}", p.Id, p.SessionId);
+                        return; // Already running in user session
+                    }
+                }
+                finally { p.Dispose(); }
+            }
+
+            // No collector in user session — launch one
+            var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName
+                          ?? Path.Combine(AppContext.BaseDirectory, "KaderoAgent.exe");
+            var workDir = Path.GetDirectoryName(exePath);
+
+            _logger.LogInformation("Launching headless collector in user session");
+            var pid = Capture.InteractiveProcessLauncher.LaunchInUserSession(
+                exePath, "--headless", workDir, _logger);
+
+            if (pid > 0)
+                _logger.LogInformation("Headless collector launched: PID={Pid}", pid);
+            else
+                _logger.LogWarning("Failed to launch headless collector (no user session available)");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "EnsureHeadlessCollectorRunning failed");
+        }
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         // Subscribe to session switch events
@@ -133,7 +178,7 @@ public class SessionWatcher : BackgroundService
                             if (svc != null)
                             {
                                 var serverCfg = _authManager.ServerConfig;
-                                var autoStart = serverCfg?.AutoStart ?? false;
+                                var autoStart = serverCfg?.AutoStart ?? true;
                                 var configFromServer = serverCfg?.ConfigReceivedFromServer ?? false;
 
                                 if (autoStart && configFromServer && _captureManager.IsRecording)
@@ -147,6 +192,9 @@ public class SessionWatcher : BackgroundService
                     case SessionSwitchReason.SessionLogon:
                         _logger.LogInformation("Session LOGON");
                         _isSessionActive = true;
+
+                        // Launch headless collector in the new user session
+                        EnsureHeadlessCollectorRunning();
 
                         // Invalidate cached username -- new user session may be a different user
                         _userSessionInfo.InvalidateCache();
@@ -230,6 +278,12 @@ public class SessionWatcher : BackgroundService
                             Details = new Dictionary<string, object> { ["reason"] = e.Reason.ToString() }
                         });
 
+                        // Desktop is back — clear DesktopUnavailable flag so auto-start retries immediately
+                        _captureManager.ClearDesktopUnavailable();
+
+                        // Ensure headless collector is running in user session
+                        EnsureHeadlessCollectorRunning();
+
                         // Update FocusIntervalSink and InputEventSink username and resume if paused
                         {
                             var reconnectUsername = _userSessionInfo.GetCurrentUsername();
@@ -239,9 +293,19 @@ public class SessionWatcher : BackgroundService
                         {
                             var creds = _credentialStore.Load();
                             var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";
-                            await _commandHandler.ResumeRecordingAsync(baseUrl, CancellationToken.None);
 
+                            // If was in DesktopUnavailable — attempt auto-start directly
                             var svc = GetAgentService();
+                            if (svc?.CurrentState == AgentState.DesktopUnavailable)
+                            {
+                                _logger.LogInformation("Desktop reconnected, auto-starting recording after DesktopUnavailable");
+                                await _commandHandler.AutoStartRecordingAsync(baseUrl, CancellationToken.None);
+                            }
+                            else
+                            {
+                                await _commandHandler.ResumeRecordingAsync(baseUrl, CancellationToken.None);
+                            }
+
                             if (svc != null)
                             {
                                 if (_captureManager.IsRecording)
