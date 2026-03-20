@@ -32,6 +32,7 @@ public class OnboardingService {
     private final UserOAuthLinkRepository linkRepository;
     private final OAuthIdentityRepository identityRepository;
     private final RoleRepository roleRepository;
+    private final TenantMembershipRepository tenantMembershipRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final OAuthService oauthService;
     private final JwtTokenProvider jwtTokenProvider;
@@ -87,46 +88,75 @@ public class OnboardingService {
 
         log.debug("Copied {} system roles from template to tenant {}", newRoles.size(), tenant.getSlug());
 
-        // 5. Create User
+        // 5. Find existing User or create new one
+        String normalizedEmail = identity.getEmail().toLowerCase().trim();
         String firstName = request.getFirstName();
         String lastName = request.getLastName();
         if (firstName == null || firstName.isBlank()) {
             firstName = identity.getName();
         }
 
-        User user = User.builder()
-                .tenant(tenant)
-                .username(identity.getEmail())
-                .email(identity.getEmail())
-                .passwordHash(null)
-                .authProvider("oauth")
-                .firstName(firstName)
-                .lastName(lastName)
-                .isActive(true)
-                .settings(new HashMap<>())
-                .build();
+        Optional<User> existingUser = userRepository.findActiveByEmail(normalizedEmail);
+        User user;
+        boolean isNewUser;
 
-        // 6. Assign OWNER role
-        Role ownerRole = newRoles.get("OWNER");
-        if (ownerRole == null) {
-            // Fallback to TENANT_ADMIN if OWNER role does not exist
-            ownerRole = newRoles.get("TENANT_ADMIN");
-        }
-        if (ownerRole != null) {
-            user.setRoles(Set.of(ownerRole));
-        }
+        if (existingUser.isPresent()) {
+            // User already exists — reuse, add membership to new tenant
+            user = existingUser.get();
+            isNewUser = false;
+            log.info("Existing user found for onboarding: user_id={}, email={}", user.getId(), normalizedEmail);
+        } else {
+            // Create new User
+            user = User.builder()
+                    .tenant(tenant)
+                    .username(normalizedEmail)
+                    .email(normalizedEmail)
+                    .passwordHash(null)
+                    .authProvider("oauth")
+                    .firstName(firstName)
+                    .lastName(lastName)
+                    .isActive(true)
+                    .settings(new HashMap<>())
+                    .build();
 
-        user = userRepository.save(user);
+            // Assign OWNER role to user.roles (legacy compatibility)
+            Role ownerRole = newRoles.get("OWNER");
+            if (ownerRole == null) {
+                ownerRole = newRoles.get("TENANT_ADMIN");
+            }
+            if (ownerRole != null) {
+                user.setRoles(Set.of(ownerRole));
+            }
+
+            user = userRepository.save(user);
+            isNewUser = true;
+        }
 
         MDC.put("user_id", user.getId().toString());
 
-        // 7. Create UserOAuthLink
-        UserOAuthLink link = UserOAuthLink.builder()
+        // 6. Create TenantMembership with OWNER role
+        Role ownerMembershipRole = newRoles.get("OWNER");
+        if (ownerMembershipRole == null) {
+            ownerMembershipRole = newRoles.get("TENANT_ADMIN");
+        }
+        TenantMembership membership = TenantMembership.builder()
                 .user(user)
-                .oauthIdentity(identity)
-                .linkedBy(user)
+                .tenant(tenant)
+                .isActive(true)
+                .isDefault(isNewUser) // default tenant only for new users
+                .roles(ownerMembershipRole != null ? Set.of(ownerMembershipRole) : new HashSet<>())
                 .build();
-        linkRepository.save(link);
+        tenantMembershipRepository.save(membership);
+
+        // 7. Create UserOAuthLink (if not already linked)
+        if (isNewUser || linkRepository.findByUserIdAndOauthIdentityId(user.getId(), identity.getId()).isEmpty()) {
+            UserOAuthLink link = UserOAuthLink.builder()
+                    .user(user)
+                    .oauthIdentity(identity)
+                    .linkedBy(user)
+                    .build();
+            linkRepository.save(link);
+        }
 
         log.info("Onboarding complete: tenant_id={}, user_id={}, oauth_identity_id={}",
                 tenant.getId(), user.getId(), identity.getId());

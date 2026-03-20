@@ -118,11 +118,33 @@ public class AuthService {
 
         loginAttempts.remove(rateLimitKey);
 
-        List<String> roles = user.getRoles().stream().map(r -> r.getCode()).toList();
-        List<String> permissions = user.getRoles().stream()
-                .flatMap(r -> r.getPermissions().stream())
-                .map(p -> p.getCode())
-                .distinct().sorted().toList();
+        // Resolve roles from tenant membership (preferred) or fallback to user.roles
+        var membershipOpt = tenantMembershipRepository
+                .findActiveByUserIdAndTenantId(user.getId(), tenant.getId());
+        List<String> roles;
+        List<String> permissions;
+        List<RoleResponse> roleResponses;
+        if (membershipOpt.isPresent()) {
+            var membership = membershipOpt.get();
+            roles = membership.getRoles().stream().map(r -> r.getCode()).toList();
+            permissions = membership.getRoles().stream()
+                    .flatMap(r -> r.getPermissions().stream())
+                    .map(p -> p.getCode())
+                    .distinct().sorted().toList();
+            roleResponses = membership.getRoles().stream()
+                    .map(r -> RoleResponse.builder().code(r.getCode()).name(r.getName()).build())
+                    .toList();
+        } else {
+            // Fallback for users without membership (legacy)
+            roles = user.getRoles().stream().map(r -> r.getCode()).toList();
+            permissions = user.getRoles().stream()
+                    .flatMap(r -> r.getPermissions().stream())
+                    .map(p -> p.getCode())
+                    .distinct().sorted().toList();
+            roleResponses = user.getRoles().stream()
+                    .map(r -> RoleResponse.builder().code(r.getCode()).name(r.getName()).build())
+                    .toList();
+        }
         List<String> scopes = determineScopesForRoles(roles);
 
         String accessToken = jwtTokenProvider.generateAccessToken(
@@ -147,10 +169,6 @@ public class AuthService {
 
         auditService.logAction(tenant.getId(), user.getId(), "LOGIN", "AUTH", user.getId(),
                 Map.of("roles", roles), ipAddress, userAgent, getCorrelationId());
-
-        List<RoleResponse> roleResponses = user.getRoles().stream()
-                .map(r -> RoleResponse.builder().code(r.getCode()).name(r.getName()).build())
-                .toList();
 
         UserResponse userResponse = UserResponse.builder()
                 .id(user.getId())
@@ -212,11 +230,25 @@ public class AuthService {
             throw new InvalidCredentialsException("Account or tenant is disabled", "ACCOUNT_DISABLED");
         }
 
-        List<String> roles = user.getRoles().stream().map(r -> r.getCode()).toList();
-        List<String> permissions = user.getRoles().stream()
-                .flatMap(r -> r.getPermissions().stream())
-                .map(p -> p.getCode())
-                .distinct().sorted().toList();
+        // Resolve roles from tenant membership (preferred) or fallback to user.roles
+        var refreshMembership = tenantMembershipRepository
+                .findActiveByUserIdAndTenantId(user.getId(), tenantId);
+        List<String> roles;
+        List<String> permissions;
+        if (refreshMembership.isPresent()) {
+            var membership = refreshMembership.get();
+            roles = membership.getRoles().stream().map(r -> r.getCode()).toList();
+            permissions = membership.getRoles().stream()
+                    .flatMap(r -> r.getPermissions().stream())
+                    .map(p -> p.getCode())
+                    .distinct().sorted().toList();
+        } else {
+            roles = user.getRoles().stream().map(r -> r.getCode()).toList();
+            permissions = user.getRoles().stream()
+                    .flatMap(r -> r.getPermissions().stream())
+                    .map(p -> p.getCode())
+                    .distinct().sorted().toList();
+        }
         List<String> scopes = determineScopesForRoles(roles);
 
         String accessToken = jwtTokenProvider.generateAccessToken(

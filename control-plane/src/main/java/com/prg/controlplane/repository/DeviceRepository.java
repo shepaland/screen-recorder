@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -45,4 +46,9 @@ public interface DeviceRepository extends JpaRepository<Device, UUID> {
             @Param("ungrouped") boolean ungrouped,
             @Param("groupIds") List<UUID> groupIds,
             Pageable pageable);
+
+    /** Find devices that are not offline and haven't sent heartbeat since threshold. */
+    @Query("SELECT d FROM Device d WHERE d.status != 'offline' AND d.isDeleted = false " +
+           "AND (d.lastHeartbeatTs IS NULL OR d.lastHeartbeatTs < :threshold)")
+    List<Device> findStaleDevices(@Param("threshold") Instant threshold);
 }
