@@ -261,17 +261,8 @@ public class SessionWatcher : BackgroundService
                             }
                         }
 
-                        // Start recording for the new user session (if autostart + config from server)
+                        // Start recording for the new user session (uses local defaults if server config not yet received)
                         {
-                            var serverCfg = _authManager.ServerConfig;
-                            var configFromServer = serverCfg?.ConfigReceivedFromServer ?? false;
-
-                            if (!configFromServer)
-                            {
-                                _logger.LogInformation("SessionLogon: ServerConfig not confirmed by server, staying Online. " +
-                                    "Heartbeat will deliver config and trigger auto-start if needed.");
-                            }
-                            else
                             {
                                 var creds = _credentialStore.Load();
                                 var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";

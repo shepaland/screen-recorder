@@ -27,6 +27,7 @@ public class CommandHandler
     private DateTime? _sessionStartTime;
     private string _currentBaseUrl = "";
     private bool _isPausedByLock;
+    private readonly SemaphoreSlim _startLock = new(1, 1);
 
     // Crash recovery backoff
     private int _consecutiveFailures;
@@ -89,18 +90,10 @@ public class CommandHandler
 
         var serverCfg = _authManager.ServerConfig;
         var autoStart = serverCfg?.AutoStart ?? _config.Value.AutoStart;
-        var configFromServer = serverCfg?.ConfigReceivedFromServer ?? false;
 
         if (!autoStart)
         {
             _logger.LogInformation("AutoStart is disabled, not resuming after unlock");
-            return;
-        }
-
-        if (!configFromServer)
-        {
-            _logger.LogInformation("ServerConfig not confirmed by server, not resuming after unlock. " +
-                "Heartbeat will deliver config and trigger auto-start if needed.");
             return;
         }
 
@@ -277,6 +270,16 @@ public class CommandHandler
     {
         if (_captureManager.IsRecording) return;
 
+        // Prevent concurrent StartRecording calls (race between AgentService and HeartbeatService)
+        if (!await _startLock.WaitAsync(0, ct))
+        {
+            _logger.LogDebug("StartRecording already in progress, skipping");
+            return;
+        }
+        try
+        {
+        if (_captureManager.IsRecording) return; // double-check under lock
+
         if (!(_authManager.ServerConfig?.RecordingEnabled ?? true))
         {
             _logger.LogInformation("Recording disabled by token policy, ignoring StartRecording");
@@ -331,6 +334,11 @@ public class CommandHandler
                      ?? _config.Value.SessionMaxDurationMin;
         _logger.LogInformation("Recording started: session={Session}, fps={Fps}, res={Res}, maxMin={MaxMin}",
             sessionId, fps, resolution, maxMin);
+        }
+        finally
+        {
+            _startLock.Release();
+        }
     }
 
     /// <summary>

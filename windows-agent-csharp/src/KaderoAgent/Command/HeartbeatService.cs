@@ -140,8 +140,12 @@ public class HeartbeatService : BackgroundService
                 if ((curState == AgentState.Online || curState == AgentState.DesktopUnavailable)
                     && !_captureManager.IsRecording)
                 {
+                    // Auto-start uses local defaults until server provides config.
+                    // ConfigReceivedFromServer no longer blocks auto-start.
                     var serverCfg = _authManager.ServerConfig;
-                    if (serverCfg is { ConfigReceivedFromServer: true, AutoStart: true, RecordingEnabled: true })
+                    var autoStart = serverCfg?.AutoStart ?? _config.Value.AutoStart;
+                    var recordingEnabled = serverCfg?.RecordingEnabled ?? true;
+                    if (autoStart && recordingEnabled)
                     {
                         // Exponential backoff: 0, 30, 60, 120, 300, 600s (max 10 min)
                         var backoffIdx = Math.Min(_autoStartFailures, AutoStartBackoffSeconds.Length - 1);

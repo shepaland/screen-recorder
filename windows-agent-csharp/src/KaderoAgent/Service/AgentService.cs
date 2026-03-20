@@ -108,17 +108,22 @@ public class AgentService : BackgroundService
         var creds = _credentialStore.Load();
         var baseUrl = creds?.ServerUrl?.TrimEnd('/') ?? "";
 
-        // Auto-start: ALWAYS wait for first heartbeat to get fresh config from server.
-        // Never trust saved AutoStart — it may be stale. HeartbeatService will handle
-        // auto-start with exponential backoff after receiving fresh device_settings.
-        _logger.LogInformation("Waiting for first heartbeat to get fresh config before auto-start");
-
         // If user session already active (Service started after user logon) —
-        // launch headless analytics collector in user session
-        if (_sessionWatcher is SessionWatcher sw && sw.IsSessionActive)
+        // launch headless analytics collector and start recording immediately
+        if (_sessionWatcher == null || _sessionWatcher.IsSessionActive)
         {
-            _logger.LogInformation("User session already active, launching headless collector");
-            LaunchHeadlessCollector();
+            if (_sessionWatcher != null)
+            {
+                _logger.LogInformation("User session active, launching headless collector");
+                LaunchHeadlessCollector();
+            }
+
+            // Immediate auto-start with local defaults (60s chunks, 720p, low, 1fps).
+            // No server dependency — HeartbeatService will hot-restart with server params later.
+            _logger.LogInformation("Starting recording immediately with local defaults");
+            await _commandHandler.AutoStartRecordingAsync(baseUrl, ct);
+            if (_captureManager.IsRecording)
+                SetState(AgentState.Recording);
         }
 
         // Pending segments are handled by DataSyncService (reads from SQLite)
