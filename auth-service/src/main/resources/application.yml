@@ -110,6 +110,7 @@ prg:
   email:
     from: ${EMAIL_FROM:otp@shepaland.ru}
     from-name: ${EMAIL_FROM_NAME:Кадеро}
+  invite-url-base: ${INVITE_URL_BASE:https://services-test.shepaland.ru/screenrecorder}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:80}
 

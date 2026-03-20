@@ -80,6 +80,60 @@ public class EmailService {
     }
 
     /**
+     * Send an invitation email to join a tenant.
+     */
+    public void sendInvitation(String to, String tenantName, String inviteLink) {
+        String subject = "Приглашение в " + tenantName + " — Кадеро";
+        String htmlBody = buildInvitationEmailBody(tenantName, inviteLink);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(new InternetAddress(emailConfig.getFrom(), emailConfig.getFromName(), "UTF-8"));
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(htmlBody, true);
+
+            mailSender.send(message);
+            log.info("Invitation email sent to: {}", maskEmail(to));
+        } catch (MessagingException | MailException | UnsupportedEncodingException e) {
+            log.error("Failed to send invitation email to {}: {}", maskEmail(to), e.getMessage());
+            throw new RuntimeException("Email delivery failed", e);
+        }
+    }
+
+    private String buildInvitationEmailBody(String tenantName, String inviteLink) {
+        return """
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+              <div style="text-align: center; margin-bottom: 24px;">
+                <h1 style="font-size: 20px; color: #1a1a1a; margin: 0;">Кадеро</h1>
+              </div>
+
+              <p style="color: #333; font-size: 16px; line-height: 1.5;">
+                Вас пригласили в организацию <strong>%s</strong>.
+              </p>
+
+              <div style="text-align: center; margin: 32px 0;">
+                <a href="%s" style="display: inline-block; background: #dc2626; color: #fff; text-decoration: none; padding: 12px 32px; border-radius: 6px; font-size: 16px; font-weight: 600;">
+                  Принять приглашение
+                </a>
+              </div>
+
+              <p style="color: #666; font-size: 14px; line-height: 1.5;">
+                Ссылка действительна 7 дней. Если вы не ожидали это приглашение, проигнорируйте это письмо.
+              </p>
+
+              <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+
+              <p style="color: #999; font-size: 12px;">
+                Это автоматическое сообщение от платформы Кадеро. Не отвечайте на него.
+              </p>
+            </div>
+            """.formatted(tenantName, inviteLink);
+    }
+
+    /**
      * Mask email for log output: "user@domain.com" -> "us***@domain.com"
      */
     private String maskEmail(String email) {
