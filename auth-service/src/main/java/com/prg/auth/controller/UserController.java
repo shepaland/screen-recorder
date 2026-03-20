@@ -13,6 +13,7 @@ import com.prg.auth.dto.response.UserSettingsResponse;
 import com.prg.auth.exception.AccessDeniedException;
 import com.prg.auth.security.UserPrincipal;
 import com.prg.auth.service.EmailOtpService;
+import com.prg.auth.service.InvitationService;
 import com.prg.auth.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -31,6 +32,7 @@ public class UserController {
 
     private final UserService userService;
     private final EmailOtpService emailOtpService;
+    private final InvitationService invitationService;
 
     @GetMapping
     public ResponseEntity<PageResponse<UserResponse>> getUsers(
@@ -71,6 +73,24 @@ public class UserController {
                 request, principal.getTenantId(), principal,
                 getClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/invite")
+    public ResponseEntity<Void> inviteUser(
+            @RequestBody java.util.Map<String, String> request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        requirePermission(principal, "USERS:CREATE");
+        String email = request.get("email");
+        String roleId = request.get("role_id");
+        if (email == null || email.isBlank()) {
+            throw new com.prg.auth.exception.BadRequestException("Email is required");
+        }
+        invitationService.invite(
+                principal.getTenantId(),
+                email,
+                roleId != null ? UUID.fromString(roleId) : null,
+                principal.getUserId());
+        return ResponseEntity.ok().build();
     }
 
     @PutMapping("/{id}")

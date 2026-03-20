@@ -13,7 +13,6 @@ export default function UserCreatePage() {
   const navigate = useNavigate();
   const { addToast } = useToast();
 
-  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -27,22 +26,19 @@ export default function UserCreatePage() {
   useEffect(() => {
     getRoles({ size: 100 })
       .then((data) => setRoles(data.content))
-      .catch(() => addToast('error', 'Failed to load roles'));
+      .catch(() => addToast('error', 'Не удалось загрузить роли'));
   }, [addToast]);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!username.trim() || username.length < 3) {
-      newErrors.username = 'Username must be at least 3 characters';
-    }
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = 'Valid email is required';
+      newErrors.email = 'Введите корректный email';
     }
     if (!password || password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
+      newErrors.password = 'Пароль должен быть не менее 8 символов';
     } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-      newErrors.password = 'Password must contain uppercase, lowercase, and a digit';
+      newErrors.password = 'Пароль должен содержать заглавную, строчную букву и цифру';
     }
 
     setErrors(newErrors);
@@ -57,7 +53,6 @@ export default function UserCreatePage() {
 
     try {
       await createUser({
-        username: username.trim(),
         email: email.trim(),
         password,
         first_name: firstName.trim() || undefined,
@@ -65,22 +60,20 @@ export default function UserCreatePage() {
         role_ids: selectedRoleIds.length > 0 ? selectedRoleIds : undefined,
       });
 
-      addToast('success', 'User created successfully');
+      addToast('success', 'Пользователь создан');
       navigate('/users');
     } catch (err) {
       if (err instanceof AxiosError) {
         const data = err.response?.data as ErrorResponse | undefined;
         if (err.response?.status === 409) {
-          if (data?.code === 'USERNAME_ALREADY_EXISTS') {
-            setErrors({ username: 'Username is already taken' });
-          } else if (data?.code === 'EMAIL_ALREADY_EXISTS') {
-            setErrors({ email: 'Email is already taken' });
+          if (data?.code === 'EMAIL_ALREADY_EXISTS') {
+            setErrors({ email: 'Этот email уже зарегистрирован в системе' });
           }
         } else {
-          addToast('error', data?.error || 'Failed to create user');
+          addToast('error', data?.error || 'Не удалось создать пользователя');
         }
       } else {
-        addToast('error', 'An unexpected error occurred');
+        addToast('error', 'Произошла ошибка');
       }
     } finally {
       setIsSubmitting(false);
@@ -103,35 +96,17 @@ export default function UserCreatePage() {
           className="flex items-center text-sm text-gray-500 hover:text-gray-700 mb-4"
         >
           <ArrowLeftIcon className="h-4 w-4 mr-1" />
-          Back to Users
+          Назад к пользователям
         </button>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Create User</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Создать пользователя</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Add a new user account to your organization.
+          Добавьте нового пользователя в вашу организацию.
         </p>
       </div>
 
       {/* Form */}
       <div className="card max-w-2xl">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Username */}
-          <div>
-            <label htmlFor="username" className="label">
-              Username *
-            </label>
-            <input
-              id="username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className={`input-field mt-1 ${errors.username ? 'ring-red-300 focus:ring-red-500' : ''}`}
-              placeholder="john.doe"
-            />
-            {errors.username && (
-              <p className="mt-1 text-sm text-red-600">{errors.username}</p>
-            )}
-          </div>
-
           {/* Email */}
           <div>
             <label htmlFor="email" className="label">
@@ -143,7 +118,7 @@ export default function UserCreatePage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className={`input-field mt-1 ${errors.email ? 'ring-red-300 focus:ring-red-500' : ''}`}
-              placeholder="john.doe@company.com"
+              placeholder="user@company.ru"
             />
             {errors.email && (
               <p className="mt-1 text-sm text-red-600">{errors.email}</p>
@@ -153,7 +128,7 @@ export default function UserCreatePage() {
           {/* Password */}
           <div>
             <label htmlFor="password" className="label">
-              Password *
+              Пароль *
             </label>
             <input
               id="password"
@@ -161,7 +136,7 @@ export default function UserCreatePage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className={`input-field mt-1 ${errors.password ? 'ring-red-300 focus:ring-red-500' : ''}`}
-              placeholder="Min 8 chars, uppercase, lowercase, digit"
+              placeholder="Минимум 8 символов, заглавная, строчная, цифра"
             />
             {errors.password && (
               <p className="mt-1 text-sm text-red-600">{errors.password}</p>
@@ -172,7 +147,7 @@ export default function UserCreatePage() {
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div>
               <label htmlFor="firstName" className="label">
-                First Name
+                Имя
               </label>
               <input
                 id="firstName"
@@ -180,12 +155,12 @@ export default function UserCreatePage() {
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 className="input-field mt-1"
-                placeholder="John"
+                placeholder="Иван"
               />
             </div>
             <div>
               <label htmlFor="lastName" className="label">
-                Last Name
+                Фамилия
               </label>
               <input
                 id="lastName"
@@ -193,16 +168,16 @@ export default function UserCreatePage() {
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 className="input-field mt-1"
-                placeholder="Doe"
+                placeholder="Иванов"
               />
             </div>
           </div>
 
           {/* Roles */}
           <div>
-            <label className="label">Roles</label>
+            <label className="label">Роли</label>
             <p className="text-sm text-gray-500 mb-3">
-              Select one or more roles for this user.
+              Выберите одну или несколько ролей для пользователя.
             </p>
             <div className="space-y-2">
               {roles.map((role) => (
@@ -224,7 +199,7 @@ export default function UserCreatePage() {
                   </div>
                   {role.is_system && (
                     <span className="ml-auto inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                      System
+                      Системная
                     </span>
                   )}
                 </label>
@@ -239,11 +214,11 @@ export default function UserCreatePage() {
               onClick={() => navigate('/users')}
               className="btn-secondary"
             >
-              Cancel
+              Отмена
             </button>
             <button type="submit" disabled={isSubmitting} className="btn-primary">
               {isSubmitting && <LoadingSpinner size="sm" className="mr-2" />}
-              {isSubmitting ? 'Creating...' : 'Create User'}
+              {isSubmitting ? 'Создание...' : 'Создать'}
             </button>
           </div>
         </form>

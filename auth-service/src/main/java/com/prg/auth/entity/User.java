@@ -14,15 +14,15 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "users", uniqueConstraints = {
-        @UniqueConstraint(name = "uq_users_tenant_username", columnNames = {"tenant_id", "username"}),
-        @UniqueConstraint(name = "uq_users_tenant_email", columnNames = {"tenant_id", "email"})
+        @UniqueConstraint(name = "uq_users_username_global", columnNames = {"username"}),
+        @UniqueConstraint(name = "uq_users_email_global", columnNames = {"email"})
 })
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(exclude = {"roles"})
-@ToString(exclude = {"roles"})
+@EqualsAndHashCode(exclude = {"roles", "memberships"})
+@ToString(exclude = {"roles", "memberships"})
 public class User {
 
     @Id
@@ -75,6 +75,10 @@ public class User {
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
 
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    @Builder.Default
+    private Set<TenantMembership> memberships = new HashSet<>();
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", nullable = false)
     @Builder.Default
@@ -88,6 +92,7 @@ public class User {
 
     @PrePersist
     protected void onCreate() {
+        normalizeEmailUsername();
         if (createdTs == null) createdTs = Instant.now();
         if (updatedTs == null) updatedTs = Instant.now();
         if (isActive == null) isActive = true;
@@ -99,6 +104,15 @@ public class User {
 
     @PreUpdate
     protected void onUpdate() {
+        normalizeEmailUsername();
         updatedTs = Instant.now();
+    }
+
+    /** Username always equals email, both normalized to lowercase+trim. */
+    private void normalizeEmailUsername() {
+        if (email != null) {
+            email = email.trim().toLowerCase();
+            username = email;
+        }
     }
 }

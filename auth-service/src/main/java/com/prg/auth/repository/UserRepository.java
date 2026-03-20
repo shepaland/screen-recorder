@@ -27,6 +27,18 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     boolean existsByTenantIdAndEmail(UUID tenantId, String email);
 
+    /** Global uniqueness check — username = email, case-insensitive. */
+    boolean existsByEmail(String email);
+
+    /** Find single active user by email (globally unique). */
+    @Query("SELECT u FROM User u JOIN FETCH u.roles r JOIN FETCH r.permissions JOIN FETCH u.tenant t " +
+           "WHERE LOWER(u.email) = LOWER(:email) AND u.isActive = true AND t.isActive = true")
+    Optional<User> findActiveByEmail(@Param("email") String email);
+
+    /** Count active users with this email (should always be 0 or 1). */
+    @Query("SELECT COUNT(u) FROM User u WHERE LOWER(u.email) = LOWER(:email) AND u.isActive = true")
+    long countActiveByEmail(@Param("email") String email);
+
     Page<User> findByTenantId(UUID tenantId, Pageable pageable);
 
     @Query("SELECT u FROM User u WHERE u.tenant.id = :tenantId " +

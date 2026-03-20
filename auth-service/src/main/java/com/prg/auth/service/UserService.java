@@ -80,12 +80,10 @@ public class UserService {
         Tenant tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found", "TENANT_NOT_FOUND"));
 
-        // Check uniqueness
-        if (userRepository.existsByTenantIdAndUsername(tenantId, request.getUsername())) {
-            throw new DuplicateResourceException("Username already exists in this tenant", "USERNAME_ALREADY_EXISTS");
-        }
-        if (userRepository.existsByTenantIdAndEmail(tenantId, request.getEmail())) {
-            throw new DuplicateResourceException("Email already exists in this tenant", "EMAIL_ALREADY_EXISTS");
+        // Check global uniqueness (username = email, globally unique)
+        String normalizedEmail = request.getEmail().trim().toLowerCase();
+        if (userRepository.existsByEmail(normalizedEmail)) {
+            throw new DuplicateResourceException("Email already registered in the system", "EMAIL_ALREADY_EXISTS");
         }
 
         // Resolve roles
@@ -100,8 +98,8 @@ public class UserService {
 
         User user = User.builder()
                 .tenant(tenant)
-                .username(request.getUsername())
-                .email(request.getEmail())
+                .username(normalizedEmail)
+                .email(normalizedEmail)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
@@ -129,12 +127,12 @@ public class UserService {
         Map<String, Object> changes = new HashMap<>();
 
         if (request.getEmail() != null) {
-            if (!request.getEmail().equals(user.getEmail()) &&
-                    userRepository.existsByTenantIdAndEmail(tenantId, request.getEmail())) {
-                throw new DuplicateResourceException("Email already exists in this tenant", "EMAIL_ALREADY_EXISTS");
+            String newEmail = request.getEmail().trim().toLowerCase();
+            if (!newEmail.equals(user.getEmail()) && userRepository.existsByEmail(newEmail)) {
+                throw new DuplicateResourceException("Email already registered in the system", "EMAIL_ALREADY_EXISTS");
             }
-            changes.put("email", request.getEmail());
-            user.setEmail(request.getEmail());
+            changes.put("email", newEmail);
+            user.setEmail(newEmail);  // @PreUpdate will set username = email
         }
         if (request.getFirstName() != null) {
             changes.put("first_name", request.getFirstName());

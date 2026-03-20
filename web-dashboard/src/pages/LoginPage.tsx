@@ -38,7 +38,7 @@ function getErrorMessage(err: unknown): string {
       return 'Слишком много попыток. Попробуйте позже.';
     }
     if (err.response?.status === 401) {
-      return 'Неверное имя пользователя или пароль';
+      return 'Неверный email или пароль';
     }
     if (err.response?.status === 503) {
       return 'Сервис email временно недоступен. Попробуйте позже';
@@ -89,7 +89,7 @@ export default function LoginPage() {
   const handlePasswordLogin = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!username.trim()) { setError('Введите имя пользователя'); return; }
+    if (!username.trim()) { setError('Введите email'); return; }
     if (!password.trim()) { setError('Введите пароль'); return; }
     setIsSubmitting(true);
     try {
@@ -382,18 +382,18 @@ export default function LoginPage() {
         {/* Password login form */}
         <form onSubmit={handlePasswordLogin} className="space-y-4">
           <div>
-            <label htmlFor="username" className="label">Имя пользователя</label>
+            <label htmlFor="username" className="label">Email</label>
             <div className="mt-1">
               <input
                 id="username"
                 name="username"
-                type="text"
-                autoComplete="username"
+                type="email"
+                autoComplete="email"
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="input-field"
-                placeholder="superadmin"
+                placeholder="user@company.ru"
               />
             </div>
           </div>
