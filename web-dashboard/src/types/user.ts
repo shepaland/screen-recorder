@@ -19,7 +19,7 @@ export interface UserResponse {
 }
 
 export interface CreateUserRequest {
-  username: string;
+  username?: string;  // deprecated: auto-set from email
   email: string;
   password: string;
   first_name?: string;

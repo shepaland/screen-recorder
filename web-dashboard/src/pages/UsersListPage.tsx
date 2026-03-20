@@ -74,21 +74,16 @@ export default function UsersListPage() {
 
   const columns: Column<UserResponse>[] = [
     {
-      key: 'username',
-      title: 'Username',
-      sortable: true,
-      render: (user) => (
-        <span className="font-medium text-gray-900">{user.username}</span>
-      ),
-    },
-    {
       key: 'email',
       title: 'Email',
       sortable: true,
+      render: (user) => (
+        <span className="font-medium text-gray-900">{user.email}</span>
+      ),
     },
     {
       key: 'name',
-      title: 'Name',
+      title: 'Имя',
       render: (user) => {
         const name = [user.first_name, user.last_name].filter(Boolean).join(' ');
         return name || '--';
