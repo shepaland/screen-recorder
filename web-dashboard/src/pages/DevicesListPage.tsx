@@ -350,7 +350,7 @@ export default function DevicesListPage() {
   return (
     <div className="flex h-full">
       {/* Desktop sidebar */}
-      <div className="hidden lg:block">
+      <div className="hidden lg:block w-64">
         <DeviceGroupTree
           groups={groups}
           selectedGroupId={selectedGroupId}

@@ -258,7 +258,7 @@ export default function EmployeeListPage() {
   return (
     <div className="flex h-[calc(100vh-4rem)]">
       {/* Desktop sidebar — groups */}
-      <div className="hidden lg:block">
+      <div className="hidden lg:block w-64">
         <EmployeeGroupSidebar
           groups={groups}
           selectedGroupId={selectedGroupId}

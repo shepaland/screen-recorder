@@ -167,7 +167,7 @@ export default function DeviceGroupTree({
   };
 
   return (
-    <div className="w-64 shrink-0 border-r border-gray-200 bg-gray-50 overflow-y-auto">
+    <div className="shrink-0 border-r border-gray-200 bg-gray-50 overflow-y-auto">
       <div className="p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Группы</h3>
