@@ -256,11 +256,11 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Поиск записей</h1>
 
       {/* Search bar */}
-      <div className="flex gap-3 mb-4">
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1">
           <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
@@ -412,11 +412,11 @@ export default function SearchPage() {
               <th className="w-8 px-2 py-3" />
               <th className="px-4 py-3 text-left">Сотрудник</th>
               <th className="px-4 py-3 text-left">Устройство</th>
-              <th className="px-4 py-3 text-left">Сессия</th>
+              <th className="hidden lg:table-cell px-4 py-3 text-left">Сессия</th>
               <th className="px-4 py-3 text-left">Начало</th>
-              <th className="px-4 py-3 text-left">Конец</th>
+              <th className="hidden md:table-cell px-4 py-3 text-left">Конец</th>
               <th className="px-4 py-3 text-right">Сегменты</th>
-              <th className="px-4 py-3 text-right">Размер</th>
+              <th className="hidden sm:table-cell px-4 py-3 text-right">Размер</th>
               <th className="px-4 py-3 text-center">Действия</th>
             </tr>
           </thead>
@@ -550,16 +550,16 @@ function SessionRow({
             <span className="text-[10px] text-red-500">удалено</span>
           )}
         </td>
-        <td className="px-4 py-3">
+        <td className="hidden lg:table-cell px-4 py-3">
           <div className="font-mono text-xs text-gray-500 break-all">{session.id}</div>
           <div className="text-[10px] mt-0.5">{statusLabel(session.status)}</div>
         </td>
         <td className="px-4 py-3 text-xs text-gray-600">{formatDate(session.started_ts)}</td>
-        <td className="px-4 py-3 text-xs text-gray-600">
+        <td className="hidden md:table-cell px-4 py-3 text-xs text-gray-600">
           {session.ended_ts ? formatDate(session.ended_ts) : <span className="text-green-600 font-medium">В процессе</span>}
         </td>
         <td className="px-4 py-3 text-right text-gray-700">{session.segment_count}</td>
-        <td className="px-4 py-3 text-right text-gray-700">{formatBytes(session.total_bytes)}</td>
+        <td className="hidden sm:table-cell px-4 py-3 text-right text-gray-700">{formatBytes(session.total_bytes)}</td>
         <td className="px-4 py-3">
           <div className="flex items-center justify-center gap-1">
             <button
