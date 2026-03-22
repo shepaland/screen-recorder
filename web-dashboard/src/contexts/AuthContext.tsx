@@ -43,9 +43,11 @@ function getTokenExpiry(token: string): number | null {
  */
 function extractAccessTokenFromUrl(): string | null {
   const params = new URLSearchParams(window.location.search);
-  const token = params.get('access_token');
+  const token = params.get('access_token') || params.get('token');
   if (token) {
     params.delete('access_token');
+    params.delete('token');
+    params.delete('verified');
     const newSearch = params.toString();
     const newUrl =
       window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash;

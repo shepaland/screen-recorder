@@ -36,6 +36,12 @@ import SearchPage from './pages/SearchPage';
 import SessionDetailPage from './pages/SessionDetailPage';
 import WebhookSettingsPage from './pages/WebhookSettingsPage';
 import AcceptInvitePage from './pages/AcceptInvitePage';
+import RegisterPage from './pages/RegisterPage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
+import VerifyEmailExpiredPage from './pages/VerifyEmailExpiredPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import ResetPasswordExpiredPage from './pages/ResetPasswordExpiredPage';
 
 function App() {
   return (
@@ -43,6 +49,12 @@ function App() {
       {/* Public routes -- auth pages */}
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
+        <Route path="/verify-email-expired" element={<VerifyEmailExpiredPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+        <Route path="/reset-password-expired" element={<ResetPasswordExpiredPage />} />
       </Route>
 
       {/* Public routes -- OAuth flow (full-screen, no AuthLayout wrapper) */}

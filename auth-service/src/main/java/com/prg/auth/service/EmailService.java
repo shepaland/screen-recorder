@@ -134,6 +134,116 @@ public class EmailService {
     }
 
     /**
+     * Send a verification link email for registration confirmation.
+     */
+    public void sendVerificationLink(String to, String firstName, String verifyLink) {
+        String subject = "Подтвердите регистрацию — Кадеро";
+        String htmlBody = buildVerificationLinkBody(firstName, verifyLink);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(new InternetAddress(emailConfig.getFrom(), emailConfig.getFromName(), "UTF-8"));
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(htmlBody, true);
+
+            mailSender.send(message);
+            log.info("Verification link email sent to: {}", maskEmail(to));
+        } catch (MessagingException | MailException | UnsupportedEncodingException e) {
+            log.error("Failed to send verification link email to {}: {}", maskEmail(to), e.getMessage());
+            throw new RuntimeException("Email delivery failed", e);
+        }
+    }
+
+    private String buildVerificationLinkBody(String firstName, String verifyLink) {
+        String greeting = (firstName != null && !firstName.isBlank())
+                ? "Здравствуйте, " + firstName + "!"
+                : "Здравствуйте!";
+        return """
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+              <div style="text-align: center; margin-bottom: 24px;">
+                <h1 style="font-size: 20px; color: #1a1a1a; margin: 0;">Кадеро</h1>
+              </div>
+
+              <p style="color: #333; font-size: 16px; line-height: 1.5;">
+                %s Для завершения регистрации нажмите кнопку ниже.
+              </p>
+
+              <div style="text-align: center; margin: 32px 0;">
+                <a href="%s" style="display: inline-block; background: #dc2626; color: #fff; text-decoration: none; padding: 12px 32px; border-radius: 6px; font-size: 16px; font-weight: 600;">
+                  Подтвердить email
+                </a>
+              </div>
+
+              <p style="color: #666; font-size: 14px; line-height: 1.5;">
+                Ссылка действительна 24 часа. Если вы не регистрировались, проигнорируйте это письмо.
+              </p>
+
+              <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+
+              <p style="color: #999; font-size: 12px;">
+                Это автоматическое сообщение от платформы Кадеро. Не отвечайте на него.
+              </p>
+            </div>
+            """.formatted(greeting, verifyLink);
+    }
+
+    /**
+     * Send a password reset link email.
+     */
+    public void sendPasswordResetLink(String to, String firstName, String resetLink) {
+        String subject = "Сброс пароля — Кадеро";
+        String greeting = (firstName != null && !firstName.isBlank())
+                ? "Здравствуйте, " + firstName + "!"
+                : "Здравствуйте!";
+        String htmlBody = """
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+              <div style="text-align: center; margin-bottom: 24px;">
+                <h1 style="font-size: 20px; color: #1a1a1a; margin: 0;">Кадеро</h1>
+              </div>
+
+              <p style="color: #333; font-size: 16px; line-height: 1.5;">
+                %s Мы получили запрос на сброс пароля для вашего аккаунта.
+              </p>
+
+              <div style="text-align: center; margin: 32px 0;">
+                <a href="%s" style="display: inline-block; background: #dc2626; color: #fff; text-decoration: none; padding: 12px 32px; border-radius: 6px; font-size: 16px; font-weight: 600;">
+                  Сбросить пароль
+                </a>
+              </div>
+
+              <p style="color: #666; font-size: 14px; line-height: 1.5;">
+                Ссылка действительна 1 час. Если вы не запрашивали сброс пароля, проигнорируйте это письмо.
+              </p>
+
+              <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+
+              <p style="color: #999; font-size: 12px;">
+                Это автоматическое сообщение от платформы Кадеро. Не отвечайте на него.
+              </p>
+            </div>
+            """.formatted(greeting, resetLink);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(new InternetAddress(emailConfig.getFrom(), emailConfig.getFromName(), "UTF-8"));
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(htmlBody, true);
+
+            mailSender.send(message);
+            log.info("Password reset email sent to: {}", maskEmail(to));
+        } catch (MessagingException | MailException | UnsupportedEncodingException e) {
+            log.error("Failed to send password reset email to {}: {}", maskEmail(to), e.getMessage());
+            throw new RuntimeException("Email delivery failed", e);
+        }
+    }
+
+    /**
      * Mask email for log output: "user@domain.com" -> "us***@domain.com"
      */
     private String maskEmail(String email) {

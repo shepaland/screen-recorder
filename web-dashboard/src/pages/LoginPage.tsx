@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type FormEvent, type KeyboardEvent, type ClipboardEvent } from 'react';
-import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { getOAuthLoginUrl, initiateEmailOtp, verifyEmailOtp, resendEmailOtp } from '../api/auth';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -399,7 +399,12 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label htmlFor="password" className="label">Пароль</label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="password" className="label">Пароль</label>
+              <Link to="/forgot-password" className="text-sm text-red-600 hover:text-red-500">
+                Забыли пароль?
+              </Link>
+            </div>
             <div className="mt-1">
               <input
                 id="password"
@@ -444,6 +449,11 @@ export default function LoginPage() {
           </button>
 
         </div>
+
+        <p className="mt-6 text-center text-sm text-gray-500">
+          Нет аккаунта?{' '}
+          <Link to="/register" className="font-semibold text-red-600 hover:text-red-500">Создать</Link>
+        </p>
       </div>
     </div>
   );
