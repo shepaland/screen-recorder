@@ -47,6 +47,7 @@ export default function TenantsPage() {
     {
       key: 'slug',
       title: 'Slug',
+      className: 'hidden sm:table-cell',
       render: (tenant) => (
         <span className="font-mono text-sm text-gray-500">{tenant.slug}</span>
       ),
@@ -66,6 +67,7 @@ export default function TenantsPage() {
     {
       key: 'created_ts',
       title: 'Created',
+      className: 'hidden lg:table-cell',
       render: (tenant) => new Date(tenant.created_ts).toLocaleDateString(),
     },
   ];

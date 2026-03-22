@@ -121,6 +121,7 @@ export default function RecordingSettingsPage() {
     {
       key: 'settings_summary',
       title: 'Настройки записи',
+      className: 'hidden sm:table-cell',
       render: (device) => {
         const s = device.settings as Partial<DeviceSettings> | null;
         const hasSettings = s && Object.keys(s).length > 0;
@@ -141,6 +142,7 @@ export default function RecordingSettingsPage() {
     {
       key: 'segment_duration',
       title: 'Сегмент',
+      className: 'hidden md:table-cell',
       render: (device) => {
         const s = device.settings as Partial<DeviceSettings> | null;
         return (
@@ -153,6 +155,7 @@ export default function RecordingSettingsPage() {
     {
       key: 'session_max',
       title: 'Макс. сессия',
+      className: 'hidden md:table-cell',
       render: (device) => {
         const s = device.settings as Partial<DeviceSettings> | null;
         return (

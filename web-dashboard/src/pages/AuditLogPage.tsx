@@ -99,11 +99,13 @@ export default function AuditLogPage() {
     {
       key: 'resource_type',
       title: 'Resource Type',
+      className: 'hidden md:table-cell',
       render: (log) => log.resource_type,
     },
     {
       key: 'resource_id',
       title: 'Resource ID',
+      className: 'hidden lg:table-cell',
       render: (log) =>
         log.resource_id ? (
           <span className="font-mono text-xs text-gray-500">
@@ -116,6 +118,7 @@ export default function AuditLogPage() {
     {
       key: 'ip_address',
       title: 'IP Address',
+      className: 'hidden sm:table-cell',
       render: (log) => log.ip_address || '--',
     },
   ];

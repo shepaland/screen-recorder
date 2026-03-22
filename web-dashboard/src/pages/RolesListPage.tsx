@@ -93,6 +93,7 @@ export default function RolesListPage() {
     {
       key: 'code',
       title: 'Код',
+      className: 'hidden sm:table-cell',
       render: (role) => (
         <span className="font-mono text-sm font-medium text-gray-900">{role.code}</span>
       ),
@@ -105,6 +106,7 @@ export default function RolesListPage() {
     {
       key: 'is_system',
       title: 'Тип',
+      className: 'hidden md:table-cell',
       render: (role) => (
         <StatusBadge
           active={role.is_system}
