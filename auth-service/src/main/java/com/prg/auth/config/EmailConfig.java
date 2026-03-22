@@ -8,7 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class EmailConfig {
 
     /** From email address */
-    private String from = "otp@shepaland.ru";
+    private String from = "noreply@shepaland.ru";
 
     /** From display name */
     private String fromName = "Кадеро";

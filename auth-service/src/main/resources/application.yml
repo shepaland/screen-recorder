@@ -34,17 +34,18 @@ spring:
 
   mail:
     host: ${SMTP_HOST:sm16.hosting.reg.ru}
-    port: ${SMTP_PORT:465}
-    username: ${SMTP_USERNAME:otp@shepaland.ru}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:noreply@shepaland.ru}
     password: ${SMTP_PASSWORD:}
     properties:
       mail:
         smtp:
           auth: true
           ssl:
-            enable: true
-          starttls:
             enable: false
+          starttls:
+            enable: true
+            required: true
           connectiontimeout: 5000
           timeout: 10000
           writetimeout: 10000
@@ -108,7 +109,7 @@ prg:
     hmac-secret: ${OTP_HMAC_SECRET:dev-only-hmac-secret-not-for-production}
     max-tenants-per-email: 10
   email:
-    from: ${EMAIL_FROM:otp@shepaland.ru}
+    from: ${EMAIL_FROM:noreply@shepaland.ru}
     from-name: ${EMAIL_FROM_NAME:Кадеро}
   invite-url-base: ${INVITE_URL_BASE:https://services-test.shepaland.ru/screenrecorder}
   cors:

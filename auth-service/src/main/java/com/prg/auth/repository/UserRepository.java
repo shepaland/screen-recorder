@@ -31,7 +31,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     boolean existsByEmail(String email);
 
     /** Find single active user by email (globally unique). */
-    @Query("SELECT u FROM User u JOIN FETCH u.roles r JOIN FETCH r.permissions JOIN FETCH u.tenant t " +
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.roles r LEFT JOIN FETCH r.permissions JOIN FETCH u.tenant t " +
            "WHERE LOWER(u.email) = LOWER(:email) AND u.isActive = true AND t.isActive = true")
     Optional<User> findActiveByEmail(@Param("email") String email);
 
