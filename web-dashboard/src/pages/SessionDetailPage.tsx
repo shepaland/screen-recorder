@@ -41,7 +41,7 @@ export default function SessionDetailPage() {
       <h1 className="text-2xl font-bold text-white mb-2">Просмотр записи</h1>
       <p className="text-gray-400 text-sm mb-6 font-mono">{sessionId}</p>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-white/5 rounded-lg p-4">
           <div className="text-gray-400 text-xs uppercase">Сегментов</div>
           <div className="text-white text-xl font-bold">{segments.length}</div>
