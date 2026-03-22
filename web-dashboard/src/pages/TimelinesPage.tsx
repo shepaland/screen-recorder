@@ -92,7 +92,7 @@ export default function TimelinesPage() {
           </button>
 
           <div className="relative">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-700 min-w-[220px] justify-center">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-700 sm:min-w-[220px] justify-center">
               <CalendarIcon className="h-4 w-4 text-gray-400" />
               <span>{formatDateDisplay(date)}</span>
             </div>
