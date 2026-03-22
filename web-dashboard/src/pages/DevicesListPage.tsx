@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
+import { FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import DataTable, { type Column } from '../components/DataTable';
 import DeviceStatusBadge from '../components/DeviceStatusBadge';
 import PermissionGate from '../components/PermissionGate';
@@ -44,6 +45,9 @@ export default function DevicesListPage() {
   // Groups
   const [groups, setGroups] = useState<DeviceGroupResponse[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null); // null=all, 'ungrouped', or UUID
+
+  // Mobile group panel
+  const [groupPanelOpen, setGroupPanelOpen] = useState(false);
 
   // Group dialog
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
@@ -201,6 +205,7 @@ export default function DevicesListPage() {
     {
       key: 'os_version',
       title: 'ОС',
+      className: 'hidden md:table-cell',
       render: (device) => (
         <span className="text-gray-900">{device.os_version || '--'}</span>
       ),
@@ -208,6 +213,7 @@ export default function DevicesListPage() {
     {
       key: 'agent_version',
       title: 'Агент',
+      className: 'hidden lg:table-cell',
       render: (device) => (
         <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-mono text-gray-700">
           {device.agent_version || '--'}
@@ -229,6 +235,7 @@ export default function DevicesListPage() {
     {
       key: 'group',
       title: 'Группа',
+      className: 'hidden md:table-cell',
       render: (device) => (
         <PermissionGate permission="DEVICES:MANAGE" fallback={
           <span className="text-xs text-gray-500">{device.device_group_name || 'Без группы'}</span>
@@ -244,6 +251,7 @@ export default function DevicesListPage() {
     {
       key: 'ip_address',
       title: 'IP',
+      className: 'hidden lg:table-cell',
       render: (device) => (
         <span className="font-mono text-xs text-gray-700">{device.ip_address || '--'}</span>
       ),
@@ -258,6 +266,7 @@ export default function DevicesListPage() {
     {
       key: 'user',
       title: 'Оператор',
+      className: 'hidden sm:table-cell',
       render: (device) => {
         if (!device.user) return <span className="text-gray-400">--</span>;
         return (
@@ -340,30 +349,59 @@ export default function DevicesListPage() {
 
   return (
     <div className="flex h-full">
-      {/* Sidebar with group tree */}
-      <DeviceGroupTree
-        groups={groups}
-        selectedGroupId={selectedGroupId}
-        onSelectAll={() => {
-          setSelectedGroupId(null);
-          setPage(0);
-        }}
-        onSelectGroup={(id) => {
-          setSelectedGroupId(id);
-          setPage(0);
-        }}
-        onSelectUngrouped={() => {
-          setSelectedGroupId('ungrouped');
-          setPage(0);
-        }}
-        onCreateGroup={(parentId) => handleCreateGroup(parentId)}
-        onEditGroup={handleEditGroup}
-        onDeleteGroup={(group) => setDeleteGroupTarget(group)}
-        totalDevices={allDevicesCount}
-      />
+      {/* Desktop sidebar */}
+      <div className="hidden lg:block">
+        <DeviceGroupTree
+          groups={groups}
+          selectedGroupId={selectedGroupId}
+          onSelectAll={() => { setSelectedGroupId(null); setPage(0); }}
+          onSelectGroup={(id) => { setSelectedGroupId(id); setPage(0); setGroupPanelOpen(false); }}
+          onSelectUngrouped={() => { setSelectedGroupId('ungrouped'); setPage(0); }}
+          onCreateGroup={(parentId) => handleCreateGroup(parentId)}
+          onEditGroup={handleEditGroup}
+          onDeleteGroup={(group) => setDeleteGroupTarget(group)}
+          totalDevices={allDevicesCount}
+        />
+      </div>
+
+      {/* Mobile slide-over for groups */}
+      {groupPanelOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="fixed inset-0 bg-gray-600/75" onClick={() => setGroupPanelOpen(false)} />
+          <div className="fixed inset-y-0 left-0 w-72 bg-white shadow-xl z-50 overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold text-gray-900">Группы</h2>
+              <button onClick={() => setGroupPanelOpen(false)} className="p-1 text-gray-400 hover:text-gray-600">
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <DeviceGroupTree
+              groups={groups}
+              selectedGroupId={selectedGroupId}
+              onSelectAll={() => { setSelectedGroupId(null); setPage(0); setGroupPanelOpen(false); }}
+              onSelectGroup={(id) => { setSelectedGroupId(id); setPage(0); setGroupPanelOpen(false); }}
+              onSelectUngrouped={() => { setSelectedGroupId('ungrouped'); setPage(0); setGroupPanelOpen(false); }}
+              onCreateGroup={(parentId) => handleCreateGroup(parentId)}
+              onEditGroup={handleEditGroup}
+              onDeleteGroup={(group) => setDeleteGroupTarget(group)}
+              totalDevices={allDevicesCount}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Main content */}
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
+        {/* Mobile: group filter button */}
+        <div className="lg:hidden mb-4">
+          <button
+            onClick={() => setGroupPanelOpen(true)}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            <FunnelIcon className="h-5 w-5" />
+            Группы {selectedGroupId === 'ungrouped' ? '(Без группы)' : selectedGroupId ? `(${groups.find(g => g.id === selectedGroupId)?.name || '...'})` : '(Все)'}
+          </button>
+        </div>
         {/* Page header */}
         <div className="sm:flex sm:items-center sm:justify-between">
           <div>
