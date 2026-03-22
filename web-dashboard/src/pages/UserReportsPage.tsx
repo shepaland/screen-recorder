@@ -60,18 +60,20 @@ export default function UserReportsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={() => navigate('/archive/employees')}
-          className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
-        >
-          <ArrowLeftIcon className="h-5 w-5" />
-        </button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-gray-900">{displayName}</h1>
-          {displayName !== decodedUsername && (
-            <p className="text-sm text-gray-500">{decodedUsername}</p>
-          )}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex items-center gap-4 flex-1">
+          <button
+            onClick={() => navigate('/archive/employees')}
+            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+          >
+            <ArrowLeftIcon className="h-5 w-5" />
+          </button>
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold text-gray-900">{displayName}</h1>
+            {displayName !== decodedUsername && (
+              <p className="text-sm text-gray-500">{decodedUsername}</p>
+            )}
+          </div>
         </div>
 
         {/* Date controls */}
@@ -105,7 +107,7 @@ export default function UserReportsPage() {
 
       {/* Tabs */}
       <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
+        <nav className="-mb-px flex space-x-2 sm:space-x-8 overflow-x-auto -mx-4 px-4 scrollbar-hide">
           {TABS.map((tab) => (
             <button
               key={tab.id}
