@@ -22,6 +22,8 @@ import {
   ChevronRightIcon,
   UsersIcon,
   CheckCircleIcon,
+  FunnelIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 
 const PAGE_SIZE = 20;
@@ -95,6 +97,9 @@ export default function EmployeeListPage() {
   // Chart date range
   const [dateRange, setDateRange] = useState<DateRange>('7');
   const { from: chartFrom, to: chartTo } = useMemo(() => getDateRange(dateRange), [dateRange]);
+
+  // Mobile group panel
+  const [groupPanelOpen, setGroupPanelOpen] = useState(false);
 
   // Assign to group
   const [assigningUser, setAssigningUser] = useState<string | null>(null);
@@ -252,22 +257,61 @@ export default function EmployeeListPage() {
 
   return (
     <div className="flex h-[calc(100vh-4rem)]">
-      {/* Left sidebar — groups */}
-      <EmployeeGroupSidebar
-        groups={groups}
-        selectedGroupId={selectedGroupId}
-        ungrouped={showUngrouped}
-        onSelectAll={handleSelectAll}
-        onSelectGroup={handleSelectGroup}
-        onSelectUngrouped={handleSelectUngrouped}
-        onCreateGroup={handleCreateGroup}
-        onEditGroup={handleEditGroup}
-        onDeleteGroup={handleDeleteGroup}
-        totalEmployees={totalElements}
-      />
+      {/* Desktop sidebar — groups */}
+      <div className="hidden lg:block">
+        <EmployeeGroupSidebar
+          groups={groups}
+          selectedGroupId={selectedGroupId}
+          ungrouped={showUngrouped}
+          onSelectAll={handleSelectAll}
+          onSelectGroup={(id) => { handleSelectGroup(id); setGroupPanelOpen(false); }}
+          onSelectUngrouped={() => { handleSelectUngrouped(); setGroupPanelOpen(false); }}
+          onCreateGroup={handleCreateGroup}
+          onEditGroup={handleEditGroup}
+          onDeleteGroup={handleDeleteGroup}
+          totalEmployees={totalElements}
+        />
+      </div>
+
+      {/* Mobile slide-over for groups */}
+      {groupPanelOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="fixed inset-0 bg-gray-600/75" onClick={() => setGroupPanelOpen(false)} />
+          <div className="fixed inset-y-0 left-0 w-72 bg-white shadow-xl z-50 overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold text-gray-900">Группы</h2>
+              <button onClick={() => setGroupPanelOpen(false)} className="p-1 text-gray-400 hover:text-gray-600">
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <EmployeeGroupSidebar
+              groups={groups}
+              selectedGroupId={selectedGroupId}
+              ungrouped={showUngrouped}
+              onSelectAll={() => { handleSelectAll(); setGroupPanelOpen(false); }}
+              onSelectGroup={(id) => { handleSelectGroup(id); setGroupPanelOpen(false); }}
+              onSelectUngrouped={() => { handleSelectUngrouped(); setGroupPanelOpen(false); }}
+              onCreateGroup={handleCreateGroup}
+              onEditGroup={handleEditGroup}
+              onDeleteGroup={handleDeleteGroup}
+              totalEmployees={totalElements}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Right panel — table */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+        {/* Mobile: group filter button */}
+        <div className="lg:hidden">
+          <button
+            onClick={() => setGroupPanelOpen(true)}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            <FunnelIcon className="h-5 w-5" />
+            Группы {selectedGroupId ? `(${findGroupName(groups, selectedGroupId)})` : showUngrouped ? '(Неразмеченные)' : '(Все)'}
+          </button>
+        </div>
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -349,7 +393,7 @@ export default function EmployeeListPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <form onSubmit={handleSearch} className="flex-1 max-w-md">
             <div className="relative">
               <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -401,7 +445,7 @@ export default function EmployeeListPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Сотрудник
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Домен
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -413,7 +457,7 @@ export default function EmployeeListPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Статус
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Группа
                   </th>
                 </tr>
@@ -440,7 +484,7 @@ export default function EmployeeListPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {user.windows_domain || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -460,7 +504,7 @@ export default function EmployeeListPage() {
                         {user.is_active ? 'Активен' : 'Неактивен'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {user.groups && user.groups.length > 0 ? (
                           user.groups.map((gn, i) => (
