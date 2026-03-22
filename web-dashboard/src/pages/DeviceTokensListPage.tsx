@@ -289,6 +289,7 @@ export default function DeviceTokensListPage() {
     {
       key: 'expires_at',
       title: 'Срок действия',
+      className: 'hidden lg:table-cell',
       render: (token) => {
         if (!token.expires_at) return <span className="text-gray-500">Бессрочный</span>;
         const isExpired = new Date(token.expires_at) < new Date();
@@ -314,6 +315,7 @@ export default function DeviceTokensListPage() {
     {
       key: 'recording_enabled',
       title: 'Настройки',
+      className: 'hidden md:table-cell',
       render: (token) => {
         const isToggling = togglingRecording.has(token.id);
         return (
@@ -352,6 +354,7 @@ export default function DeviceTokensListPage() {
     {
       key: 'created_by_username',
       title: 'Создал',
+      className: 'hidden sm:table-cell',
       render: (token) => (
         <span className="text-gray-700">{token.created_by_username || '--'}</span>
       ),
