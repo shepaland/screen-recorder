@@ -98,14 +98,24 @@ public class AuthService {
             throw new InvalidCredentialsException("Invalid username or password");
         }
 
-        // Reject password login for OAuth users
-        if ("oauth".equals(user.getAuthProvider())) {
+        // Reject login if email not verified (email-registered users)
+        if ("password".equals(user.getAuthProvider()) && !Boolean.TRUE.equals(user.getEmailVerified())) {
             auditService.logAction(tenant.getId(), user.getId(), "LOGIN_FAILED", "AUTH", null,
-                    Map.of("reason", "oauth_user_password_login"),
+                    Map.of("reason", "email_not_verified"),
                     ipAddress, userAgent, getCorrelationId());
             throw new AccessDeniedException(
-                    "This account uses OAuth authentication. Please log in via OAuth provider.",
-                    "OAUTH_USER_PASSWORD_LOGIN_DENIED");
+                    "Please verify your email before logging in.",
+                    "EMAIL_NOT_VERIFIED");
+        }
+
+        // Reject password login for users without a password set
+        if (!Boolean.TRUE.equals(user.getIsPasswordSet())) {
+            auditService.logAction(tenant.getId(), user.getId(), "LOGIN_FAILED", "AUTH", null,
+                    Map.of("reason", "password_not_set"),
+                    ipAddress, userAgent, getCorrelationId());
+            throw new AccessDeniedException(
+                    "Password not set. Please log in via OAuth or set a password in your profile.",
+                    "PASSWORD_NOT_SET");
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
@@ -169,6 +179,92 @@ public class AuthService {
 
         auditService.logAction(tenant.getId(), user.getId(), "LOGIN", "AUTH", user.getId(),
                 Map.of("roles", roles), ipAddress, userAgent, getCorrelationId());
+
+        UserResponse userResponse = UserResponse.builder()
+                .id(user.getId())
+                .tenantId(tenant.getId())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .authProvider(user.getAuthProvider())
+                .emailVerified(user.getEmailVerified())
+                .isPasswordSet(user.getIsPasswordSet())
+                .roles(roleResponses)
+                .permissions(permissions)
+                .settings(user.getSettings())
+                .build();
+
+        LoginResponse loginResponse = LoginResponse.builder()
+                .accessToken(accessToken)
+                .tokenType("Bearer")
+                .expiresIn(jwtTokenProvider.getAccessTokenTtl())
+                .user(userResponse)
+                .build();
+
+        return AuthResult.<LoginResponse>builder()
+                .response(loginResponse)
+                .rawRefreshToken(rawRefreshToken)
+                .build();
+    }
+
+    /**
+     * Login a verified user without password check (for email verification auto-login).
+     */
+    @Transactional
+    public AuthResult<LoginResponse> loginVerifiedUser(User user, String ipAddress, String userAgent) {
+        Tenant tenant = user.getTenant();
+
+        var membershipOpt = tenantMembershipRepository
+                .findActiveByUserIdAndTenantId(user.getId(), tenant.getId());
+        List<String> roles;
+        List<String> permissions;
+        List<RoleResponse> roleResponses;
+        if (membershipOpt.isPresent()) {
+            var membership = membershipOpt.get();
+            roles = membership.getRoles().stream().map(r -> r.getCode()).toList();
+            permissions = membership.getRoles().stream()
+                    .flatMap(r -> r.getPermissions().stream())
+                    .map(p -> p.getCode())
+                    .distinct().sorted().toList();
+            roleResponses = membership.getRoles().stream()
+                    .map(r -> RoleResponse.builder().code(r.getCode()).name(r.getName()).build())
+                    .toList();
+        } else {
+            roles = user.getRoles() != null ? user.getRoles().stream().map(r -> r.getCode()).toList() : List.of();
+            permissions = user.getRoles() != null ? user.getRoles().stream()
+                    .flatMap(r -> r.getPermissions().stream())
+                    .map(p -> p.getCode())
+                    .distinct().sorted().toList() : List.of();
+            roleResponses = user.getRoles() != null ? user.getRoles().stream()
+                    .map(r -> RoleResponse.builder().code(r.getCode()).name(r.getName()).build())
+                    .toList() : List.of();
+        }
+        List<String> scopes = determineScopesForRoles(roles);
+
+        String accessToken = jwtTokenProvider.generateAccessToken(
+                user.getId(), tenant.getId(), user.getUsername(), user.getEmail(),
+                roles, permissions, scopes);
+
+        String rawRefreshToken = UUID.randomUUID().toString();
+        String tokenHash = sha256(rawRefreshToken);
+
+        RefreshToken refreshToken = RefreshToken.builder()
+                .user(user)
+                .tenantId(tenant.getId())
+                .tokenHash(tokenHash)
+                .deviceInfo(userAgent)
+                .ipAddress(ipAddress)
+                .expiresAt(Instant.now().plusSeconds(jwtConfig.getRefreshTokenTtl()))
+                .isRevoked(false)
+                .build();
+        refreshTokenRepository.save(refreshToken);
+
+        userRepository.updateLastLoginTs(user.getId(), Instant.now());
+
+        auditService.logAction(tenant.getId(), user.getId(), "LOGIN", "AUTH", user.getId(),
+                Map.of("roles", roles, "method", "email_verification"),
+                ipAddress, userAgent, getCorrelationId());
 
         UserResponse userResponse = UserResponse.builder()
                 .id(user.getId())

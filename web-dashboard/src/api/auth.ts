@@ -124,6 +124,50 @@ export async function resendEmailOtp(data: ResendOtpRequest): Promise<InitiateOt
   return response.data;
 }
 
+// --- Email Registration (wizard) ---
+
+export interface RegisterRequestData {
+  email: string;
+  password: string;
+  first_name?: string;
+  last_name?: string;
+  company_name: string;
+}
+
+export async function registerByEmail(data: RegisterRequestData): Promise<{ message: string; email: string }> {
+  const response = await apiClient.post<{ message: string; email: string }>('/auth/register', data);
+  return response.data;
+}
+
+export async function resendVerification(email: string): Promise<{ message: string; resend_available_in: number }> {
+  const response = await apiClient.post<{ message: string; resend_available_in: number }>(
+    '/auth/register/resend-verification',
+    { email }
+  );
+  return response.data;
+}
+
+// --- Password Reset ---
+
+export async function forgotPassword(email: string): Promise<{ message: string }> {
+  const response = await apiClient.post<{ message: string }>('/auth/forgot-password', { email });
+  return response.data;
+}
+
+export async function resetPassword(token: string, password: string): Promise<LoginResponse> {
+  const response = await apiClient.post<LoginResponse>('/auth/reset-password', { token, password });
+  setAccessToken(response.data.access_token);
+  if (response.data.user) {
+    response.data.user = normalizeUser(response.data.user);
+  }
+  return response.data;
+}
+
+export async function resendResetLink(email: string): Promise<{ message: string }> {
+  const response = await apiClient.post<{ message: string }>('/auth/forgot-password/resend', { email });
+  return response.data;
+}
+
 // --- Profile & Password ---
 
 export async function updateMyProfile(data: UpdateProfileRequest): Promise<UpdateProfileResponse> {
